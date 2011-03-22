@@ -15,11 +15,9 @@ import traceback
 import urllib
 import HTMLParser
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../lib'))
-from cros_build_lib import Info
-from cros_build_lib import ReinterpretPathForChroot
-from cros_build_lib import RunCommand
-from cros_build_lib import Warning
+import constants
+sys.path.append(constants.SOURCE_ROOT)
+import chromite.lib.cros_build_lib as cros_lib
 
 _IMAGE_TO_EXTRACT = 'chromiumos_test_image.bin'
 _NEW_STYLE_VERSION = '0.9.131.0'
@@ -63,7 +61,7 @@ def ModifyBootDesc(download_folder, redirect_file=None):
     redirect_file:  For testing.  Where to copy new boot desc.
   """
   boot_desc_path = os.path.join(download_folder, 'boot.desc')
-  in_chroot_folder = ReinterpretPathForChroot(download_folder)
+  in_chroot_folder = cros_lib.ReinterpretPathForChroot(download_folder)
 
   for line in fileinput.input(boot_desc_path, inplace=1):
     # Has to be done here to get changes to sys.stdout from fileinput.input.
@@ -78,13 +76,13 @@ def ModifyBootDesc(download_folder, redirect_file=None):
         new_path = os.path.join(in_chroot_folder,
                                 os.path.basename(potential_path))
         new_line = '%s="%s"' % (var_part, new_path)
-        Info('Replacing line %s with %s' % (line, new_line))
+        cros_lib.Info('Replacing line %s with %s' % (line, new_line))
         redirect_file.write('%s\n' % new_line)
         continue
       elif 'output_dir' in var_part:
         # Special case for output_dir.
         new_line = '%s="%s"' % (var_part, in_chroot_folder)
-        Info('Replacing line %s with %s' % (line, new_line))
+        cros_lib.Info('Replacing line %s with %s' % (line, new_line))
         redirect_file.write('%s\n' % new_line)
         continue
 
@@ -142,36 +140,20 @@ def GetNewestLinkFromZipBase(board, channel, zip_server_base):
   return os.path.join(zip_dir, zip_name)
 
 
-def GetLatestZipUrl(board, channel, latest_url_base, zip_server_base):
+def GetLatestZipUrl(board, channel, zip_server_base):
   """Returns the url of the latest image zip for the given arguments.
+
+  If the latest does not exist, tries to find the rc equivalent.
 
   Args:
     board: board for the image zip.
     channel: channel for the image zip.
-    latest_url_base: base url for latest links.
     zip_server_base:  base url for zipped images.
   """
-  if latest_url_base:
-    try:
-      # Grab the latest image info.
-      latest_file_url = os.path.join(latest_url_base, channel,
-                                   'LATEST-%s' % board)
-      latest_image_file = urllib.urlopen(latest_file_url)
-      latest_image = latest_image_file.read()
-      latest_image_file.close()
-      # Convert bin.gz into zip.
-      latest_image = latest_image.replace('.bin.gz', '.zip')
-      version = latest_image.split('-')[1]
-      zip_base = os.path.join(zip_server_base, channel, board)
-      return os.path.join(zip_base, version, latest_image)
-    except IOError:
-      Warning(('Could not use latest link provided, defaulting to parsing'
-               ' latest from zip url base.'))
-
   try:
     return GetNewestLinkFromZipBase(board, channel, zip_server_base)
   except:
-    Warning('Failed to get url from standard zip base.  Trying rc.')
+    cros_lib.Warning('Failed to get url from standard zip base.  Trying rc.')
     return GetNewestLinkFromZipBase(board + '-rc', channel, zip_server_base)
 
 
@@ -195,19 +177,19 @@ def GrabZipAndExtractImage(zip_url, download_folder, image_name) :
 
     if version_url == zip_url and os.path.exists(os.path.join(download_folder,
                                                  image_name)):
-      Info('Using cached %s' % image_name)
+      cros_lib.Info('Using cached %s' % image_name)
       found_cached = True
 
   if not found_cached:
-    Info('Downloading %s' % zip_url)
-    RunCommand(['rm', '-rf', download_folder], print_cmd=False)
+    cros_lib.Info('Downloading %s' % zip_url)
+    cros_lib.RunCommand(['rm', '-rf', download_folder], print_cmd=False)
     os.mkdir(download_folder)
     urllib.urlretrieve(zip_url, zip_path)
 
     # Using unzip because python implemented unzip in native python so
     # extraction is really slow.
-    Info('Unzipping image %s' % image_name)
-    RunCommand(['unzip', '-d', download_folder, zip_path],
+    cros_lib.Info('Unzipping image %s' % image_name)
+    cros_lib.RunCommand(['unzip', '-d', download_folder, zip_path],
                print_cmd=False, error_message='Failed to download %s' % zip_url)
 
     ModifyBootDesc(download_folder)
@@ -225,7 +207,7 @@ def GrabZipAndExtractImage(zip_url, download_folder, image_name) :
     fh.close()
 
 
-def RunAUTestHarness(board, channel, latest_url_base, zip_server_base,
+def RunAUTestHarness(board, channel, zip_server_base,
                      no_graphics, type, remote, clean, test_results_root):
   """Runs the auto update test harness.
 
@@ -237,7 +219,6 @@ def RunAUTestHarness(board, channel, latest_url_base, zip_server_base,
   Args:
     board: the board for the latest image.
     channel: the channel to run the au test harness against.
-    latest_url_base: base url for getting latest links.
     zip_server_base:  base url for zipped images.
     no_graphics: boolean - If True, disable graphics during vm test.
     type: which test harness to run.  Possible values: real, vm.
@@ -245,15 +226,17 @@ def RunAUTestHarness(board, channel, latest_url_base, zip_server_base,
     clean: Clean the state of test harness before running.
     test_results_root: Root directory to store au_test_harness results.
   """
-  crosutils_root = os.path.join(os.path.dirname(__file__), '..')
+  crosutils_root = os.path.join(constants.SOURCE_ROOT, 'src', 'scripts')
   download_folder = os.path.abspath('latest_download')
-  zip_url = GetLatestZipUrl(board, channel, latest_url_base, zip_server_base)
+  zip_url = GetLatestZipUrl(board, channel, zip_server_base)
   GrabZipAndExtractImage(zip_url, download_folder, _IMAGE_TO_EXTRACT)
 
   # Tests go here.
-  latest_image = RunCommand(['./get_latest_image.sh', '--board=%s' % board],
-                            cwd=crosutils_root, redirect_stdout=True,
-                            print_cmd=True).strip()
+  return_object = cros_lib.RunCommand(
+      ['./get_latest_image.sh', '--board=%s' % board], cwd=crosutils_root,
+      redirect_stdout=True, print_cmd=True)
+
+  latest_image = return_object.output.strip()
 
   update_engine_path = os.path.join(crosutils_root, '..', 'platform',
                                     'update_engine')
@@ -275,7 +258,7 @@ def RunAUTestHarness(board, channel, latest_url_base, zip_server_base,
   if no_graphics: cmd.append('--no_graphics')
   if clean: cmd.append('--clean')
 
-  RunCommand(cmd, cwd=crosutils_root)
+  cros_lib.RunCommand(cmd, cwd=crosutils_root)
 
 
 def main():
@@ -286,8 +269,6 @@ def main():
                     help='channel for the image to compare against.')
   parser.add_option('--cache', default=False, action='store_true',
                     help='Cache payloads')
-  parser.add_option('-l', '--latestbase',
-                    help='Base url for latest links.')
   parser.add_option('-z', '--zipbase',
                     help='Base url for hosted images.')
   parser.add_option('--no_graphics', action='store_true', default=False,
@@ -309,10 +290,9 @@ def main():
   if not options.channel: parser.error('Need channel e.g. dev-channel.')
   if not options.zipbase: parser.error('Need zip url base to get images.')
 
-  RunAUTestHarness(options.board, options.channel, options.latestbase,
-                   options.zipbase, options.no_graphics, options.type,
-                   options.remote, not options.cache,
-                   options.test_results_root)
+  RunAUTestHarness(options.board, options.channel, options.zipbase,
+                   options.no_graphics, options.type, options.remote,
+                   not options.cache, options.test_results_root)
 
 
 if __name__ == '__main__':

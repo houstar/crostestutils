@@ -18,7 +18,9 @@ import re
 import sys
 import unittest
 
-sys.path.append(os.path.join(os.path.dirname(__file__), '../lib'))
+# TODO(sosa): Migrate to chromite cros_build_lib.
+import constants
+sys.path.append(constants.CROSUTILS_LIB_DIR)
 import cros_build_lib as cros_lib
 
 import au_test

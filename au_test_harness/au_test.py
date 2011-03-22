@@ -116,8 +116,8 @@ class AUTest(unittest.TestCase):
     """
     unittest.TestCase.setUp(self)
     self.worker = self.worker_class(self.options, AUTest.test_results_root)
-    self.crosutils = os.path.join(os.path.dirname(__file__), '..', '..')
-    self.download_folder = os.path.join(self.crosutils, 'latest_download')
+    self.download_folder = os.path.join(os.path.realpath(os.path.curdir),
+                                        'latest_download')
     if not os.path.exists(self.download_folder):
       os.makedirs(self.download_folder)
 

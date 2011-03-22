@@ -41,8 +41,8 @@ class AUWorker(object):
       self.verify_suite = 'suite_Smoke'
 
     # Set these up as they are used often.
-    self.crosutils = os.path.join(os.path.dirname(__file__), '..', '..')
-    self.crosutilsbin = os.path.join(os.path.dirname(__file__), '..')
+    self.crosutils = cros_lib.CROSUTILS_DIRECTORY
+    self.crosutilsbin = os.path.join(self.crosutils, 'bin')
 
   def CleanUp(self):
     """Called at the end of every test."""
