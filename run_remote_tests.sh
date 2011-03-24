@@ -14,6 +14,9 @@
 
 DEFINE_string args "" \
     "Command line arguments for test. Quoted and space separated if multiple." a
+DEFINE_string autotest_dir "" \
+    "Skip autodetection of autotest and use the specified location (must be in \
+chroot)."
 DEFINE_string board "" \
     "The board for which you are building autotest"
 DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
@@ -196,7 +199,19 @@ function main() {
   start_ssh_agent
 
   learn_board
-  autodetect_build
+  if [[ -n "${FLAGS_autotest_dir}" ]]; then
+    if [ ! -d "${FLAGS_autotest_dir}" ]; then
+      die \
+"Could not find the specified Autotest directory. Make sure the specified path \
+exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
+    fi
+    AUTOTEST_DIR=$(readlink -f "${FLAGS_autotest_dir}")
+    FLAGS_build=${FLAGS_FALSE}
+    info \
+"As requested, using the specified Autotest directory at ${AUTOTEST_DIR}."
+  else
+    autodetect_build
+  fi
 
   local control_files_to_run=""
   local chrome_autotests="${CHROME_ROOT}/src/chrome/test/chromeos/autotest/files"
