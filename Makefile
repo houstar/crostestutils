@@ -7,6 +7,9 @@ all: test_scripts
 test_scripts:
 	@echo "Preparing test scripts."
 
-install: test_scripts
-	@echo "Test files installed."
+install:
+	mkdir -p ${DESTDIR}/usr/bin
+	mkdir -p ${DESTDIR}/usr/share/crostestutils
+	install -m 0755 cros_run_unit_tests ${DESTDIR}/usr/bin
+	install -m 0644 unit_test_black_list.txt ${DESTDIR}/usr/share/crostestutils
 

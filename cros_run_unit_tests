@@ -75,11 +75,12 @@ fi
 
 # If we didn't specify packages, find all packages.
 if [ -z "${FLAGS_package_file}" -a -z "${FLAGS_packages}" ]; then
-  PACKAGE_LIST=$( ./get_package_list chromeos --board="${FLAGS_board}" |
-                  egrep '^chromeos-base' )
+  PACKAGE_LIST=$( /usr/lib/crosutils/get_package_list chromeos \
+                    --board="${FLAGS_board}" |
+                      egrep '^chromeos-base' )
 fi
 
-BLACK_LIST_FILE="${SCRIPTS_DIR}/unit_test_black_list.txt"
+BLACK_LIST_FILE="/usr/share/crostestutils/unit_test_black_list.txt"
 
 if [ "${FLAGS_withdebug}" -eq "${FLAGS_FALSE}" ]; then
   export USE="${USE} -cros-debug"
