@@ -207,6 +207,21 @@ def GrabZipAndExtractImage(zip_url, download_folder, image_name) :
     fh.close()
 
 
+def GeneratePublicKey(private_key_path):
+  """Returns the path to a newly generated public key from given private key."""
+  # Just output to local directory.
+  public_key_path = 'public_key.pem'
+  cros_lib.Info('Generating public key from private key.')
+  cros_lib.RunCommand(['/usr/bin/openssl',
+                       'rsa',
+                       '-in', private_key_path,
+                       '-pubout',
+                       '-out', public_key_path,
+                      ], print_cmd=False)
+  return public_key_path
+
+
+
 def RunAUTestHarness(board, channel, zip_server_base,
                      no_graphics, type, remote, clean, test_results_root):
   """Runs the auto update test harness.
@@ -241,6 +256,9 @@ def RunAUTestHarness(board, channel, zip_server_base,
   update_engine_path = os.path.join(crosutils_root, '..', 'platform',
                                     'update_engine')
 
+  private_key_path = os.path.join(update_engine_path, 'unittest_key.pem')
+  public_key_path = GeneratePublicKey(private_key_path)
+
   cmd = ['bin/cros_au_test_harness',
          '--base_image=%s' % os.path.join(download_folder,
                                           _IMAGE_TO_EXTRACT),
@@ -249,10 +267,8 @@ def RunAUTestHarness(board, channel, zip_server_base,
          '--board=%s' % board,
          '--type=%s' % type,
          '--remote=%s' % remote,
-         '--private_key=%s' % os.path.join(update_engine_path,
-                                           'unittest_key.pem'),
-         '--public_key=%s' % os.path.join(update_engine_path,
-                                          'unittest_key.pub.pem'),
+         '--private_key=%s' % private_key_path,
+         '--public_key=%s' % public_key_path,
          ]
   if test_results_root: cmd.append('--test_results_root=%s' % test_results_root)
   if no_graphics: cmd.append('--no_graphics')
