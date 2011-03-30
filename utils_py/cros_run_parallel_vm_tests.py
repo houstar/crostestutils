@@ -71,7 +71,9 @@ class ParallelTestRunner(object):
     ssh_port = self._base_ssh_port
     spawned_tests = []
     for test in self._tests:
-      args = [ 'cros_run_vm_test',
+      # TODO(sosa): Fix when called from /usr/bin inside the chroot.
+      args = [ os.path.join(os.path.dirname(os.path.realpath(__file__)),
+                                            '../cros_run_vm_test'),
                '--snapshot', # The image is shared so don't modify it.
                '--no_graphics',
                '--use_emerged',

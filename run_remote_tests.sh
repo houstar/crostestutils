@@ -4,10 +4,13 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# This can only run inside the chroot.
-CROSUTILS=/usr/lib/crosutils
-. "${CROSUTILS}/common.sh" || exit 1
-. "${CROSUTILS}/remote_access.sh" || die "Unable to load remote_access.sh"
+# Script to run client or server tests on a live remote image.
+. $(dirname "$(readlink -f "$0")")/outside_chroot_common.sh 2> /dev/null ||
+  SCRIPT_ROOT=/usr/lib/crosutils
+. "${SCRIPT_ROOT}/common.sh" ||
+  (echo "Unable to load common.sh" && false) ||
+  exit 1
+. "${SCRIPT_ROOT}/remote_access.sh" || die "Unable to load remote_access.sh"
 
 DEFINE_string args "" \
     "Command line arguments for test. Quoted and space separated if multiple." a
@@ -17,6 +20,7 @@ chroot)."
 DEFINE_string board "" \
     "The board for which you are building autotest"
 DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
+DEFINE_string chroot "${DEFAULT_CHROOT_DIR}" "alternate chroot location" c
 DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
 DEFINE_integer iterations 1 "Iterations to run every top level test" i
 DEFINE_string results_dir_root "" "alternate root results directory"
@@ -322,9 +326,10 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
 
   echo ""
   info "Test results:"
-  generate_test_report "${TMP}" --strip="${TMP}/"
+  ./generate_test_report "${TMP}" --strip="${TMP}/"
 
   print_time_elapsed
 }
 
+restart_in_chroot_if_needed "$@"
 main "$@"
