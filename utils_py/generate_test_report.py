@@ -28,19 +28,19 @@ _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 # filed for the crash.
 _CRASH_WHITELIST = {}
 
-class ReportGenerator(object):
-  """Collects and displays data from autoserv results directories.
 
-  This class collects status and performance data from one or more autoserv
-  result directories and generates test reports.
-  """
+class ResultCollector(object):
+  """Collects status and performance data from an autoserv results directory."""
 
-  _KEYVAL_INDENT = 2
+  def __init__(self, collect_perf=True, strip_text=''):
+    """Initialize ResultsCollector class.
 
-  def __init__(self, options, args):
-    self._options = options
-    self._args = args
-    self._color = Color(options.color)
+    Args:
+      collect_perf: Should perf keyvals be collected?
+      strip_text: Prefix to strip from test directory names.
+    """
+    self._collect_perf = collect_perf
+    self._strip_text = strip_text
 
   def _CollectPerf(self, testdir):
     """Parses keyval file under testdir.
@@ -58,7 +58,7 @@ class ReportGenerator(object):
     """
 
     perf = {}
-    if not self._options.perf:
+    if not self._collect_perf:
       return perf
 
     keyval_file = os.path.join(testdir, 'results', 'keyval')
@@ -86,7 +86,7 @@ class ReportGenerator(object):
 
     return perf
 
-  def _CollectResult(self, testdir):
+  def _CollectResult(self, testdir, results):
     """Adds results stored under testdir to the self._results dictionary.
 
     If testdir contains 'status.log' or 'status' files, assume it's a test
@@ -95,6 +95,7 @@ class ReportGenerator(object):
 
     Args:
       testdir: The autoserv test result directory.
+      results: Results dictionary to store results in.
     """
 
     status_file = os.path.join(testdir, 'status.log')
@@ -102,10 +103,6 @@ class ReportGenerator(object):
       status_file = os.path.join(testdir, 'status')
       if not os.path.isfile(status_file):
         return
-
-    # Remove false positives that are missing a debug dir.
-    if not os.path.exists(os.path.join(testdir, 'debug')):
-      return
 
     status_raw = open(status_file, 'r').read()
     status = 'FAIL'
@@ -115,8 +112,8 @@ class ReportGenerator(object):
 
     perf = self._CollectPerf(testdir)
 
-    if testdir.startswith(self._options.strip):
-      testdir = testdir.replace(self._options.strip, '', 1)
+    if testdir.startswith(self._strip_text):
+      testdir = testdir.replace(self._strip_text, '', 1)
 
     crashes = []
     regex = re.compile('Received crash notification for ([-\w]+).+ (sig \d+)')
@@ -126,20 +123,41 @@ class ReportGenerator(object):
         continue
       crashes.append('%s %s' % match.groups())
 
-    self._results[testdir] = {'crashes': crashes,
-                              'status': status,
-                              'perf': perf}
+    results[testdir] = {'crashes': crashes, 'status': status, 'perf': perf}
 
-  def _CollectResultsRec(self, resdir):
-    """Recursively collect results into the self._results dictionary.
+  def CollectResults(self, resdir):
+    """Recursively collect results into a dictionary.
 
     Args:
       resdir: results/test directory to parse results from and recurse into.
-    """
 
-    self._CollectResult(resdir)
+    Returns:
+      Dictionary of results.
+    """
+    results = {}
+    self._CollectResult(resdir, results)
     for testdir in glob.glob(os.path.join(resdir, '*')):
-      self._CollectResultsRec(testdir)
+      # Remove false positives that are missing a debug dir.
+      if not os.path.exists(os.path.join(testdir, 'debug')):
+        continue
+
+      results.update(self.CollectResults(testdir))
+    return results
+
+
+class ReportGenerator(object):
+  """Collects and displays data from autoserv results directories.
+
+  This class collects status and performance data from one or more autoserv
+  result directories and generates test reports.
+  """
+
+  _KEYVAL_INDENT = 2
+
+  def __init__(self, options, args):
+    self._options = options
+    self._args = args
+    self._color = Color(options.color)
 
   def _CollectResults(self):
     """Parses results into the self._results dictionary.
@@ -148,15 +166,16 @@ class ReportGenerator(object):
     result data (status, perf keyvals) as values.
     """
     self._results = {}
+    collector = ResultCollector(self._options.perf, self._options.strip)
     for resdir in self._args:
       if not os.path.isdir(resdir):
         Die('\'%s\' does not exist' % resdir)
-      self._CollectResultsRec(resdir)
+      self._results.update(collector.CollectResults(resdir))
 
     if not self._results:
       Die('no test directories found')
 
-  def GetTestColumnWidth(self):
+  def _GetTestColumnWidth(self):
     """Returns the test column width based on the test data.
 
     Aligns the test results by formatting the test directory entry based on
@@ -187,7 +206,7 @@ class ReportGenerator(object):
 
     tests_with_errors = []
 
-    width = self.GetTestColumnWidth()
+    width = self._GetTestColumnWidth()
     line = ''.ljust(width + 5, '-')
 
     crashes = {}
@@ -257,7 +276,7 @@ class ReportGenerator(object):
     if self._options.print_debug:
       for test in tests_with_errors:
         debug_file_regex = os.path.join(self._options.strip, test, 'debug',
-                                       '%s*.ERROR' % os.path.basename(test))
+                                        '%s*.ERROR' % os.path.basename(test))
         for path in glob.glob(debug_file_regex):
           try:
             fh = open(path)
