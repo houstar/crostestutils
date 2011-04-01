@@ -6,11 +6,8 @@
 #
 # Updates an existing vm image with another image.
 
-. $(dirname "$(readlink -f "$0")")/outside_chroot_common.sh 2> /dev/null ||
-  SCRIPT_ROOT=/usr/lib/crosutils
-. "${SCRIPT_ROOT}/common.sh" ||
-  (echo "Unable to load common.sh" && false) ||
-  exit 1
+. $(dirname "$(readlink -f "$0")")/outside_chroot_common.sh || exit 1
+. "${SCRIPT_ROOT}/common.sh" || exit 1
 . "${SCRIPT_ROOT}/lib/cros_vm_lib.sh" || die "Unable to load cros_vm_lib.sh"
 
 DEFINE_string payload "" "Full name of the payload to update with."
@@ -50,7 +47,7 @@ if [ -n "${FLAGS_proxy_port}" ]; then
   IMAGE_ARGS="${IMAGE_ARGS} --proxy_port=${FLAGS_proxy_port}"
 fi
 
-"${SCRIPTS_DIR}/image_to_live.sh" \
+"${SCRIPT_ROOT}/image_to_live.sh" \
   --for_vm \
   --remote=127.0.0.1 \
   --ssh_port=${FLAGS_ssh_port} \

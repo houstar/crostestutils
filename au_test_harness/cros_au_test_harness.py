@@ -53,9 +53,7 @@ def _PregenerateUpdates(options):
   """
   def _GenerateVMUpdate(target, src, private_key_path):
     """Generates an update using the devserver."""
-    command = ['./enter_chroot.sh',
-               '--',
-               'sudo',
+    command = ['sudo',
                'start_devserver',
                '--pregenerate_update',
                '--exit',
@@ -70,7 +68,9 @@ def _PregenerateUpdates(options):
                      cros_lib.ReinterpretPathForChroot(private_key_path))
 
     return cros_lib.RunCommandCaptureOutput(command, combine_stdout_stderr=True,
-                                            print_cmd=True)
+                                            enter_chroot=True,
+                                            print_cmd=True,
+                                            cwd=cros_lib.GetCrosUtilsPath())
 
   # Use dummy class to mock out updates that would be run as part of a test.
   test_suite = _PrepareTestSuite(options, use_dummy_worker=True)
@@ -168,7 +168,8 @@ def _CleanPreviousWork(options):
   # Wipe devserver cache.
   cros_lib.RunCommandCaptureOutput(
       ['sudo', 'start_devserver', '--clear_cache', '--exit', ],
-      enter_chroot=True, print_cmd=False, combine_stdout_stderr=True)
+      enter_chroot=True, print_cmd=False, combine_stdout_stderr=True,
+      cwd=cros_lib.GetCrosUtilsPath())
 
   # Clean previous vm images if they exist.
   if options.type == 'vm':

@@ -88,4 +88,4 @@ class PublicKeyManager(object):
                          cros_lib.ReinterpretPathForChroot(from_dir),
                          image], print_cmd=False, redirect_stdout=True,
                         redirect_stderr=True, enter_chroot=True,
-                        cwd=cros_lib.CROSUTILS_DIRECTORY)
+                        cwd=cros_lib.GetCrosUtilsPath())

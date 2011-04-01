@@ -36,7 +36,8 @@ class DevServerWrapper(threading.Thread):
                          '--production',
                          ], enter_chroot=True, print_cmd=False,
                          log_to_file=os.path.join(self.test_root,
-                                                  'dev_server.log'))
+                                                  'dev_server.log'),
+                         cwd=cros_lib.GetCrosUtilsPath())
 
   def Stop(self):
     """Kills the devserver instance."""

@@ -53,11 +53,12 @@ class RealAUWorker(au_worker.AUWorker):
     """Verifies an image using run_remote_tests.sh with verification suite."""
     test_directory = self.GetNextResultsPath('verify')
     output = cros_lib.RunCommand(
-        ['%s/run_remote_tests.sh' % self.crosutils,
+        ['run_remote_tests.sh',
          '--remote=%s' % self.remote,
          '--results_dir_root=%s' % test_directory,
          self.verify_suite,
-        ], error_ok=True, enter_chroot=False, redirect_stdout=True)
+        ], error_ok=True, enter_chroot=True, redirect_stdout=True,
+        cwd=self.crosutils)
     return self.AssertEnoughTestsPassed(unittest, output,
                                         percent_required_to_pass)
 

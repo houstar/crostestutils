@@ -13,17 +13,12 @@ install:
 	mkdir -p "${DESTDIR}/usr/share/crostestutils"
 	install -m 0644 lib/constants.py "${DESTDIR}/usr/lib/crostestutils"
 	install -m 0755 cros_run_unit_tests "${DESTDIR}/usr/bin"
-	install -m 0755 cros_run_vm_test ${DESTDIR}/usr/bin
 	install -m 0755 run_remote_tests.sh ${DESTDIR}/usr/bin
 	install -m 0644 unit_test_black_list.txt \
 		"${DESTDIR}/usr/share/crostestutils"
-	install -m 0755 utils_py/cros_run_parallel_vm_tests.py \
-		"${DESTDIR}/usr/lib/crostestutils"
 	install -m 0755 utils_py/generate_test_report.py \
 		"${DESTDIR}/usr/lib/crostestutils"
 
 	# Make symlinks for those python files in lib.
-	ln -s "${DESTDIR}/usr/lib/crostestutils/cros_run_parallel_vm_tests.py" \
-		"${DESTDIR}/usr/bin/cros_run_parallel_vm_tests"
 	ln -s "${DESTDIR}/usr/lib/crostestutils/generate_test_report.py" \
 		"${DESTDIR}/usr/bin/generate_test_report"

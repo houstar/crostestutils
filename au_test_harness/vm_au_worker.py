@@ -103,7 +103,7 @@ class VMAUWorker(au_worker.AUWorker):
     (_, _, log_directory_in_chroot) = log_directory.rpartition('chroot')
     # image_to_live already verifies lsb-release matching.  This is just
     # for additional steps.
-    commandWithArgs = ['%s/cros_run_vm_test' % self.crosutilsbin,
+    commandWithArgs = ['./cros_run_vm_test',
                        '--image_path=%s' % self.vm_image_path,
                        '--snapshot',
                        '--persist',
@@ -114,7 +114,8 @@ class VMAUWorker(au_worker.AUWorker):
                       ]
     if self.graphics_flag: commandWithArgs.append(self.graphics_flag)
     output = cros_lib.RunCommand(commandWithArgs, error_ok=True,
-                                 enter_chroot=False, redirect_stdout=True)
+                                 enter_chroot=False, redirect_stdout=True,
+                                 cwd=self.crosutilsbin)
     return self.AssertEnoughTestsPassed(unittest, output,
                                         percent_required_to_pass)
 
