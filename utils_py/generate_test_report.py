@@ -30,8 +30,8 @@ _CRASH_WHITELIST = {
   # TODO(dalecurtis): Remove once http://crosbug.com/13678 is fixed.
   'chromeos-wm': ['sig 6'],
 
-  # TODO(dalecurtis): Remove once http://crosbug.com/13753 is fixed.
-  'SynTPEnh': ['sig 6']
+  # TODO(dalecurtis): Remove once http://crosbug.com/13377 is fixed.
+  'SynTPEnh': ['sig 6', 'sig 11']
 }
 
 
