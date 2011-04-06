@@ -22,6 +22,11 @@ import chromite.lib.cros_build_lib as cros_lib
 _IMAGE_TO_EXTRACT = 'chromiumos_test_image.bin'
 _NEW_STYLE_VERSION = '0.9.131.0'
 
+class CrosImageDoesNotExistError(Exception):
+  """Error thrown when no image can be found."""
+  pass
+
+
 class HTMLDirectoryParser(HTMLParser.HTMLParser):
   """HTMLParser for parsing the default apache file index."""
 
@@ -111,6 +116,8 @@ def GetLatestLinkFromPage(url, regex):
   Args:
     url: Url to download and parse.
     regex: Regular expression to match links against.
+  Raises:
+    CrosImageDoesNotExistError if no image found using args.
   """
   url_file = urllib.urlopen(url)
   url_html = url_file.read()
@@ -120,7 +127,10 @@ def GetLatestLinkFromPage(url, regex):
   # Parses links with versions embedded.
   url_parser = HTMLDirectoryParser(regex=regex)
   url_parser.feed(url_html)
-  return reduce(_GreaterVersion, url_parser.link_list)
+  try:
+    return reduce(_GreaterVersion, url_parser.link_list)
+  except TypeError:
+    raise CrosImageDoesNotExistError('No image found at %s' % url)
 
 
 def GetNewestLinkFromZipBase(board, channel, zip_server_base):
@@ -130,6 +140,8 @@ def GetNewestLinkFromZipBase(board, channel, zip_server_base):
     board: board for the image zip.
     channel: channel for the image zip.
     zip_server_base:  base url for zipped images.
+  Raises:
+    CrosImageDoesNotExistError if no image found using args.
   """
   zip_base = os.path.join(zip_server_base, channel, board)
   latest_version = GetLatestLinkFromPage(zip_base, '\d+\.\d+\.\d+\.\d+/')
@@ -143,7 +155,8 @@ def GetNewestLinkFromZipBase(board, channel, zip_server_base):
 def GetLatestZipUrl(board, channel, zip_server_base):
   """Returns the url of the latest image zip for the given arguments.
 
-  If the latest does not exist, tries to find the rc equivalent.
+  If the latest does not exist, tries to find the rc equivalent.  If neither
+  exist, returns None.
 
   Args:
     board: board for the image zip.
@@ -152,9 +165,13 @@ def GetLatestZipUrl(board, channel, zip_server_base):
   """
   try:
     return GetNewestLinkFromZipBase(board, channel, zip_server_base)
-  except:
-    cros_lib.Warning('Failed to get url from standard zip base.  Trying rc.')
+  except CrosImageDoesNotExistError as ce:
+    cros_lib.Warning(str(ce))
+  try:
     return GetNewestLinkFromZipBase(board + '-rc', channel, zip_server_base)
+  except CrosImageDoesNotExistError as ce:
+    cros_lib.Warning(str(ce))
+    return None
 
 
 def GrabZipAndExtractImage(zip_url, download_folder, image_name) :
@@ -242,16 +259,26 @@ def RunAUTestHarness(board, channel, zip_server_base,
     test_results_root: Root directory to store au_test_harness results.
   """
   crosutils_root = os.path.join(constants.SOURCE_ROOT, 'src', 'scripts')
+
+  # Grab the latest image we've built.
+  return_object = cros_lib.RunCommand(
+    ['./get_latest_image.sh', '--board=%s' % board], cwd=crosutils_root,
+    redirect_stdout=True, print_cmd=True)
+
+  latest_image_dir = return_object.output.strip()
+  target_image = os.path.join(latest_image_dir, _IMAGE_TO_EXTRACT)
+
+  # Grab the latest official build for this board to use as the base image.
+  # If it doesn't exist, run the update test against itself.
   download_folder = os.path.abspath('latest_download')
   zip_url = GetLatestZipUrl(board, channel, zip_server_base)
-  GrabZipAndExtractImage(zip_url, download_folder, _IMAGE_TO_EXTRACT)
 
-  # Tests go here.
-  return_object = cros_lib.RunCommand(
-      ['./get_latest_image.sh', '--board=%s' % board], cwd=crosutils_root,
-      redirect_stdout=True, print_cmd=True)
-
-  latest_image = return_object.output.strip()
+  base_image = None
+  if zip_url:
+    GrabZipAndExtractImage(zip_url, download_folder, _IMAGE_TO_EXTRACT)
+    base_image = os.path.join(download_folder, _IMAGE_TO_EXTRACT)
+  else:
+    base_image = target_image
 
   update_engine_path = os.path.join(crosutils_root, '..', 'platform',
                                     'update_engine')
@@ -260,10 +287,8 @@ def RunAUTestHarness(board, channel, zip_server_base,
   public_key_path = GeneratePublicKey(private_key_path)
 
   cmd = ['bin/cros_au_test_harness',
-         '--base_image=%s' % os.path.join(download_folder,
-                                          _IMAGE_TO_EXTRACT),
-         '--target_image=%s' % os.path.join(latest_image,
-                                            _IMAGE_TO_EXTRACT),
+         '--base_image=%s' % base_image,
+         '--target_image=%s' % target_image,
          '--board=%s' % board,
          '--type=%s' % type,
          '--remote=%s' % remote,
