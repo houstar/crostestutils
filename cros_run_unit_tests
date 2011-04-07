@@ -47,9 +47,10 @@ function record_test_failure() {
   FAILED_PACKAGES="${FAILED_PACKAGES} ${1}"
 }
 
+# Run the unit test for the given package, via ebuild src_test() function.
 function run_unit_test() {
-  FEATURES="-buildpkg -digest noauto" \
-    ebuild-${FLAGS_board} "${1}" clean unpack prepare configure test
+  FEATURES="-buildpkg -digest" \
+    ebuild-${FLAGS_board} "${1}" clean test clean
 }
 
 # Parse command line and die if unexpected parameters given.
