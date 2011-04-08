@@ -232,9 +232,19 @@ class AUWorker(object):
     unittest.assertTrue(percent_passed >= percent_required_to_pass)
     return percent_passed
 
-  def InitializeResultsDirectory(self):
-    """Called by a test to initialize a results directory for this worker."""
-    # Use the name of the test.
+  def Initialize(self, port):
+    """Initializes test specific variables for each test.
+
+    Each test needs to specify a unique ssh port.
+
+    Args:
+      port:  Unique port for ssh access.
+    """
+    # Initialize port vars.
+    self._ssh_port = port
+    self._kvm_pid_file = '/tmp/kvm.%d' % port
+
+    # Initialize test results directory.
     test_name = inspect.stack()[1][3]
     self.results_directory = os.path.join(self.test_results_root, test_name)
     self.results_count = 0

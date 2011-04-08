@@ -131,7 +131,9 @@ class AUTest(unittest.TestCase):
     This test checks that we can update by updating the stateful partition
     rather than wiping it.
     """
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9222)
+    # Just make sure some tests pass on original image.  Some old images
+    # don't pass many tests.
     self.worker.PrepareBase(self.base_image_path)
 
     # Update to
@@ -148,7 +150,9 @@ class AUTest(unittest.TestCase):
     This test checks that we can update successfully after wiping the
     stateful partition.
     """
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9223)
+    # Just make sure some tests pass on original image.  Some old images
+    # don't pass many tests.
     self.worker.PrepareBase(self.base_image_path)
 
     # Update to
@@ -193,7 +197,7 @@ class AUTest(unittest.TestCase):
         self.data_size += len(data)
         return data
 
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9224)
     self.AttemptUpdateWithFilter(InterruptionFilter(), proxy_port=8082)
 
   def testDelayedUpdate(self):
@@ -224,7 +228,7 @@ class AUTest(unittest.TestCase):
         self.data_size += len(data)
         return data
 
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9225)
     self.AttemptUpdateWithFilter(DelayedFilter(), proxy_port=8083)
 
   def SimpleTest(self):
@@ -233,7 +237,7 @@ class AUTest(unittest.TestCase):
     We explicitly don't use test prefix so that isn't run by default.  Can be
     run using test_prefix option.
     """
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9226)
     self.worker.PrepareBase(self.base_image_path)
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
     self.worker.VerifyImage(self)
@@ -243,7 +247,7 @@ class AUTest(unittest.TestCase):
   # TODO(sosa): Get test to work with verbose.
   def NotestPartialUpdate(self):
     """Tests what happens if we attempt to update with a truncated payload."""
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9227)
     # Preload with the version we are trying to test.
     self.worker.PrepareBase(self.target_image_path)
 
@@ -262,7 +266,7 @@ class AUTest(unittest.TestCase):
   # TODO(sosa): Get test to work with verbose.
   def NotestCorruptedUpdate(self):
     """Tests what happens if we attempt to update with a corrupted payload."""
-    self.worker.InitializeResultsDirectory()
+    self.worker.Initialize(9228)
     # Preload with the version we are trying to test.
     self.worker.PrepareBase(self.target_image_path)
 

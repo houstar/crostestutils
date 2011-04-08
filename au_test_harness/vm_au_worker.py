@@ -5,7 +5,6 @@
 """Module containing implementation of an au_worker for virtual machines."""
 
 import os
-import threading
 import unittest
 
 import cros_build_lib as cros_lib
@@ -16,19 +15,12 @@ import au_worker
 class VMAUWorker(au_worker.AUWorker):
   """Test harness for updating virtual machines."""
 
-  # Class variables used to acquire individual VM variables per test.
-  _vm_lock = threading.Lock()
-  _next_port = 9222
-
   def __init__(self, options, test_results_root):
     """Processes vm-specific options."""
     au_worker.AUWorker.__init__(self, options, test_results_root)
     self.graphics_flag = ''
     if options.no_graphics: self.graphics_flag = '--no_graphics'
     if not self.board: cros_lib.Die('Need board to convert base image to vm.')
-
-    self._AcquireUniquePortAndPidFile()
-    self._KillExistingVM(self._kvm_pid_file)
 
   def _KillExistingVM(self, pid_file):
     """Kills an existing VM specified by the pid_file."""
@@ -39,13 +31,6 @@ class VMAUWorker(au_worker.AUWorker):
                           cwd=self.crosutilsbin)
 
     assert not os.path.exists(pid_file)
-
-  def _AcquireUniquePortAndPidFile(self):
-    """Acquires unique ssh port and pid file for VM."""
-    with VMAUWorker._vm_lock:
-      self._ssh_port = VMAUWorker._next_port
-      self._kvm_pid_file = '/tmp/kvm.%d' % self._ssh_port
-      VMAUWorker._next_port += 1
 
   def CleanUp(self):
     """Stop the vm after a test."""

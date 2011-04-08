@@ -283,8 +283,9 @@ def RunAUTestHarness(board, channel, zip_server_base,
   update_engine_path = os.path.join(crosutils_root, '..', 'platform',
                                     'update_engine')
 
-  private_key_path = os.path.join(update_engine_path, 'unittest_key.pem')
-  public_key_path = GeneratePublicKey(private_key_path)
+  if clean:
+    private_key_path = os.path.join(update_engine_path, 'unittest_key.pem')
+    public_key_path = GeneratePublicKey(private_key_path)
 
   cmd = ['bin/cros_au_test_harness',
          '--base_image=%s' % base_image,
@@ -292,12 +293,14 @@ def RunAUTestHarness(board, channel, zip_server_base,
          '--board=%s' % board,
          '--type=%s' % type,
          '--remote=%s' % remote,
-         '--private_key=%s' % private_key_path,
-         '--public_key=%s' % public_key_path,
          ]
   if test_results_root: cmd.append('--test_results_root=%s' % test_results_root)
   if no_graphics: cmd.append('--no_graphics')
-  if clean: cmd.append('--clean')
+  # Using keys is only compatible with clean.
+  if clean:
+    cmd.append('--clean')
+    cmd.append('--private_key=%s' % private_key_path)
+    cmd.append('--public_key=%s' % public_key_path)
 
   cros_lib.RunCommand(cmd, cwd=crosutils_root)
 
