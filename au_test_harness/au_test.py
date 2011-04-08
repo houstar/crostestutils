@@ -132,20 +132,15 @@ class AUTest(unittest.TestCase):
     rather than wiping it.
     """
     self.worker.InitializeResultsDirectory()
-    # Just make sure some tests pass on original image.  Some old images
-    # don't pass many tests.
     self.worker.PrepareBase(self.base_image_path)
-    # TODO(sosa): move to 100% once we start testing using the autotest paired
-    # with the dev channel.
-    percent_passed = self.worker.VerifyImage(self, 10)
 
-    # Update to - all tests should pass on new image.
+    # Update to
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
-    percent_passed = self.worker.VerifyImage(self)
+    self.worker.VerifyImage(self)
 
-    # Update from - same percentage should pass that originally passed.
-    self.worker.PerformUpdate(self.base_image_path, self.target_image_path)
-    self.worker.VerifyImage(self, percent_passed)
+    # Update from
+    self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
+    self.worker.VerifyImage(self)
 
   def testUpdateWipeStateful(self):
     """Tests if we can update after cleaning the stateful partition.
@@ -154,20 +149,17 @@ class AUTest(unittest.TestCase):
     stateful partition.
     """
     self.worker.InitializeResultsDirectory()
-    # Just make sure some tests pass on original image.  Some old images
-    # don't pass many tests.
     self.worker.PrepareBase(self.base_image_path)
-    percent_passed = self.worker.VerifyImage(self, 10)
 
-    # Update to - all tests should pass on new image.
+    # Update to
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path,
                               'clean')
     self.worker.VerifyImage(self)
 
-    # Update from - same percentage should pass that originally passed.
-    self.worker.PerformUpdate(self.base_image_path, self.target_image_path,
+    # Update from
+    self.worker.PerformUpdate(self.target_image_path, self.target_image_path,
                               'clean')
-    self.worker.VerifyImage(self, percent_passed)
+    self.worker.VerifyImage(self)
 
   def testInterruptedUpdate(self):
     """Tests what happens if we interrupt payload delivery 3 times."""
