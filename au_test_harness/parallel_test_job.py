@@ -104,7 +104,13 @@ def RunParallelJobs(number_of_simultaneous_jobs, jobs, jobs_args,
   """
   def ProcessOutputWrapper(func, args, output):
     """Simple function wrapper that puts the output of a function in a queue."""
-    output.put(func(*args))
+    try:
+      output.put(func(*args))
+    except:
+      output.put('')
+      raise
+    finally:
+      output.close()
 
   assert len(jobs) == len(jobs_args), 'Length of args array is wrong.'
   # Cache sudo access.
