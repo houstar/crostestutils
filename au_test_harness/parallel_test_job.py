@@ -89,28 +89,30 @@ class ParallelJob(multiprocessing.Process):
     return '%s(%s)' % (self._target, self._args)
 
 
-def RunParallelJobs(number_of_simultaneous_jobs, jobs, jobs_args,
-                    print_status):
+def RunParallelJobs(number_of_simultaneous_jobs, jobs, jobs_args):
   """Runs set number of specified jobs in parallel.
+
+  Note that there is a bug in Python Queue implementation that doesn't
+  allow arbitrary sizes to be returned.  Instead, the process will just
+  appear to have hung.  Be careful when accepting output.
 
   Args:
     number_of_simultaneous_jobs:  Max number of parallel_jobs to be run in
       parallel.
     jobs:  Array of methods to run.
     jobs_args:  Array of args associated with method calls.
-    print_status: True if you'd like this to print out .'s as it runs jobs.
   Returns:
-    Returns an array of results corresponding to each parallel_job.
+    Returns an array of results corresponding to each parallel_job's output.
   """
-  def ProcessOutputWrapper(func, args, output):
+  def ProcessOutputWrapper(func, args, output_queue):
     """Simple function wrapper that puts the output of a function in a queue."""
     try:
-      output.put(func(*args))
+      output_queue.put(func(*args))
     except:
-      output.put('')
+      output_queue.put(None)
       raise
     finally:
-      output.close()
+      output_queue.close()
 
   assert len(jobs) == len(jobs_args), 'Length of args array is wrong.'
   # Cache sudo access.

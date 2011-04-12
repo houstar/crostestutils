@@ -29,6 +29,7 @@ import dummy_au_worker
 import dev_server_wrapper
 import parallel_test_job
 import public_key_manager
+import tempfile
 import update_exception
 
 def _PrepareTestSuite(options, use_dummy_worker=False):
@@ -51,8 +52,8 @@ def _PregenerateUpdates(options):
   Raises:
     update_exception.UpdateException if we fail to generate an update.
   """
-  def _GenerateVMUpdate(target, src, private_key_path):
-    """Generates an update using the devserver."""
+  def _GenerateVMUpdate(target, src, private_key_path, log_file):
+    """Returns the error code from generating an update using the devserver."""
     command = ['sudo',
                'start_devserver',
                '--pregenerate_update',
@@ -67,10 +68,41 @@ def _PregenerateUpdates(options):
       command.append('--private_key=%s' %
                      cros_lib.ReinterpretPathForChroot(private_key_path))
 
-    return cros_lib.RunCommandCaptureOutput(command, combine_stdout_stderr=True,
-                                            enter_chroot=True,
-                                            print_cmd=True,
-                                            cwd=cros_lib.GetCrosUtilsPath())
+    return cros_lib.RunCommand(command, enter_chroot=True, print_cmd=True,
+                               cwd=cros_lib.GetCrosUtilsPath(),
+                               log_to_file=log_file, error_ok=True,
+                               exit_code=True)
+
+  def _ProcessGeneratorOutputs(log_files, return_codes):
+    """Processes results from the log files of GenerateVMUpdate calls.
+
+    Returns an array of cache entries from the log files.
+    """
+    return_array = []
+    # Looking for this line in the output.
+    key_line_re = re.compile('^PREGENERATED_UPDATE=([\w/.]+)')
+    for log_file, return_code in map(lambda x, y: (x, y), log_files,
+                                     return_codes):
+      log_file_handle = open(log_file)
+      output = log_file_handle.read()
+      log_file_handle.close()
+
+      if return_code != 0:
+        cros_lib.Warning(output)
+        raise update_exception.UpdateException(return_code,
+                                               'Failed to generate update.')
+      else:
+        for line in output.splitlines():
+          match = key_line_re.search(line)
+          if match:
+            # Convert blah/blah/update.gz -> update/blah/blah.
+            path_to_update_gz = match.group(1).rstrip()
+            (path_to_update_dir, _, _) = path_to_update_gz.rpartition(
+                '/update.gz')
+            return_array.append('/'.join(['update', path_to_update_dir]))
+
+    assert len(return_array) == len(log_files), 'Return result size mismatch.'
+    return return_array
 
   # Use dummy class to mock out updates that would be run as part of a test.
   test_suite = _PrepareTestSuite(options, use_dummy_worker=True)
@@ -83,10 +115,12 @@ def _PregenerateUpdates(options):
   update_ids = []
   jobs = []
   args = []
+  log_files = []
   modified_images = set()
   for target, srcs in dummy_au_worker.DummyAUWorker.delta_list.items():
     modified_images.add(target)
     for src_key in srcs:
+      log_file = tempfile.mktemp('GenerateVMUpdate')
       (src, _ , key) = src_key.partition('+')
       if src: modified_images.add(src)
       # TODO(sosa): Add private key as part of caching name once devserver can
@@ -95,7 +129,8 @@ def _PregenerateUpdates(options):
       print >> sys.stderr, 'AU: %s' % update_id
       update_ids.append(update_id)
       jobs.append(_GenerateVMUpdate)
-      args.append((target, src, key))
+      args.append((target, src, key, log_file))
+      log_files.append(log_file)
 
   # Always add the base image path.  This is only useful for non-delta updates.
   modified_images.add(options.base_image)
@@ -108,33 +143,8 @@ def _PregenerateUpdates(options):
       manager.AddKeyToImage()
       au_test.AUTest.public_key_managers.append(manager)
 
-  raw_results = parallel_test_job.RunParallelJobs(options.jobs, jobs, args,
-                                                  print_status=True)
-  results = []
-
-  # Looking for this line in the output.
-  key_line_re = re.compile('^PREGENERATED_UPDATE=([\w/.]+)')
-  for result in raw_results:
-    (return_code, output, _) = result
-    if return_code != 0:
-      cros_lib.Warning(output)
-      raise update_exception.UpdateException(return_code,
-                                             'Failed to generate all updates.')
-    else:
-      for line in output.splitlines():
-        match = key_line_re.search(line)
-        if match:
-          # Convert blah/blah/update.gz -> update/blah/blah.
-          path_to_update_gz = match.group(1).rstrip()
-          (path_to_update_dir, _, _) = path_to_update_gz.rpartition(
-              '/update.gz')
-          results.append('/'.join(['update', path_to_update_dir]))
-          break
-
-  # Make sure all generation of updates returned cached locations.
-  if len(raw_results) != len(results):
-    raise update_exception.UpdateException(
-        1, 'Insufficient number cache directories returned.')
+  error_codes = parallel_test_job.RunParallelJobs(options.jobs, jobs, args)
+  results = _ProcessGeneratorOutputs(log_files, error_codes)
 
   # Build the dictionary from our id's and returned cache paths.
   cache_dictionary = {}
@@ -155,8 +165,7 @@ def _RunTestsInParallel(options):
     threads.append(unittest.TextTestRunner(verbosity=2).run)
     args.append(test_case)
 
-  results = parallel_test_job.RunParallelJobs(options.jobs, threads, args,
-                                              print_status=False)
+  results = parallel_test_job.RunParallelJobs(options.jobs, threads, args)
   for test_result in results:
     if not test_result.wasSuccessful():
       cros_lib.Die('Test harness was not successful')
