@@ -231,8 +231,8 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9225)
     self.AttemptUpdateWithFilter(DelayedFilter(), proxy_port=8083)
 
-  def SimpleTest(self):
-    """A simple update that updates once from a base image to a target.
+  def SimpleTestUpdateAndVerify(self):
+    """Test that updates once from a base image to a target.
 
     We explicitly don't use test prefix so that isn't run by default.  Can be
     run using test_prefix option.
@@ -240,6 +240,16 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9226)
     self.worker.PrepareBase(self.base_image_path)
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
+    self.worker.VerifyImage(self)
+
+  def SimpleTestVerify(self):
+    """Test that only verifies the target image.
+
+    We explicitly don't use test prefix so that isn't run by default.  Can be
+    run using test_prefix option.
+    """
+    self.worker.Initialize(9227)
+    self.worker.PrepareBase(self.target_image_path)
     self.worker.VerifyImage(self)
 
   # --- DISABLED TESTS ---

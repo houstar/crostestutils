@@ -102,9 +102,9 @@ class VMAUWorker(au_worker.AUWorker):
     if self.graphics_flag: commandWithArgs.append(self.graphics_flag)
     self.TestInfo('Running smoke suite to verify image.')
     output = cros_lib.RunCommand(
-        commandWithArgs, error_ok=True, enter_chroot=False,
-        redirect_stdout=True, redirect_stderr=True, cwd=self.crosutilsbin,
-        print_cmd=False, combine_stdout_stderr=True)
+        commandWithArgs, error_ok=(percent_required_to_pass != 100),
+        enter_chroot=False, redirect_stdout=True, redirect_stderr=True,
+        cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
     return self.AssertEnoughTestsPassed(unittest, output,
                                         percent_required_to_pass)
 
