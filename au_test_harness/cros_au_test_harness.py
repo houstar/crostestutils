@@ -68,7 +68,18 @@ def _PregenerateUpdates(options):
       command.append('--private_key=%s' %
                      cros_lib.ReinterpretPathForChroot(private_key_path))
 
-    return cros_lib.RunCommand(command, enter_chroot=True, print_cmd=True,
+    if src:
+      debug_message = 'delta update payload from %s to %s' % (target, src)
+    else:
+      debug_message = 'full update payload to %s' % target
+
+    if private_key_path:
+      debug_message = 'Generating a signed ' + debug_message
+    else:
+      debug_message = 'Generating an unsigned ' + debug_message
+
+    cros_lib.Info(debug_message)
+    return cros_lib.RunCommand(command, enter_chroot=True, print_cmd=False,
                                cwd=cros_lib.GetCrosUtilsPath(),
                                log_to_file=log_file, error_ok=True,
                                exit_code=True)
@@ -106,12 +117,11 @@ def _PregenerateUpdates(options):
 
   # Use dummy class to mock out updates that would be run as part of a test.
   test_suite = _PrepareTestSuite(options, use_dummy_worker=True)
-  test_result = unittest.TextTestRunner(verbosity=0).run(test_suite)
+  test_result = unittest.TextTestRunner(
+      stream=open(os.devnull, 'w')).run(test_suite)
   if not test_result.wasSuccessful():
     raise update_exception.UpdateException(1,
                                            'Error finding updates to generate.')
-
-  cros_lib.Info('The following delta updates are required.')
   update_ids = []
   jobs = []
   args = []
@@ -126,7 +136,6 @@ def _PregenerateUpdates(options):
       # TODO(sosa): Add private key as part of caching name once devserver can
       # handle it its own cache.
       update_id = dev_server_wrapper.GenerateUpdateId(target, src, key)
-      print >> sys.stderr, 'AU: %s' % update_id
       update_ids.append(update_id)
       jobs.append(_GenerateVMUpdate)
       args.append((target, src, key, log_file))
@@ -143,6 +152,7 @@ def _PregenerateUpdates(options):
       manager.AddKeyToImage()
       au_test.AUTest.public_key_managers.append(manager)
 
+  cros_lib.Info('Generating updates required for this test suite in parallel.')
   error_codes = parallel_test_job.RunParallelJobs(options.jobs, jobs, args)
   results = _ProcessGeneratorOutputs(log_files, error_codes)
 
@@ -162,13 +172,16 @@ def _RunTestsInParallel(options):
   for test in test_suite:
     test_name = test.id()
     test_case = unittest.TestLoader().loadTestsFromName(test_name)
-    threads.append(unittest.TextTestRunner(verbosity=2).run)
+    threads.append(unittest.TextTestRunner().run)
     args.append(test_case)
 
+  cros_lib.Info('Running tests in test suite in parallel.')
   results = parallel_test_job.RunParallelJobs(options.jobs, threads, args)
   for test_result in results:
     if not test_result.wasSuccessful():
-      cros_lib.Die('Test harness was not successful')
+      cros_lib.Die(
+          'Test harness was not successful. See logs for details. '
+          'Note:  Ignore max recursion depth errors crosbug.com/14274')
 
 
 def _CleanPreviousWork(options):
@@ -269,7 +282,7 @@ def main():
         # TODO(sosa) - Take in a machine pool for a real test.
         # Can't run in parallel with only one remote device.
         test_suite = _PrepareTestSuite(options)
-        test_result = unittest.TextTestRunner(verbosity=2).run(test_suite)
+        test_result = unittest.TextTestRunner().run(test_suite)
         if not test_result.wasSuccessful(): cros_lib.Die('Test harness failed.')
 
     finally:

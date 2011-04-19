@@ -6,6 +6,7 @@
 
 class UpdateException(Exception):
   """Exception thrown when _UpdateImage or _UpdateUsingPayload fail"""
-  def __init__(self, code, stdout):
+  def __init__(self, code, output):
+    super(UpdateException, self).__init__(output)
     self.code = code
-    self.stdout = stdout
+    self.output = output

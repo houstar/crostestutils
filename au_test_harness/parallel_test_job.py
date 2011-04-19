@@ -64,17 +64,22 @@ class ParallelJob(multiprocessing.Process):
           if not active_job:
             active_job = parallel_job
 
-      return (active_count, parallel_job)
+      return (active_count, active_job)
 
+    first_time = True
     start_time = time.time()
     while (time.time() - start_time) < cls.MAX_TIMEOUT_SECONDS:
       (active_count, active_job) = GetCurrentActiveCount()
       if active_count == 0:
         return
       else:
-        print >> sys.stderr, (
-            'Process Pool Active: Waiting on %d/%d jobs to complete' %
-            (active_count, len(parallel_jobs)))
+        if not first_time:
+          print (
+              'Process Pool Active: Waiting on %d/%d jobs to complete' %
+              (active_count, len(parallel_jobs)))
+        else:
+          first_time = False
+
         active_job.join(cls.SLEEP_TIMEOUT_SECONDS)
         time.sleep(5) # Prevents lots of printing out as job is ending.
 

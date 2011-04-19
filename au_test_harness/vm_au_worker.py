@@ -17,7 +17,7 @@ class VMAUWorker(au_worker.AUWorker):
 
   def __init__(self, options, test_results_root):
     """Processes vm-specific options."""
-    au_worker.AUWorker.__init__(self, options, test_results_root)
+    super(VMAUWorker, self).__init__(options, test_results_root)
     self.graphics_flag = ''
     if options.no_graphics: self.graphics_flag = '--no_graphics'
     if not self.board: cros_lib.Die('Need board to convert base image to vm.')
@@ -25,10 +25,8 @@ class VMAUWorker(au_worker.AUWorker):
   def _KillExistingVM(self, pid_file):
     """Kills an existing VM specified by the pid_file."""
     if os.path.exists(pid_file):
-      cros_lib.Warning('Existing %s found.  Deleting and killing process' %
-                       pid_file)
       cros_lib.RunCommand(['./cros_stop_vm', '--kvm_pid=%s' % pid_file],
-                          cwd=self.crosutilsbin)
+                          cwd=self.crosutilsbin, print_cmd=False)
 
     assert not os.path.exists(pid_file)
 
@@ -61,6 +59,8 @@ class VMAUWorker(au_worker.AUWorker):
           ]
     self.AppendUpdateFlags(cmd, image_path, src_image_path, proxy_port,
                            private_key_path)
+    self.TestInfo(self.GetUpdateMessage(image_path, src_image_path, True,
+                                        proxy_port))
     self.RunUpdateCmd(cmd, log_directory)
 
   def UpdateUsingPayload(self, update_path, stateful_change='old',
@@ -80,6 +80,8 @@ class VMAUWorker(au_worker.AUWorker):
            stateful_change_flag,
            ]
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
+    self.TestInfo(self.GetUpdateMessage(image_path, src_image_path, True,
+                                        proxy_port))
     self.RunUpdateCmd(cmd, log_directory)
 
   def VerifyImage(self, unittest, percent_required_to_pass=100):
@@ -98,9 +100,11 @@ class VMAUWorker(au_worker.AUWorker):
                        self.verify_suite,
                       ]
     if self.graphics_flag: commandWithArgs.append(self.graphics_flag)
-    output = cros_lib.RunCommand(commandWithArgs, error_ok=True,
-                                 enter_chroot=False, redirect_stdout=True,
-                                 cwd=self.crosutilsbin)
+    self.TestInfo('Running smoke suite to verify image.')
+    output = cros_lib.RunCommand(
+        commandWithArgs, error_ok=True, enter_chroot=False,
+        redirect_stdout=True, redirect_stderr=True, cwd=self.crosutilsbin,
+        print_cmd=False, combine_stdout_stderr=True)
     return self.AssertEnoughTestsPassed(unittest, output,
                                         percent_required_to_pass)
 

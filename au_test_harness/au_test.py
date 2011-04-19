@@ -81,11 +81,11 @@ class AUTest(unittest.TestCase):
       self.worker.UpdateUsingPayload(payload)
     except UpdateException as err:
       # Will raise ValueError if expected is not found.
-      if re.search(re.escape(expected_msg), err.stdout, re.MULTILINE):
+      if re.search(re.escape(expected_msg), err.output, re.MULTILINE):
         return
       else:
         cros_lib.Warning("Didn't find '%s' in:" % expected_msg)
-        cros_lib.Warning(err.stdout)
+        cros_lib.Warning(err.output)
 
     self.fail('We managed to update when failure was expected')
 
@@ -114,7 +114,7 @@ class AUTest(unittest.TestCase):
 
     Sets instance specific variables and initializes worker.
     """
-    unittest.TestCase.setUp(self)
+    super(AUTest, self).setUp()
     self.worker = self.worker_class(self.options, AUTest.test_results_root)
     self.download_folder = os.path.join(os.path.realpath(os.path.curdir),
                                         'latest_download')

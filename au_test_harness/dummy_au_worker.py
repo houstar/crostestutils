@@ -6,6 +6,8 @@
 
 import unittest
 
+import cros_build_lib as cros_lib
+
 import au_worker
 
 class DummyAUWorker(au_worker.AUWorker):
@@ -19,7 +21,7 @@ class DummyAUWorker(au_worker.AUWorker):
   delta_list = {}
 
   def __init__(self, options, test_results_root):
-    au_worker.AUWorker.__init__(self, options, test_results_root)
+    super(DummyAUWorker, self).__init__(options, test_results_root)
     self.au_type = options.type
 
   def PrepareBase(self, image_path):

@@ -15,7 +15,7 @@ class RealAUWorker(au_worker.AUWorker):
 
   def __init__(self, options, test_results_root):
     """Processes non-vm-specific options."""
-    au_worker.AUWorker.__init__(self, options, test_results_root)
+    super(RealAUWorker, self).__init__(options, test_results_root)
     self.remote = options.remote
     if not self.remote: cros_lib.Die('We require a remote address for tests.')
 

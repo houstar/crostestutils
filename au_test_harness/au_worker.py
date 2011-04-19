@@ -48,6 +48,17 @@ class AUWorker(object):
     """Called at the end of every test."""
     pass
 
+  def GetUpdateMessage(self, update_target, update_base, from_vm, proxy):
+    if update_base:
+      str = 'Performing a delta update from %s to %s' % (
+          update_base, update_target)
+    else:
+      str = 'Performing a full update to %s' % update_target
+
+    if from_vm: str += ' in a VM'
+    if proxy: ' using a proxy on port %s' % proxy
+    return str
+
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port=None, private_key_path=None):
     """Implementation of an actual update.
@@ -111,19 +122,14 @@ class AUWorker(object):
       private_key_path:  Path to a private key to use with update payload.
     Raises an update_exception.UpdateException if _UpdateImage returns an error.
     """
-    try:
-      if not self.use_delta_updates: src_image_path = ''
-      if private_key_path:
-        key_to_use = private_key_path
-      else:
-        key_to_use = self.private_key
+    if not self.use_delta_updates: src_image_path = ''
+    if private_key_path:
+      key_to_use = private_key_path
+    else:
+      key_to_use = self.private_key
 
-      self.UpdateImage(image_path, src_image_path, stateful_change,
-                              proxy_port, key_to_use)
-    except update_exception.UpdateException as err:
-      # If the update fails, print it out
-      Warning(err.stdout)
-      raise
+    self.UpdateImage(image_path, src_image_path, stateful_change,
+                            proxy_port, key_to_use)
 
   @classmethod
   def SetUpdateCache(cls, update_cache):
@@ -161,7 +167,6 @@ class AUWorker(object):
                            '--test_image'
                           ], enter_chroot=True, cwd=self.crosutils)
 
-    cros_lib.Info('Using %s as base' % self.vm_image_path)
     assert os.path.exists(self.vm_image_path)
 
   def GetStatefulChangeFlag(self, stateful_change):
@@ -179,7 +184,6 @@ class AUWorker(object):
     Modifies cmd in places by appending appropriate items given args.
     """
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
-
     # Get pregenerated update if we have one.
     update_id = dev_server_wrapper.GenerateUpdateId(image_path, src_image_path,
                                                     private_key_path)
@@ -200,17 +204,18 @@ class AUWorker(object):
     if self.verbose:
       try:
         if log_directory:
-          cros_lib.RunCommand(cmd, log_to_file=os.path.join(log_directory,
-                                                            'update.log'))
+          cros_lib.RunCommand(
+              cmd, log_to_file=os.path.join(log_directory, 'update.log'),
+              print_cmd=False)
         else:
-          cros_lib.RunCommand(cmd)
-      except Exception as e:
-        Warning(str(e))
+          cros_lib.RunCommand(cmd, print_cmd=False)
+      except cros_lib.RunCommandException as e:
         raise update_exception.UpdateException(1, str(e))
     else:
-      (code, stdout, stderr) = cros_lib.RunCommandCaptureOutput(cmd)
+      (code, stdout, unused_stderr) = cros_lib.RunCommandCaptureOutput(
+          cmd, print_cmd=False)
       if code != 0:
-        Warning(stdout)
+        cros_lib.Warning(stdout)
         raise update_exception.UpdateException(code, stdout)
 
   def AssertEnoughTestsPassed(self, unittest, output, percent_required_to_pass):
@@ -223,14 +228,18 @@ class AUWorker(object):
     Returns:
       percent that passed.
     """
-    cros_lib.Info('Output from VerifyImage():')
-    print >> sys.stderr, output
-    sys.stderr.flush()
     percent_passed = self._ParseGenerateTestReportOutput(output)
-    cros_lib.Info('Percent passed: %d vs. Percent required: %d' % (
+    self.TestInfo('Percent passed: %d vs. Percent required: %d' % (
         percent_passed, percent_required_to_pass))
-    unittest.assertTrue(percent_passed >= percent_required_to_pass)
+    if percent_passed < percent_required_to_pass:
+      print output
+      unittest.fail('%d percent of tests are required to pass' %
+                    percent_required_to_pass)
+
     return percent_passed
+
+  def TestInfo(self, message):
+    cros_lib.Info('%s: %s' % (self.test_name, message))
 
   def Initialize(self, port):
     """Initializes test specific variables for each test.
@@ -245,8 +254,9 @@ class AUWorker(object):
     self._kvm_pid_file = '/tmp/kvm.%d' % port
 
     # Initialize test results directory.
-    test_name = inspect.stack()[1][3]
-    self.results_directory = os.path.join(self.test_results_root, test_name)
+    self.test_name = inspect.stack()[1][3]
+    self.results_directory = os.path.join(self.test_results_root,
+                                          self.test_name)
     self.results_count = 0
 
   def GetNextResultsPath(self, label):
@@ -276,7 +286,6 @@ class AUWorker(object):
       if line.startswith("Total PASS:"):
         # FORMAT: ^TOTAL PASS: num_passed/num_total (percent%)$
         percent_passed = line.split()[3].strip('()%')
-        cros_lib.Info('Percent of tests passed %s' % percent_passed)
         break
 
     return int(percent_passed)
