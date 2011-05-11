@@ -27,8 +27,8 @@ _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 # empty. If you add an entry, mark it with a TODO(<your name>) and the issue
 # filed for the crash.
 _CRASH_WHITELIST = {
-  # TODO(dalecurtis): Remove once http://crosbug.com/13733 is fixed.
-  'chromeos-wm': ['sig 6'],
+  # TODO(dalecurtis): Remove both once http://crosbug.com/13733 is fixed.
+  'chromeos-wm': ['sig 6', 'sig 11'],
 
   # TODO(dalecurtis): Remove once http://crosbug.com/13763 is fixed.
   'console-kit-daemon': ['sig 11'],
