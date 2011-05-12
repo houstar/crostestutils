@@ -21,6 +21,7 @@ DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
 DEFINE_integer iterations 1 "Iterations to run every top level test" i
 DEFINE_string results_dir_root "" "alternate root results directory"
 DEFINE_boolean verbose ${FLAGS_FALSE} "Show verbose autoserv output" v
+DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
     "Force use of emerged autotest packages"
 
@@ -292,6 +293,11 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
       verbose="--verbose"
     fi
 
+    local image=""
+    if [[ -n "${FLAGS_update_url}" ]]; then
+      image="--image ${FLAGS_update_url}"
+    fi
+
     RAN_ANY_TESTS=${FLAGS_TRUE}
 
     # Remove chrome autotest location prefix from control_file if needed
@@ -302,7 +308,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     fi
 
     local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
-        ${option} ${control_file} -r ${results_dir} ${verbose}"
+        ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
     if [ -n "${FLAGS_args}" ]; then
       autoserv_args="${autoserv_args} --args=${FLAGS_args}"
     fi
