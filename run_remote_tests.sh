@@ -236,9 +236,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
       done
       exit 1
     fi
-    for i in $(seq 1 $FLAGS_iterations); do
-      control_files_to_run="${control_files_to_run} '${finds}'"
-    done
+    control_files_to_run="${control_files_to_run} '${finds}'"
   done
 
   echo ""
@@ -249,80 +247,85 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
 
   [ ${FLAGS_build} -eq ${FLAGS_TRUE} ] && prepare_build_env
 
-  info "Running the following control files:"
+  info "Running the following control files ${FLAGS_iterations} times:"
   for control_file in ${control_files_to_run}; do
     info " * ${control_file}"
   done
 
-  for control_file in ${control_files_to_run}; do
-    # Assume a line starts with TEST_TYPE =
-    control_file=$(remove_quotes "${control_file}")
-    local test_type=$(read_test_type "${AUTOTEST_DIR}/${control_file}")
-    # Check if the control file is an absolute path (i.e. chrome autotests case)
-    if [[ ${control_file:0:1} == "/" ]]; then
-      test_type=$(read_test_type "${control_file}")
-    fi
-    local option
-    if [[ "${test_type}" == "client" ]]; then
-      option="-c"
-    else
-      option="-s"
-    fi
-    echo ""
-    info "Running ${test_type} test ${control_file}"
-    local control_file_name=$(basename "${control_file}")
-    local short_name=$(basename "$(dirname "${control_file}")")
-
-    # testName/control --> testName
-    # testName/control.bvt --> testName.bvt
-    # testName/control.regression --> testName.regression
-    # testName/some_control --> testName.some_control
-    if [[ "${control_file_name}" != control ]]; then
-      if [[ "${control_file_name}" == control.* ]]; then
-        short_name=${short_name}.${control_file_name/control./}
-      else
-        short_name=${short_name}.${control_file_name}
+  for i in $(seq 1 $FLAGS_iterations); do
+    for control_file in ${control_files_to_run}; do
+      # Assume a line starts with TEST_TYPE =
+      control_file=$(remove_quotes "${control_file}")
+      local test_type=$(read_test_type "${AUTOTEST_DIR}/${control_file}")
+      # Check if the control file is an absolute path (i.e. chrome autotests)
+      if [[ ${control_file:0:1} == "/" ]]; then
+        test_type=$(read_test_type "${control_file}")
       fi
-    fi
+      local option
+      if [[ "${test_type}" == "client" ]]; then
+        option="-c"
+      else
+        option="-s"
+      fi
+      echo ""
+      info "Running ${test_type} test ${control_file}"
+      local control_file_name=$(basename "${control_file}")
+      local short_name=$(basename "$(dirname "${control_file}")")
 
-    local results_dir_name="${short_name}"
-    local results_dir="${TMP}/${results_dir_name}"
-    rm -rf "${results_dir}"
-    local verbose=""
-    if [[ ${FLAGS_verbose} -eq $FLAGS_TRUE ]]; then
-      verbose="--verbose"
-    fi
+      # testName/control --> testName
+      # testName/control.bvt --> testName.bvt
+      # testName/control.regression --> testName.regression
+      # testName/some_control --> testName.some_control
+      if [[ "${control_file_name}" != control ]]; then
+        if [[ "${control_file_name}" == control.* ]]; then
+          short_name=${short_name}.${control_file_name/control./}
+        else
+          short_name=${short_name}.${control_file_name}
+        fi
+      fi
 
-    local image=""
-    if [[ -n "${FLAGS_update_url}" ]]; then
-      image="--image ${FLAGS_update_url}"
-    fi
+      local results_dir_name="${short_name}"
+      if [ "${FLAGS_iterations}" -ne 1 ]; then
+        results_dir_name="${results_dir_name}.${i}"
+      fi
+      local results_dir="${TMP}/${results_dir_name}"
+      rm -rf "${results_dir}"
+      local verbose=""
+      if [[ ${FLAGS_verbose} -eq $FLAGS_TRUE ]]; then
+        verbose="--verbose"
+      fi
 
-    RAN_ANY_TESTS=${FLAGS_TRUE}
+      local image=""
+      if [[ -n "${FLAGS_update_url}" ]]; then
+        image="--image ${FLAGS_update_url}"
+      fi
 
-    # Remove chrome autotest location prefix from control_file if needed
-    if [[ ${control_file:0:${#chrome_autotests}} == \
-          "${chrome_autotests}" ]]; then
-      control_file="${control_file:${#chrome_autotests}+1}"
-      info "Running chrome autotest ${control_file}"
-    fi
+      RAN_ANY_TESTS=${FLAGS_TRUE}
 
-    local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
-        ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
-    if [ -n "${FLAGS_args}" ]; then
-      autoserv_args="${autoserv_args} --args=${FLAGS_args}"
-    fi
+      # Remove chrome autotest location prefix from control_file if needed
+      if [[ ${control_file:0:${#chrome_autotests}} == \
+            "${chrome_autotests}" ]]; then
+        control_file="${control_file:${#chrome_autotests}+1}"
+        info "Running chrome autotest ${control_file}"
+      fi
 
-    sudo chmod a+w ./server/{tests,site_tests}
-    echo ./server/autoserv ${autoserv_args}
+      local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
+          ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
+      if [ -n "${FLAGS_args}" ]; then
+        autoserv_args="${autoserv_args} --args=${FLAGS_args}"
+      fi
 
-    if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
-      # run autoserv in subshell
-      (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
-       ./server/autoserv ${autoserv_args})
-    else
-      ./server/autoserv ${autoserv_args}
-    fi
+      sudo chmod a+w ./server/{tests,site_tests}
+      echo ./server/autoserv ${autoserv_args}
+
+      if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
+        # run autoserv in subshell
+        (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
+         ./server/autoserv ${autoserv_args})
+      else
+        ./server/autoserv ${autoserv_args}
+      fi
+    done
   done
   popd > /dev/null
 
