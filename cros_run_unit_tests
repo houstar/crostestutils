@@ -22,6 +22,8 @@ DEFINE_string board "${DEFAULT_BOARD}" \
   "Target board of which tests were built"
 DEFINE_string build_root "${DEFAULT_BUILD_ROOT}" \
   "Root of build output"
+DEFINE_boolean fast "${DEFAULT_FAST}" \
+  "Call many emerges in parallel."
 DEFINE_string package_file "" \
   "File with space-separated list of packages to run unit tests" f
 DEFINE_string packages "" \
@@ -29,28 +31,18 @@ DEFINE_string packages "" \
 DEFINE_boolean withdebug "${FLAGS_TRUE}" \
   "Build debug versions of Chromium-OS-specific packages."
 
-# Total count of packages with unit tests.
-TEST_COUNT=0
-# Number of unit test failures.
-TEST_FAILURES=0
 # List of packages with no unit tests.
 NO_UNITTESTS=""
-# List of packages that have unit test failures.
-FAILED_PACKAGES=""
+
+EMERGE_CMD="emerge"
+EMERGE_BOARD_CMD="emerge-${FLAGS_board}"
+if [[ "${FLAGS_fast}" -eq "${FLAGS_TRUE}" ]]; then
+  EMERGE_CMD="${GCLIENT_ROOT}/chromite/bin/parallel_emerge"
+  EMERGE_BOARD_CMD="${EMERGE_CMD} --board=${FLAGS_board}"
+fi
 
 function check_src_test() {
   egrep '^src_test()' "${1}" > /dev/null
-}
-
-function record_test_failure() {
-  TEST_FAILURES=$(( TEST_FAILURES + 1 ))
-  FAILED_PACKAGES="${FAILED_PACKAGES} ${1}"
-}
-
-# Run the unit test for the given package, via ebuild src_test() function.
-function run_unit_test() {
-  FEATURES="-buildpkg -digest" \
-    ebuild-${FLAGS_board} "${1}" clean test clean
 }
 
 # Parse command line and die if unexpected parameters given.
@@ -87,6 +79,7 @@ if [ "${FLAGS_withdebug}" -eq "${FLAGS_FALSE}" ]; then
   export USE="${USE} -cros-debug"
 fi
 
+TEST_PACKAGE_LIST=""
 for package in ${PACKAGE_LIST}; do
   if grep -xq "${package}" "${BLACK_LIST_FILE}"; then
     warn "Skipping package ${package} since it is blacklisted."
@@ -96,11 +89,10 @@ for package in ${PACKAGE_LIST}; do
     warn "${package} not found"
   if [ -n "${EBUILD_PATH}" ]; then
     if check_src_test "${EBUILD_PATH}"; then
-      run_unit_test "${EBUILD_PATH}" || record_test_failure "${package}"
+      TEST_PACKAGE_LIST="${TEST_PACKAGE_LIST} ${package}"
     else
       NO_UNITTESTS="${NO_UNITTESTS} ${package}"
     fi
-    TEST_COUNT=$(( TEST_COUNT + 1 ))
   fi
 done
 
@@ -109,10 +101,6 @@ if [ -n "${NO_UNITTESTS}" ]; then
   warn "${NO_UNITTESTS}"
 fi
 
-if [ ${TEST_FAILURES} -ne 0 ]; then
-  error "Run completed with ${TEST_FAILURES}/${TEST_COUNT} test failures."
-  error "Following packages had failing tests:"
-  die "${FAILED_PACKAGES}"
-else
-  info "All unit tests passed."
-fi
+sudo -E PKGDIR="/build/${FLAGS_board}/test-packages" FEATURES="test" \
+  ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly ${TEST_PACKAGE_LIST}
+info "All unit tests passed."
