@@ -101,6 +101,9 @@ if [ -n "${NO_UNITTESTS}" ]; then
   warn "${NO_UNITTESTS}"
 fi
 
-sudo -E PKGDIR="/build/${FLAGS_board}/test-packages" FEATURES="test" \
-  ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly ${TEST_PACKAGE_LIST}
+if [ -n "${TEST_PACKAGE_LIST}" ]; then
+  sudo -E PKGDIR="/build/${FLAGS_board}/test-packages" FEATURES="test" \
+    ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly ${TEST_PACKAGE_LIST}
+fi
+
 info "All unit tests passed."
