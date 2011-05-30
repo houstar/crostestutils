@@ -34,13 +34,6 @@ DEFINE_boolean withdebug "${FLAGS_TRUE}" \
 # List of packages with no unit tests.
 NO_UNITTESTS=""
 
-EMERGE_CMD="emerge"
-EMERGE_BOARD_CMD="emerge-${FLAGS_board}"
-if [[ "${FLAGS_fast}" -eq "${FLAGS_TRUE}" ]]; then
-  EMERGE_CMD="${GCLIENT_ROOT}/chromite/bin/parallel_emerge"
-  EMERGE_BOARD_CMD="${EMERGE_CMD} --board=${FLAGS_board}"
-fi
-
 function check_src_test() {
   egrep '^src_test()' "${1}" > /dev/null
 }
@@ -54,6 +47,13 @@ check_flags_only_and_allow_null_arg "${@}" && set --
 set -e
 
 [ -z "${FLAGS_board}" ] && die "--board required"
+
+EMERGE_CMD="emerge"
+EMERGE_BOARD_CMD="emerge-${FLAGS_board}"
+if [[ "${FLAGS_fast}" -eq "${FLAGS_TRUE}" ]]; then
+  EMERGE_CMD="${GCLIENT_ROOT}/chromite/bin/parallel_emerge"
+  EMERGE_BOARD_CMD="${EMERGE_CMD} --board=${FLAGS_board}"
+fi
 
 # Create package list from package file and list of packages.
 if [ -n "${FLAGS_package_file}" ]; then
