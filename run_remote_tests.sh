@@ -19,11 +19,18 @@ DEFINE_string board "" \
 DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
 DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
 DEFINE_integer iterations 1 "Iterations to run every top level test" i
+DEFINE_boolean profile ${FLAGS_FALSE} \
+    "Enable profiling for the autotest."
+DEFINE_string profiler "perf" \
+    "The name of the autotest profiler to be used for profiling."
+DEFINE_string profiler_args "" \
+    "Arguments to pass to the autotest profiler's 'initialize' function. \
+Must be in python-style named argument format."
 DEFINE_string results_dir_root "" "alternate root results directory"
-DEFINE_boolean verbose ${FLAGS_FALSE} "Show verbose autoserv output" v
 DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
     "Force use of emerged autotest packages"
+DEFINE_boolean verbose ${FLAGS_FALSE} "Show verbose autoserv output" v
 
 RAN_ANY_TESTS=${FLAGS_FALSE}
 
@@ -162,6 +169,28 @@ autotest-tests to continue."
   fi
 }
 
+# Generate a control file which has a profiler enabled.
+function generate_profiled_control_file() {
+  local control_file_path="$1"
+  local results_dir="$2"
+
+  mkdir -p "${results_dir}"
+  local tmp="${results_dir}/$(basename "${control_file_path}").with_profiling"
+  local profiler_args="${FLAGS_profiler_args}"
+  if [ -n "${profiler_args}" ]; then
+    profiler_args=", ${profiler_args}"
+  fi
+
+  echo "job.default_profile_only = True" > ${tmp}
+  echo "job.profilers.add('${FLAGS_profiler}' ${profiler_args})" >> ${tmp}
+  cat "${control_file_path}" >> ${tmp}
+  # Ensure newline after main control file.
+  echo "" >> ${tmp}
+  echo "job.profilers.delete('${FLAGS_profiler}')" >> ${tmp}
+
+  echo "${tmp}"
+}
+
 function main() {
   cd "${SCRIPTS_DIR}"
 
@@ -256,11 +285,16 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     for control_file in ${control_files_to_run}; do
       # Assume a line starts with TEST_TYPE =
       control_file=$(remove_quotes "${control_file}")
-      local test_type=$(read_test_type "${AUTOTEST_DIR}/${control_file}")
-      # Check if the control file is an absolute path (i.e. chrome autotests)
+
+      # Check if the control file is an absolute path (i.e. chrome autotests).
       if [[ ${control_file:0:1} == "/" ]]; then
-        test_type=$(read_test_type "${control_file}")
+        local control_file_path="${control_file}"
+      else
+        local control_file_path="${AUTOTEST_DIR}/${control_file}"
       fi
+
+      local test_type=$(read_test_type "${control_file_path}")
+
       local option
       if [[ "${test_type}" == "client" ]]; then
         option="-c"
@@ -307,6 +341,19 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
             "${chrome_autotests}" ]]; then
         control_file="${control_file:${#chrome_autotests}+1}"
         info "Running chrome autotest ${control_file}"
+      fi
+
+      # If profiling is enabled, wrap up control file in profiling code.
+      if [ "${FLAGS_profile}" -eq ${FLAGS_TRUE} ]; then
+        if [[ "${test_type}" == "server" ]]; then
+          die "Profiling enabled, but a server test was specified. \
+Profiling only works with client tests."
+        fi
+        local profiled_control_file=$(generate_profiled_control_file \
+            "${control_file_path}" "${results_dir}")
+        info "Profiling enabled. Using generated control file at \
+${profiled_control_file}."
+        control_file="${profiled_control_file}"
       fi
 
       local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
