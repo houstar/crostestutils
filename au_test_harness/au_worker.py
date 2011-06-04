@@ -216,7 +216,7 @@ class AUWorker(object):
           cmd, print_cmd=False)
       if code != 0:
         cros_lib.Warning(stdout)
-        raise update_exception.UpdateException(code, stdout)
+        raise update_exception.UpdateException(code, 'Update cmd failed')
 
   def AssertEnoughTestsPassed(self, unittest, output, percent_required_to_pass):
     """Helper function that asserts a sufficient number of tests passed.
