@@ -178,10 +178,13 @@ def _RunTestsInParallel(options):
   cros_lib.Info('Running tests in test suite in parallel.')
   results = parallel_test_job.RunParallelJobs(options.jobs, threads, args)
   for test_result in results:
-    if not test_result.wasSuccessful():
+    if test_result is None or not test_result.wasSuccessful():
+      # TODO(sosa): Fix max recursion depth warnings. http://crosbug.com/14274
       cros_lib.Die(
           'Test harness was not successful. See logs for details. '
-          'Note:  Ignore max recursion depth errors crosbug.com/14274')
+          'Note: Max recursion depth warnings are normal and occur regardless '
+          'of success or failure. Scroll up past the warnings to see the '
+          'actual failures.')
 
 
 def _CleanPreviousWork(options):
