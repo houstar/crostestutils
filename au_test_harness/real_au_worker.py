@@ -49,14 +49,18 @@ class RealAUWorker(au_worker.AUWorker):
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
     self.RunUpdateCmd(cmd)
 
-  def VerifyImage(self, unittest, percent_required_to_pass=100):
-    """Verifies an image using run_remote_tests.sh with verification suite."""
+  def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
+    """Verifies an image using run_remote_tests.sh with verification suite
+    or with the test passed as parameter."""
     test_directory = self.GetNextResultsPath('verify')
+    if test == '':
+      test = self.verify_suite
+
     output = cros_lib.RunCommand(
         ['run_remote_tests.sh',
          '--remote=%s' % self.remote,
          '--results_dir_root=%s' % test_directory,
-         self.verify_suite,
+         test,
         ], error_ok=True, enter_chroot=True, redirect_stdout=True,
         cwd=self.crosutils)
     return self.AssertEnoughTestsPassed(unittest, output,

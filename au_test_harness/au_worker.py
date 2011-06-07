@@ -83,7 +83,7 @@ class AUWorker(object):
     """
     pass
 
-  def VerifyImage(self, unittest, percent_required_to_pass=100):
+  def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
     """Verifies the image with tests.
 
     Verifies that the test images passes the percent required.  Subclasses must
@@ -93,6 +93,8 @@ class AUWorker(object):
       unittest: pointer to a unittest to fail if we cannot verify the image.
       percent_required_to_pass:  percentage required to pass.  This should be
         fall between 0-100.
+      test: test that will be used to verify the image. If omitted or equal to
+        the empty string the code will use self.verify_suite.
 
     Returns:
       Returns the percent that passed.

@@ -252,6 +252,13 @@ class AUTest(unittest.TestCase):
     self.worker.PrepareBase(self.target_image_path)
     self.worker.VerifyImage(self)
 
+  def testPlatformToolchainOptions(self):
+    """Tests the hardened toolchain options.
+    """
+    self.worker.Initialize(9228)
+    self.worker.PrepareBase(self.base_image_path)
+    self.worker.VerifyImage(self, 100, 'platform_ToolchainOptions')
+
   # --- DISABLED TESTS ---
 
   # TODO(sosa): Get test to work with verbose.

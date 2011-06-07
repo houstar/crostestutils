@@ -84,12 +84,15 @@ class VMAUWorker(au_worker.AUWorker):
                                         proxy_port))
     self.RunUpdateCmd(cmd, log_directory)
 
-  def VerifyImage(self, unittest, percent_required_to_pass=100):
-    """Runs vm smoke suite to verify image."""
+  def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
+    """Runs vm smoke suite or any single test to verify image."""
     log_directory = self.GetNextResultsPath('verify')
     (_, _, log_directory_in_chroot) = log_directory.rpartition('chroot')
     # image_to_live already verifies lsb-release matching.  This is just
     # for additional steps.
+    if test == '':
+      test = self.verify_suite
+
     commandWithArgs = ['./cros_run_vm_test',
                        '--image_path=%s' % self.vm_image_path,
                        '--snapshot',
@@ -97,7 +100,7 @@ class VMAUWorker(au_worker.AUWorker):
                        '--kvm_pid=%s' % self._kvm_pid_file,
                        '--ssh_port=%s' % self._ssh_port,
                        '--results_dir_root=%s' % log_directory_in_chroot,
-                       self.verify_suite,
+                       test,
                       ]
     if self.graphics_flag: commandWithArgs.append(self.graphics_flag)
     self.TestInfo('Running smoke suite to verify image.')
