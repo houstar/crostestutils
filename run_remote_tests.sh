@@ -20,12 +20,9 @@ DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
 DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
 DEFINE_integer iterations 1 "Iterations to run every top level test" i
 DEFINE_boolean profile ${FLAGS_FALSE} \
-    "Enable profiling for the autotest."
-DEFINE_string profiler "perf" \
-    "The name of the autotest profiler to be used for profiling."
-DEFINE_string profiler_args "" \
-    "Arguments to pass to the autotest profiler's 'initialize' function. \
-Must be in python-style named argument format."
+    "Enable profiling for the autotest using perf."
+DEFINE_string profiler_args "-e cycles" \
+    "Arguments to pass to perf record."
 DEFINE_string results_dir_root "" "alternate root results directory"
 DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
@@ -177,16 +174,13 @@ function generate_profiled_control_file() {
   mkdir -p "${results_dir}"
   local tmp="${results_dir}/$(basename "${control_file_path}").with_profiling"
   local profiler_args="${FLAGS_profiler_args}"
-  if [ -n "${profiler_args}" ]; then
-    profiler_args=", ${profiler_args}"
-  fi
 
   echo "job.default_profile_only = True" > ${tmp}
-  echo "job.profilers.add('${FLAGS_profiler}' ${profiler_args})" >> ${tmp}
+  echo "job.profilers.add('cros_perf', options='${profiler_args}')" >> ${tmp}
   cat "${control_file_path}" >> ${tmp}
   # Ensure newline after main control file.
   echo "" >> ${tmp}
-  echo "job.profilers.delete('${FLAGS_profiler}')" >> ${tmp}
+  echo "job.profilers.delete('cros_perf')" >> ${tmp}
 
   echo "${tmp}"
 }
