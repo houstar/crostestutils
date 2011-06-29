@@ -9,15 +9,14 @@ import os
 import os.path
 import re
 
+import resultset
 
-def PrintRawData(reader, dirlist, use_timestats, keylist):
+
+def PrintRawData(reader, dirlist, keytype, keylist):
   """Print 'bootperf' results in "raw data" format."""
   for dir_ in dirlist:
     results = reader(dir_)
-    if use_timestats:
-      keyset = results.TimeKeySet()
-    else:
-      keyset = results.DiskKeySet()
+    keyset = results.KeySet(keytype)
     for i in range(0, keyset.num_iterations):
       if len(dirlist) > 1:
         line = "%s %3d" % (results.name, i)
@@ -33,23 +32,21 @@ def PrintRawData(reader, dirlist, use_timestats, keylist):
       print line
 
 
-def PrintStatisticsSummary(reader, dirlist, use_timestats, keylist):
+def PrintStatisticsSummary(reader, dirlist, keytype, keylist):
   """Print 'bootperf' results in "summary of averages" format."""
-  if use_timestats:
+  if (keytype == resultset.TestResultSet.BOOTTIME_KEYSET or
+      keytype == resultset.TestResultSet.FIRMWARE_KEYSET):
     header = "%5s %3s  %5s %3s  %s" % (
         "time", "s%", "dt", "s%", "event")
     format = "%5s %2d%%  %5s %2d%%  %s"
   else:
-    header = "%6s %3s  %6s %3s  %s" % (
+    header = "%7s %3s  %7s %3s  %s" % (
         "diskrd", "s%", "delta", "s%", "event")
-    format = "%6s %2d%%  %6s %2d%%  %s"
+    format = "%7s %2d%%  %7s %2d%%  %s"
   havedata = False
   for dir_ in dirlist:
     results = reader(dir_)
-    if use_timestats:
-      keyset = results.TimeKeySet()
-    else:
-      keyset = results.DiskKeySet()
+    keyset = results.KeySet(keytype)
     if keylist is not None:
       markers = keylist
     else:

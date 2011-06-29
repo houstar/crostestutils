@@ -5,15 +5,16 @@
 """Classes and functions for managing platform_BootPerf results.
 
 Results from the platform_BootPerf test in the ChromiumOS autotest
-package are stored in as performance 'keyvals', that is, a mapping
+package are stored as performance 'keyvals', that is, a mapping
 of names to numeric values.  For each iteration of the test, one
 set of keyvals is recorded.
 
-This module currently tracks two kinds of keyval results, the boot
-time results, and the disk read results.  These results are stored
-with keyval names such as 'seconds_kernel_to_login' and
-'rdbytes_kernel_to_login'.  These keyvals record an accumulated
-total measured from a fixed time in the past (kernel startup), e.g.
+This module currently tracks three kinds of keyval results: the boot
+time results, the disk read results, and firmware time results.
+These results are stored with keyval names such as
+'seconds_kernel_to_login', 'rdbytes_kernel_to_login', and
+'seconds_power_on_to_kernel'.  These keyvals record an accumulated
+total measured from a fixed time in the past, e.g.
 'seconds_kernel_to_login' records the total seconds from kernel
 startup to login screen ready.
 
@@ -24,6 +25,10 @@ startup.
 The disk read keyval names all start with the prefix
 'rdbytes_kernel_to_', and record bytes read from the boot device
 since kernel startup.
+
+The firmware keyval names all start with the prefix
+'seconds_power_on_to_', and record time in seconds since CPU
+power on.
 
 """
 
@@ -70,36 +75,47 @@ def _KeyDelta(dict_, key0, key1):
 class TestResultSet(object):
   """A set of boot time and disk usage result statistics.
 
-  Objects of this class consist of two sets of result statistics:
-  the boot time statistics and the disk statistics.
+  Objects of this class consist of three sets of result statistics:
+  the boot time statistics, the disk statistics, and the firmware
+  time statistics.
 
   Class TestResultsSet does not interpret or store keyval mappings
   directly; iteration results are processed by attached _KeySet
-  objects, one for boot time (`_timekeys`), one for disk read
-  (`_diskkeys`).  These attached _KeySet objects can be obtained
-  with appropriate methods; various methods on these objects will
-  calculate statistics on the results, and provide the raw data.
+  objects, one for each of the three types of result keyval. The
+  _KeySet objects are kept in a dictionary; they can be obtained
+  by calling the KeySet with the name of the keyset desired.
+  Various methods on the KeySet objects will calculate statistics on
+  the results, and provide the raw data.
 
   """
 
+  # The names of the available KeySets, to be used as arguments to
+  # KeySet().
+  BOOTTIME_KEYSET = "time"
+  DISK_KEYSET = "disk"
+  FIRMWARE_KEYSET = "firmware"
+
   def __init__(self, name):
     self.name = name
-    self._timekeys = _TimeKeySet()
-    self._diskkeys = _DiskKeySet()
+    self._keysets = {
+      self.BOOTTIME_KEYSET : _TimeKeySet(),
+      self.DISK_KEYSET : _DiskKeySet(),
+      self.FIRMWARE_KEYSET : _FirmwareKeySet(),
+    }
 
   def AddIterationResults(self, runkeys):
     """Add keyval results from a single iteration.
 
     A TestResultSet is constructed by repeatedly calling
-    AddRunResults(), iteration by iteration.  Iteration results are
-    passed in as a dictionary mapping keyval attributes to values.
-    When all iteration results have been added, FinalizeResults()
-    makes the results available for analysis.
+    AddIterationResults(), iteration by iteration.  Iteration
+    results are passed in as a dictionary mapping keyval attributes
+    to values.  When all iteration results have been added,
+    FinalizeResults() makes the results available for analysis.
 
     """
 
-    self._timekeys.AddRunResults(runkeys)
-    self._diskkeys.AddRunResults(runkeys)
+    for keyset in self._keysets.itervalues():
+      keyset.AddIterationResults(runkeys)
 
   def FinalizeResults(self):
     """Make results available for analysis.
@@ -112,46 +128,40 @@ class TestResultSet(object):
 
     """
 
-    self._timekeys.FinalizeResults()
-    self._diskkeys.FinalizeResults()
+    for keyset in self._keysets.itervalues():
+      keyset.FinalizeResults()
 
-  def TimeKeySet(self):
+  def KeySet(self, keytype):
     """Return the boot time statistics result set."""
-    return self._timekeys
-
-  def DiskKeySet(self):
-    """Return the disk read statistics result set."""
-    return self._diskkeys
+    return self._keysets[keytype]
 
 
 class _KeySet(object):
   """Container for a set of related statistics.
 
   _KeySet is an abstract superclass for containing collections of
-  either boot time or disk read statistics.  Statistics are stored
+  a related set of performance statistics.  Statistics are stored
   as a dictionary (`_keyvals`) mapping keyval names to lists of
-  values.
+  values.  The lists are indexed by the iteration number.
 
   The mapped keyval names are shortened by stripping the prefix
-  that identifies the type of prefix (keyvals that don't start with
+  that identifies the type of keyval (keyvals that don't start with
   the proper prefix are ignored).  So, for example, with boot time
   keyvals, 'seconds_kernel_to_login' becomes 'login' (and
   'rdbytes_kernel_to_login' is ignored).
 
   A list of all valid keyval names is stored in the `markers`
   instance variable.  The list is sorted by the natural ordering of
-  the underlying values (see the module comments for more details).
-
-  The list of values associated with a given keyval name are indexed
-  in the order in which they were added.  So, all values for a given
-  iteration are stored at the same index.
+  the underlying values.  Each iteration is required to contain
+  the same set of keyvals.  This is enforced in FinalizeResults()
+  (see below).
 
   """
 
   def __init__(self):
     self._keyvals = {}
 
-  def AddRunResults(self, runkeys):
+  def AddIterationResults(self, runkeys):
     """Add results for one iteration."""
 
     for key, value in runkeys.iteritems():
@@ -200,14 +210,12 @@ class _KeySet(object):
     between two keys.
 
     """
-
     return _ListStats(self.DeltaData(key0, key1))
 
 
 class _TimeKeySet(_KeySet):
   """Concrete subclass of _KeySet for boot time statistics."""
 
-  # TIME_KEY_PREFIX = 'seconds_kernel_to_'
   PREFIX = 'seconds_kernel_to_'
 
   # Time-based keyvals are reported in seconds and get converted to
@@ -215,13 +223,24 @@ class _TimeKeySet(_KeySet):
   TIME_SCALE = 1000
 
   def _ConvertVal(self, value):
-    # We use a "round to nearest int" formula here to make sure we
-    # don't lose anything in the conversion from decimal.
-    return int(self.TIME_SCALE * float(value) + 0.5)
+    # We want to return the nearest exact integer here.  round()
+    # returns a float, and int() truncates its results, so we have
+    # to combine them.
+    return int(round(self.TIME_SCALE * float(value)))
 
   def PrintableStatistic(self, value):
-    v = int(value + 0.5)
+    v = int(round(value))
     return ("%d" % v, v)
+
+
+class _FirmwareKeySet(_TimeKeySet):
+  """Concrete subclass of _KeySet for firmware time statistics."""
+
+  PREFIX = 'seconds_power_on_to_'
+
+  # Time-based keyvals are reported in seconds and get converted to
+  # milliseconds
+  TIME_SCALE = 1000
 
 
 class _DiskKeySet(_KeySet):
