@@ -12,12 +12,10 @@ set of keyvals is recorded.
 This module currently tracks two kinds of keyval results, the boot
 time results, and the disk read results.  These results are stored
 with keyval names such as 'seconds_kernel_to_login' and
-'rdbytes_kernel_to_login'.  Additionally, some older versions of the
-test produced keyval names such as 'sectors_read_kernel_to_login'.
-These keyvals record an accumulated total measured from a fixed
-time in the past (kernel startup), e.g. 'seconds_kernel_to_login'
-records the total seconds from kernel startup to login screen
-ready.
+'rdbytes_kernel_to_login'.  These keyvals record an accumulated
+total measured from a fixed time in the past (kernel startup), e.g.
+'seconds_kernel_to_login' records the total seconds from kernel
+startup to login screen ready.
 
 The boot time keyval names all start with the prefix
 'seconds_kernel_to_', and record time in seconds since kernel
@@ -25,16 +23,7 @@ startup.
 
 The disk read keyval names all start with the prefix
 'rdbytes_kernel_to_', and record bytes read from the boot device
-since kernel startup.  The obsolete disk keyvals start with the
-prefix 'sectors_read_kernel_to_' and record the same statistic
-measured in 512-byte sectors.
-
-Boot time and disk kevyal values have a consistent ordering
-across iterations.  For instance, if in one iteration the value of
-'seconds_kernel_to_login' is greater than the value of
-'seconds_kernel_to_x_started', then it will be greater in *all*
-iterations.  This property is a consequence of the underlying
-measurement procedure; it is not enforced by this module.
+since kernel startup.
 
 """
 
@@ -97,7 +86,6 @@ class TestResultSet(object):
     self.name = name
     self._timekeys = _TimeKeySet()
     self._diskkeys = _DiskKeySet()
-    self._olddiskkeys = _OldDiskKeySet()
 
   def AddIterationResults(self, runkeys):
     """Add keyval results from a single iteration.
@@ -112,7 +100,6 @@ class TestResultSet(object):
 
     self._timekeys.AddRunResults(runkeys)
     self._diskkeys.AddRunResults(runkeys)
-    self._olddiskkeys.AddRunResults(runkeys)
 
   def FinalizeResults(self):
     """Make results available for analysis.
@@ -126,10 +113,7 @@ class TestResultSet(object):
     """
 
     self._timekeys.FinalizeResults()
-    if not self._diskkeys.FinalizeResults():
-      self._olddiskkeys.FinalizeResults()
-      self._diskkeys = self._olddiskkeys
-    self._olddiskkeys = None
+    self._diskkeys.FinalizeResults()
 
   def TimeKeySet(self):
     """Return the boot time statistics result set."""
@@ -255,20 +239,3 @@ class _DiskKeySet(_KeySet):
   def PrintableStatistic(self, value):
     v = round(value, 1)
     return ("%.1fM" % v, v)
-
-
-class _OldDiskKeySet(_DiskKeySet):
-  """Concrete subclass of _KeySet for the old-style disk read statistics."""
-
-  # Older versions of platform_BootPerf reported total sectors read
-  # using names of the form sectors_read_kernel_to_* (instead of the
-  # more recent rdbytes_kernel_to_*), but some of those names
-  # exceeded the 30-character limit in the MySQL database schema.
-  PREFIX = 'sectors_read_kernel_to_'
-
-  # Old sytle disk read keyvals are reported in 512-byte sectors and
-  # get converted to MBytes (1 MByte = 1 million bytes, not 2**20)
-  SECTOR_SCALE = 512 * _DiskKeySet.DISK_SCALE
-
-  def _ConvertVal(self, value):
-    return self.SECTOR_SCALE * float(value)
