@@ -252,7 +252,7 @@ class AUTest(unittest.TestCase):
     self.worker.PrepareBase(self.target_image_path)
     self.worker.VerifyImage(self)
 
-  def testPlatformToolchainOptions(self):
+  def NotestPlatformToolchainOptions(self):
     """Tests the hardened toolchain options.
     """
     self.worker.Initialize(9228)
