@@ -10,6 +10,7 @@ import select
 import socket
 import SocketServer
 import threading
+import time
 
 class Filter(object):
   """Base class for data filters.
@@ -112,10 +113,19 @@ class CrosTestProxy(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
       os.system('sudo netstat -l --tcp -n -p')
       raise
 
+
   def serve_forever_in_thread(self):
     """Helper method to start the server in a new background thread."""
     server_thread = threading.Thread(target=self.serve_forever)
     server_thread.setDaemon(True)
     server_thread.start()
+
+    # Rig the odds so that the thread has probably really started before this
+    # method returns.
+    #
+    # If anyone can come up with a better way to hook into SocketServer's
+    # serve_forever method, I'm all ears.
+
+    time.sleep(1)
 
     return server_thread
