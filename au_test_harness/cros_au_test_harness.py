@@ -219,7 +219,7 @@ def main():
                     help='Disable using delta updates.')
   parser.add_option('--no_graphics', action='store_true',
                     help='Disable graphics for the vm test.')
-  parser.add_option('-j', '--jobs', default=1, type=int,
+  parser.add_option('-j', '--jobs', default=8, type=int,
                      help='Number of simultaneous jobs')
   parser.add_option('--public_key', default=None,
                      help='Public key to use on images and updates.')
