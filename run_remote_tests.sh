@@ -61,7 +61,8 @@ function cleanup() {
      [[ ${RAN_ANY_TESTS} -eq ${FLAGS_FALSE} ]]; then
     rm -rf "${TMP}"
   else
-    ln -nsf "${TMP}" /tmp/run_remote_tests.latest
+    ln -nsf "${TMP}" /tmp/run_remote_tests.latest ||
+        warn "Could not link latest test directory."
     echo ">>> Details stored under ${TMP}"
   fi
   stop_ssh_agent
