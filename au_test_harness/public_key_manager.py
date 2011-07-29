@@ -86,6 +86,6 @@ class PublicKeyManager(object):
     from_dir = os.path.dirname(self.image_path)
     cros_lib.RunCommand(['bin/cros_make_image_bootable',
                          cros_lib.ReinterpretPathForChroot(from_dir),
-                         image], print_cmd=False, redirect_stdout=True,
-                        redirect_stderr=True, enter_chroot=True,
-                        cwd=cros_lib.GetCrosUtilsPath())
+                         image, '--force_developer_mode'], print_cmd=False,
+                         redirect_stdout=True, redirect_stderr=True,
+                         enter_chroot=True, cwd=cros_lib.GetCrosUtilsPath())
