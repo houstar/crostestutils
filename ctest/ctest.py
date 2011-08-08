@@ -240,7 +240,8 @@ def GeneratePublicKey(private_key_path):
 
 
 def RunAUTestHarness(board, channel, zip_server_base,
-                     no_graphics, type, remote, clean, test_results_root):
+                     no_graphics, type, remote, clean, target_image,
+                     test_results_root):
   """Runs the auto update test harness.
 
   The auto update test harness encapsulates testing the auto-update mechanism
@@ -256,17 +257,19 @@ def RunAUTestHarness(board, channel, zip_server_base,
     type: which test harness to run.  Possible values: real, vm.
     remote: ip address for real test harness run.
     clean: Clean the state of test harness before running.
+    target_image: Target image to test.
     test_results_root: Root directory to store au_test_harness results.
   """
   crosutils_root = os.path.join(constants.SOURCE_ROOT, 'src', 'scripts')
 
-  # Grab the latest image we've built.
-  return_object = cros_lib.RunCommand(
-    ['./get_latest_image.sh', '--board=%s' % board], cwd=crosutils_root,
-    redirect_stdout=True, print_cmd=True)
+  if target_image is None:
+    # Grab the latest image we've built.
+    return_object = cros_lib.RunCommand(
+      ['./get_latest_image.sh', '--board=%s' % board], cwd=crosutils_root,
+      redirect_stdout=True, print_cmd=True)
 
-  latest_image_dir = return_object.output.strip()
-  target_image = os.path.join(latest_image_dir, _IMAGE_TO_EXTRACT)
+    latest_image_dir = return_object.output.strip()
+    target_image = os.path.join(latest_image_dir, _IMAGE_TO_EXTRACT)
 
   # Grab the latest official build for this board to use as the base image.
   # If it doesn't exist, run the update test against itself.
@@ -317,6 +320,8 @@ def main():
                     help='Base url for hosted images.')
   parser.add_option('--no_graphics', action='store_true', default=False,
                     help='Disable graphics for the vm test.')
+  parser.add_option('--target_image', default=None,
+                    help='Target image to test.')
   parser.add_option('--test_results_root', default=None,
                     help='Root directory to store test results.  Should '
                          'be defined relative to chroot root.')
@@ -336,7 +341,8 @@ def main():
 
   RunAUTestHarness(options.board, options.channel, options.zipbase,
                    options.no_graphics, options.type, options.remote,
-                   not options.cache, options.test_results_root)
+                   not options.cache, options.target_image,
+                   options.test_results_root)
 
 
 if __name__ == '__main__':
