@@ -10,7 +10,7 @@ This script parses the contents of one or more autoserv results folders and
 generates test reports.
 """
 
-
+import datetime
 import glob
 import optparse
 import os
@@ -23,15 +23,18 @@ from cros_build_lib import Color, Die
 
 _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 
-# List of crashes which are okay to ignore. This list should almost always be
-# empty. If you add an entry, mark it with a TODO(<your name>) and the issue
-# filed for the crash.
-_CRASH_WHITELIST = {
-  # TODO(dalecurtis): Remove both once http://crosbug.com/13733 is fixed.
-  'chromeos-wm': ['sig 6', 'sig 11'],
+class CrashWaiver:
+  """Represents a crash that we want to ignore for now."""
+  def __init__(self, signals, deadline, ignored_url, ignored_person):
+    self.signals = signals
+    self.deadline = datetime.datetime.strptime(deadline, '%Y-%b-%d')
 
-  # TODO(dalecurtis): Remove once http://crosbug.com/13377 is fixed.
-  'SynTPEnh': ['sig 6', 'sig 11']
+# List of crashes which are okay to ignore. This list should almost always be
+# empty. If you add an entry, include the bug URL and your name, something like
+#     'crashy':CrashWaiver(
+#       ['sig 11'], '2011-Aug-18', 'http://crosbug/123456', 'developer'),
+
+_CRASH_WHITELIST = {
 }
 
 
@@ -124,9 +127,12 @@ class ResultCollector(object):
     crashes = []
     regex = re.compile('Received crash notification for ([-\w]+).+ (sig \d+)')
     for match in regex.finditer(status_raw):
-      if (match.group(1) in _CRASH_WHITELIST and
-          match.group(2) in _CRASH_WHITELIST[match.group(1)]):
-        continue
+      if match.group(1) in _CRASH_WHITELIST:
+        w = _CRASH_WHITELIST[match.group(1)]
+        if match.group(2) in w.signals and w.deadline > datetime.datetime.now():
+          print 'Ignoring crash in %s for waiver that expires %s' % (
+              match.group(1), w.deadline.strftime('%Y-%b-%d'))
+          continue
       crashes.append('%s %s' % match.groups())
 
     results[testdir] = {'crashes': crashes, 'status': status, 'perf': perf}
