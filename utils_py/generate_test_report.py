@@ -25,9 +25,10 @@ _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 
 class CrashWaiver:
   """Represents a crash that we want to ignore for now."""
-  def __init__(self, signals, deadline, ignored_url, ignored_person):
+  def __init__(self, signals, deadline, url, ignored_person):
     self.signals = signals
     self.deadline = datetime.datetime.strptime(deadline, '%Y-%b-%d')
+    self.url = url
 
 # List of crashes which are okay to ignore. This list should almost always be
 # empty. If you add an entry, include the bug URL and your name, something like
@@ -35,6 +36,9 @@ class CrashWaiver:
 #       ['sig 11'], '2011-Aug-18', 'http://crosbug/123456', 'developer'),
 
 _CRASH_WHITELIST = {
+    'chromeos-wm':CrashWaiver(
+        ['sig 6', 'sig 11'], '2011-Sep-11', 'http://crosbug.com/19052',
+        'davidjames')
 }
 
 
@@ -130,8 +134,7 @@ class ResultCollector(object):
       if match.group(1) in _CRASH_WHITELIST:
         w = _CRASH_WHITELIST[match.group(1)]
         if match.group(2) in w.signals and w.deadline > datetime.datetime.now():
-          print 'Ignoring crash in %s for waiver that expires %s' % (
-              match.group(1), w.deadline.strftime('%Y-%b-%d'))
+          print 'Ignoring crash in %s for waiver %s' % (match.group(1), w.url)
           continue
       crashes.append('%s %s' % match.groups())
 
