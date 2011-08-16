@@ -207,15 +207,6 @@ def _CleanPreviousWork(options):
     if os.path.exists(target_vm_image_path): os.remove(target_vm_image_path)
     if os.path.exists(base_vm_image_path): os.remove(base_vm_image_path)
 
-def _CalculateDefaultJobs():
-  """Calculate how many jobs to run in parallel by default."""
-
-  # Since each job needs loop devices, limit our number of jobs to the
-  # number of loop devices divided by two.
-  loop_count = len(glob.glob('/dev/loop*'))
-  cpu_count = multiprocessing.cpu_count()
-  return max(1, min(cpu_count, loop_count / 2))
-
 
 def main():
   parser = optparse.OptionParser()
@@ -230,7 +221,7 @@ def main():
                     help='Disable using delta updates.')
   parser.add_option('--no_graphics', action='store_true',
                     help='Disable graphics for the vm test.')
-  parser.add_option('-j', '--jobs', default=_CalculateDefaultJobs(),
+  parser.add_option('-j', '--jobs', default=3,
                     type=int, help='Number of simultaneous jobs')
   parser.add_option('--public_key', default=None,
                      help='Public key to use on images and updates.')
