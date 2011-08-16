@@ -10,8 +10,8 @@ import fileinput
 import optparse
 import os
 import re
+import shutil
 import sys
-import traceback
 import urllib
 import HTMLParser
 
@@ -271,6 +271,20 @@ def RunAUTestHarness(board, channel, zip_server_base,
     latest_image_dir = return_object.output.strip()
     target_image = os.path.join(latest_image_dir, _IMAGE_TO_EXTRACT)
 
+  # Copy image to new directory.
+  ctest_target_dir = os.path.abspath('ctest_target')
+  if os.path.exists(ctest_target_dir):
+    shutil.rmtree(ctest_target_dir)
+  os.makedirs(ctest_target_dir)
+  target_image_dir = os.path.dirname(target_image)
+  new_target_image = os.path.join(ctest_target_dir, _IMAGE_TO_EXTRACT)
+  for filename in os.listdir(target_image_dir):
+    path = os.path.join(target_image_dir, filename)
+    if (filename == _IMAGE_TO_EXTRACT or os.path.isfile(path) and
+        'image' not in filename):
+      cros_lib.Info('Copying %s to %s...' % (filename, ctest_target_dir))
+      shutil.copy(path, ctest_target_dir)
+
   # Grab the latest official build for this board to use as the base image.
   # If it doesn't exist, run the update test against itself.
   download_folder = os.path.abspath('latest_download')
@@ -281,7 +295,7 @@ def RunAUTestHarness(board, channel, zip_server_base,
     GrabZipAndExtractImage(zip_url, download_folder, _IMAGE_TO_EXTRACT)
     base_image = os.path.join(download_folder, _IMAGE_TO_EXTRACT)
   else:
-    base_image = target_image
+    base_image = new_target_image
 
   update_engine_path = os.path.join(crosutils_root, '..', 'platform',
                                     'update_engine')
@@ -292,7 +306,7 @@ def RunAUTestHarness(board, channel, zip_server_base,
 
   cmd = ['bin/cros_au_test_harness',
          '--base_image=%s' % base_image,
-         '--target_image=%s' % target_image,
+         '--target_image=%s' % new_target_image,
          '--board=%s' % board,
          '--type=%s' % type,
          '--remote=%s' % remote,

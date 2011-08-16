@@ -59,21 +59,8 @@ class PublicKeyManager(object):
       dir_path = os.path.dirname(self._full_target_key_path)
       cros_lib.RunCommand(['sudo', 'mkdir', '--parents', dir_path],
                           print_cmd=True)
-      cros_lib.RunCommand(['sync'])
       cros_lib.RunCommand(['sudo', 'cp', '--force', '-p', self.key_path,
                            self._full_target_key_path], print_cmd=True)
-    finally:
-      cros_lib.UnmountImage(self._rootfs_dir, self._stateful_dir)
-      self._MakeImageBootable()
-
-  def RemoveKeyFromImage(self):
-    """Removes the key specified in init from the image."""
-    cros_lib.Info('Removing public key from image %s.' % self.image_path)
-    try:
-      cros_lib.MountImage(self.image_path, self._rootfs_dir, self._stateful_dir,
-                          read_only=False)
-      cros_lib.RunCommand(['sudo', 'rm', '--force', self._full_target_key_path],
-                          print_cmd=False)
     finally:
       cros_lib.UnmountImage(self._rootfs_dir, self._stateful_dir)
       self._MakeImageBootable()

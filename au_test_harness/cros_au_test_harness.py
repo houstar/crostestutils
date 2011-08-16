@@ -271,37 +271,25 @@ def main():
     os.makedirs(options.test_results_root)
 
   # Pre-generate update modifies images by adding public keys to them.
-  # Wrap try to make sure we clean this up before we're done.
+  # Generate cache of updates to use during test harness.
+  update_cache = _PregenerateUpdates(options)
+  au_worker.AUWorker.SetUpdateCache(update_cache)
+
+  my_server = dev_server_wrapper.DevServerWrapper(
+      au_test.AUTest.test_results_root)
+  my_server.start()
   try:
-    # Generate cache of updates to use during test harness.
-    update_cache = _PregenerateUpdates(options)
-    au_worker.AUWorker.SetUpdateCache(update_cache)
-
-    my_server = dev_server_wrapper.DevServerWrapper(
-        au_test.AUTest.test_results_root)
-    my_server.start()
-    try:
-      if options.type == 'vm':
-        _RunTestsInParallel(options)
-      else:
-        # TODO(sosa) - Take in a machine pool for a real test.
-        # Can't run in parallel with only one remote device.
-        test_suite = _PrepareTestSuite(options)
-        test_result = unittest.TextTestRunner().run(test_suite)
-        if not test_result.wasSuccessful(): cros_lib.Die('Test harness failed.')
-
-    finally:
-      my_server.Stop()
+    if options.type == 'vm':
+      _RunTestsInParallel(options)
+    else:
+      # TODO(sosa) - Take in a machine pool for a real test.
+      # Can't run in parallel with only one remote device.
+      test_suite = _PrepareTestSuite(options)
+      test_result = unittest.TextTestRunner().run(test_suite)
+      if not test_result.wasSuccessful(): cros_lib.Die('Test harness failed.')
 
   finally:
-    # Un-modify any target images we modified.  We don't need to un-modify
-    # non-targets because they aren't important for archival steps.
-    if options.public_key:
-      cros_lib.Info('Cleaning up.  Removing keys added as part of testing.')
-      target_directory = os.path.dirname(options.target_image)
-      for key_manager in au_test.AUTest.public_key_managers:
-        if key_manager.image_path.startswith(target_directory):
-          key_manager.RemoveKeyFromImage()
+    my_server.Stop()
 
 
 if __name__ == '__main__':
