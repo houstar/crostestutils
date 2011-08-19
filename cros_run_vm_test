@@ -68,7 +68,7 @@ trap stop_kvm EXIT
 start_kvm "${FLAGS_image_path}"
 retry_until_ssh
 
-"${SCRIPT_ROOT}/enter_chroot.sh" -- run_remote_tests.sh \
+${GCLIENT_ROOT}/chromite/bin/cros_sdk -- run_remote_tests.sh \
     --board=${FLAGS_board} \
     --ssh_port=${FLAGS_ssh_port} \
     --remote=127.0.0.1 \
