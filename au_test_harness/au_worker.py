@@ -10,14 +10,12 @@ various types of target.  Types of targets include VM's, real devices, etc.
 """
 
 import inspect
-import threading
 import os
-import sys
 
 import cros_build_lib as cros_lib
 
-import dev_server_wrapper
-import update_exception
+from crostestutils.au_test_harness import update_exception
+from crostestutils.lib import dev_server_wrapper
 
 
 class AUWorker(object):
@@ -30,7 +28,7 @@ class AUWorker(object):
   def __init__(self, options, test_results_root):
     """Processes options for the specific-type of worker."""
     self.board = options.board
-    self.private_key = options.private_key
+    self._first_update = False
     self.test_results_root = test_results_root
     self.use_delta_updates = options.delta
     self.verbose = options.verbose
@@ -49,22 +47,38 @@ class AUWorker(object):
     pass
 
   def GetUpdateMessage(self, update_target, update_base, from_vm, proxy):
+    """Returns the update message that should be printed out for this update."""
     if update_base:
-      str = 'Performing a delta update from %s to %s' % (
+      msg = 'Performing a delta update from %s to %s' % (
           update_base, update_target)
     else:
-      str = 'Performing a full update to %s' % update_target
+      msg = 'Performing a full update to %s' % update_target
 
-    if from_vm: str += ' in a VM'
-    if proxy: ' using a proxy on port %s' % proxy
-    return str
+    if from_vm: msg += ' in a VM'
+    if proxy: msg += ' using a proxy on port ' + str(proxy)
+    return msg
+
+  def PrepareBase(self, image_path, signed_base):
+    """Method to be called to prepare target for testing this test.
+
+    Subclasses must override this method with the correct procedure for
+    preparing the test target.
+
+`   Args:
+      image_path: The image that should reside on the target before the test.
+      signed_base: If True, use the signed image rather than the actual image.
+    """
+    pass
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port=None, private_key_path=None):
     """Implementation of an actual update.
 
-    See PerformUpdate for description of args.  Subclasses must override this
-    method with the correct update procedure for the class.
+    Subclasses must override this method with the correct update procedure for
+    the class.
+
+    Args:
+      See PerformUpdate for description of args.
     """
     pass
 
@@ -78,6 +92,7 @@ class AUWorker(object):
     Args:
       update_path:  Path to the image to update with. This directory should
         contain both update.gz, and stateful.image.gz
+      stateful_change: How to perform the stateful update.
       proxy_port:  Port to have the client connect to. For use with
         CrosTestProxy.
     """
@@ -125,13 +140,10 @@ class AUWorker(object):
     Raises an update_exception.UpdateException if _UpdateImage returns an error.
     """
     if not self.use_delta_updates: src_image_path = ''
-    if private_key_path:
-      key_to_use = private_key_path
-    else:
-      key_to_use = self.private_key
+    key_to_use = private_key_path
 
-    self.UpdateImage(image_path, src_image_path, stateful_change,
-                            proxy_port, key_to_use)
+    self.UpdateImage(image_path, src_image_path, stateful_change, proxy_port,
+                     key_to_use)
 
   @classmethod
   def SetUpdateCache(cls, update_cache):
@@ -140,36 +152,21 @@ class AUWorker(object):
 
   # --- METHODS FOR SUB CLASS USE ---
 
-  def PrepareRealBase(self, image_path):
+  def PrepareRealBase(self, image_path, signed_base):
     """Prepares a remote device for worker test by updating it to the image."""
-    self.UpdateImage(image_path)
+    if not signed_base:
+      self.UpdateImage(image_path)
+    else:
+      self.UpdateImage(image_path + '.signed')
 
-  def PrepareVMBase(self, image_path):
-    """Prepares a VM image for worker test by creating the VM file from the img.
-    """
-    # VM Constants.
-    FULL_VDISK_SIZE = 6072
-    FULL_STATEFULFS_SIZE = 3074
-    # Needed for VM delta updates.  We need to use the qemu image rather
-    # than the base image on a first update.  By tracking the first_update
-    # we can set src_image to the qemu form of the base image when
-    # performing generating the delta payload.
+  def PrepareVMBase(self, image_path, signed_base):
+    """Prepares a VM image for worker test."""
+    # Tells the VM tests to use the Qemu image as the start point.
     self._first_update = True
-    self.vm_image_path = '%s/chromiumos_qemu_image.bin' % os.path.dirname(
-        image_path)
-    if not os.path.exists(self.vm_image_path):
-      cros_lib.Info('Creating %s' % self.vm_image_path)
-      cros_lib.RunCommand(['./image_to_vm.sh',
-                           '--full',
-                           '--from=%s' % cros_lib.ReinterpretPathForChroot(
-                               os.path.dirname(image_path)),
-                           '--vdisk_size=%s' % FULL_VDISK_SIZE,
-                           '--statefulfs_size=%s' % FULL_STATEFULFS_SIZE,
-                           '--board=%s' % self.board,
-                           '--test_image'
-                          ], enter_chroot=True, cwd=self.crosutils)
-
-    assert os.path.exists(self.vm_image_path)
+    self.vm_image_path = os.path.join(os.path.dirname(image_path),
+                                      'chromiumos_qemu_image.bin')
+    if signed_base:
+      self.vm_image_path = self.vm_image_path + '.signed'
 
   def GetStatefulChangeFlag(self, stateful_change):
     """Returns the flag to pass to image_to_vm for the stateful change."""
@@ -184,24 +181,30 @@ class AUWorker(object):
     """Appends common args to an update cmd defined by an array.
 
     Modifies cmd in places by appending appropriate items given args.
+
+    Args:
+      See PerformUpdate for description of args.
     """
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
-    # Get pregenerated update if we have one.
     update_id = dev_server_wrapper.GenerateUpdateId(image_path, src_image_path,
                                                     private_key_path)
-    cache_path = self.update_cache[update_id]
+    cache_path = self.update_cache.get(update_id)
     if cache_path:
       update_url = dev_server_wrapper.DevServerWrapper.GetDevServerURL(
           proxy_port, cache_path)
       cmd.append('--update_url=%s' % update_url)
     else:
-      cmd.append('--image=%s' % image_path)
-      if src_image_path: cmd.append('--src_image=%s' % src_image_path)
+      raise update_exception.UpdateException(
+          1, 'No payload found for %s' % update_id)
 
   def RunUpdateCmd(self, cmd, log_directory=None):
     """Runs the given update cmd given verbose options.
 
     Raises an update_exception.UpdateException if the update fails.
+
+    Args:
+      cmd:  The shell cmd to run.
+      log_directory:  Where to store the logs for this cmd.
     """
     if self.verbose:
       try:
@@ -224,6 +227,7 @@ class AUWorker(object):
     """Helper function that asserts a sufficient number of tests passed.
 
     Args:
+      unittest: the unittest object running this test.
       output: stdout from a test run.
       percent_required_to_pass: percentage required to pass.  This should be
         fall between 0-100.
@@ -268,24 +272,35 @@ class AUWorker(object):
     2_label, etc.  The directory returned is outside the chroot so if passing
     to an script that is called with enther_chroot, make sure to use
     ReinterpretPathForChroot.
+
+    Args:
+      label: The label used to describe this test phase.
+    Returns:
+      Returns a path for the results directory to use for this label.
     """
     self.results_count += 1
-    dir = os.path.join(self.results_directory, '%s_%s' % (self.results_count,
-                                                          label))
-    if not os.path.exists(dir):
-      os.makedirs(dir)
+    return_dir = os.path.join(self.results_directory, '%s_%s' % (
+        self.results_count, label))
+    if not os.path.exists(return_dir):
+      os.makedirs(return_dir)
 
-    return dir
+    return return_dir
 
   # --- PRIVATE HELPER FUNCTIONS ---
 
   def _ParseGenerateTestReportOutput(self, output):
-    """Returns the percentage of tests that passed based on output."""
+    """Returns the percentage of tests that passed based on output.
+
+    Args:
+      output: Output string for generate_test_report.py.
+    Returns:
+      The percentage of tests that passed.
+    """
     percent_passed = 0
     lines = output.split('\n')
 
     for line in lines:
-      if line.startswith("Total PASS:"):
+      if line.startswith('Total PASS:'):
         # FORMAT: ^TOTAL PASS: num_passed/num_total (percent%)$
         percent_passed = line.split()[3].strip('()%')
         break
