@@ -7,8 +7,13 @@
 
 import os
 import threading
+import time
 
 import cros_build_lib as cros_lib
+import update_exception
+
+# Wait up to 3 minutes for the dev server to start.
+DEV_SERVER_TIMEOUT = 180
 
 def GenerateUpdateId(target, src, key):
   """Returns a simple representation id of target and src paths."""
@@ -23,6 +28,7 @@ class DevServerWrapper(threading.Thread):
   def __init__(self, test_root):
     self.proc = None
     self.test_root = test_root
+    self._log_filename = os.path.join(test_root, 'dev_server.log')
     threading.Thread.__init__(self)
 
   def run(self):
@@ -35,14 +41,48 @@ class DevServerWrapper(threading.Thread):
                          '--client_prefix=ChromeOSUpdateEngine',
                          '--production',
                          ], enter_chroot=True, print_cmd=False,
-                         log_to_file=os.path.join(self.test_root,
-                                                  'dev_server.log'),
+                         log_to_file=self._log_filename,
                          cwd=cros_lib.GetCrosUtilsPath())
 
   def Stop(self):
     """Kills the devserver instance."""
     cros_lib.RunCommand(['sudo', 'pkill', '-f', 'devserver.py'], error_ok=True,
                         print_cmd=False)
+
+  def PrintLog(self):
+    """Print devserver output."""
+    # Open in update mode in case the child process hasn't opened the file yet.
+    log = open(self._log_filename, 'w+')
+    print '--- Start output from %s ---' % self._log_filename
+    for line in log:
+      sys.stdout.write(line)
+    print '--- End output from %s ---' % self._log_filename
+    log.close()
+
+  def WaitUntilStarted(self):
+    """Wait until the devserver has started."""
+    # Open in update mode in case the child process hasn't opened the file yet.
+    log = open(self._log_filename, 'w+')
+    pos = 0
+    for _ in range(DEV_SERVER_TIMEOUT * 2):
+      log.seek(pos)
+      for line in log:
+        # When the dev server has started, it will print a line stating
+        # 'Bus STARTED'. Wait for that line to appear.
+        if 'Bus STARTED' in line:
+          log.close()
+          return
+        # If we've read a complete line, and it doesn't contain the magic
+        # phrase, move on to the next line.
+        if line.endswith('\n'):
+          pos = log.tell()
+      # Looks like it hasn't started yet. Keep waiting...
+      time.sleep(0.5)
+    else:
+      log.close()
+      self.PrintLog()
+      error = 'Timeout waiting for devserver startup.'
+      raise update_exception.UpdateException(1, error)
 
   @classmethod
   def GetDevServerURL(cls, port, sub_dir):

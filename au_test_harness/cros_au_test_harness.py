@@ -279,6 +279,7 @@ def main():
       au_test.AUTest.test_results_root)
   my_server.start()
   try:
+    my_server.WaitUntilStarted()
     if options.type == 'vm':
       _RunTestsInParallel(options)
     else:
