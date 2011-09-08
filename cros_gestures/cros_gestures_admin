@@ -1,0 +1,128 @@
+#!/usr/bin/python
+# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Simple command line interface for chromeos gesture admins.
+
+This is heavily dependent/copied on the gsutil cli interface to Google Storage.
+http://code.google.com/apis/storage/docs/gsutil.html
+Think of it as a version of gsutil with assumptions for more guided use.
+
+Look here for documentation on Google Storage:
+http://code.google.com/apis/storage/docs/gsmanager.html
+"""
+
+import logging
+import pprint
+import signal
+import sys
+
+import constants
+import cros_gestures_logging
+import cros_gestures_utils
+from exception import CrosGesturesException
+
+
+color = cros_gestures_utils.Color()
+LOG = logging.getLogger('cros_gestures')
+
+
+#------------------------------------------------------------------------------
+# Setup gslib and boto by identifying gsutil/boto dirs and .boto location.
+#------------------------------------------------------------------------------
+gsutil_bin_dir, boto_config = cros_gestures_utils.FindDependencies(
+    'BOTO_VALIDATE_CONFIG')
+
+import boto
+boto.UserAgent += '/cros_gestures'
+from boto.exception import GSResponseError
+from boto.exception import InvalidUriError
+
+# We don't use the oauth2 authentication plugin directly; importing it here
+# ensures that it's loaded and available by default.
+_HAVE_OAUTH2 = False
+try:
+  from oauth2_plugin import oauth2_plugin
+  _HAVE_OAUTH2 = True
+except ImportError:
+  pass
+
+import cros_gestures_commands
+import cros_gestures_options
+
+
+#------------------------------------------------------------------------------
+# Declare custom commands.
+#------------------------------------------------------------------------------
+commands = {'cat': None, 'download': None, 'ls': None, 'invalidate': None,
+            'validate': None, 'ver': None}
+COMMANDS_STRING = ', '.join(sorted(commands.keys()))
+USAGE_STRING = (
+    'cros_gestures_admin [options] %(command)s\n%(command)s from: '
+    '%(commands)s.\n\nThis utility is used to validate and invalidate '
+    'files.  Validated files may be included in test passes.' % {
+        'command': color.Color(cros_gestures_utils.Color.BLUE, 'command'),
+        'commands': color.Color(cros_gestures_utils.Color.BOLD,
+                                COMMANDS_STRING)})
+
+
+# If user enters no commands just print the usage info.
+if len(sys.argv) == 1:
+  cros_gestures_utils.OutputAndExit(USAGE_STRING)
+options, args, command_string = cros_gestures_options.ParseArgs(USAGE_STRING,
+                                                                commands,
+                                                                admin=True)
+cros_gestures_logging.SetupLogging(options)
+if constants.debug > 1:
+  LOG.debug('Using\n\tGSUTIL_BIN_DIR=%s\n\tBOTO_CONFIG=%s.', gsutil_bin_dir,
+                                                             boto_config)
+  LOG.debug('Accepted funtionalities:\n%s.',
+            pprint.pformat(options.config_options))
+
+#------------------------------------------------------------------------------
+# Define custom commands.
+#------------------------------------------------------------------------------
+_command_inst = cros_gestures_commands.GestureCommand(gsutil_bin_dir)
+
+
+NO_MAX = sys.maxint
+# [command_function, min # args, max # args, file_uri_ok, gs_uri_ok]
+commands.update({
+    'cat': [_command_inst.CatGestureCommand, 1, NO_MAX, True, True],
+    'download': [_command_inst.DownloadGestureCommand, 1, NO_MAX, True,
+                 False],
+    'ls': [_command_inst.ListGesturesCommand, 0, NO_MAX, True, True],
+    'invalidate': [_command_inst.InvalidateGestureCommand, 1, 1, True,
+                   True],
+    'validate': [_command_inst.ValidateGestureCommand, 1, 1, True, True],
+    'ver': [_command_inst.VersionCommand, 0, 0, False, False]})
+
+
+#------------------------------------------------------------------------------
+# Main
+#------------------------------------------------------------------------------
+def main():
+  """Gesture File Command Line Interface main code."""
+  try:
+    signal.signal(signal.SIGINT, cros_gestures_utils.HandleControlC)
+    command, min_nargs, max_nargs, file_uri, gs_uri = commands[command_string]
+    # General command validation.
+    if len(args) < min_nargs or len(args) > max_nargs:
+      raise CrosGesturesException(
+          'Wrong number of arguments for "%s" command.' % command_string)
+    if not file_uri and cros_gestures_utils.HaveFileUris(args):
+      raise CrosGesturesException(
+          '"%s" command does not support "file://" URIs. '
+          'Did you mean to use a gs:// URI?' % command_string)
+    if not gs_uri and cros_gestures_commands.GestureUri.HasGSUris(args):
+      raise CrosGesturesException(
+          '"%s" command does not support gs:// URIs.' % command_string)
+    # Finally, run the command.
+    sys.exit(command(cros_gestures_utils.StripFileUris(args), options))
+  except CrosGesturesException, e:
+    cros_gestures_utils.HandleCrosGesturesException(e)
+
+
+if __name__ == '__main__':
+  main()

@@ -1,0 +1,34 @@
+This directory contains Python code that allows Chrome OS developers and testers
+to make files available for touchpad gesture testing.
+
+The command line tool is modeled very closely on (and depends) on the Google
+Storage command line client (gsutil).
+
+Contents:
+ - cros_gestures is the command line tool
+ - setup_cros_gestures.sh helps establish proper environment variables to find
+   both gsutil and the needed .boto file for authentication.
+
+For more information on installing and using gsutil, see
+<http://code.google.com/apis/storage/docs/gsutil.html>.
+
+To install gsutils:
+ - cd ~
+ - wget http://commondatastorage.googleapis.com/pub/gsutil.tar.gz
+ - gzip -d gsutil.tar.gz
+ - tar -xvf gsutil.tar
+
+To install cros_gestures:
+...git clone
+
+To install cros_gestures_boto:
+...git clone
+
+DEPLOYMENT PLAN:
+
+cros_gestures
+-cros_gestures
+-cros_gestures_boto
+-gsutil
+
+Fix environment variables in ./setup_cros_gestures.sh.

@@ -1,0 +1,131 @@
+#!/usr/bin/python
+# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Create cros_gestures command line interface package for test machines.
+
+Assemble the cros_gestures command line tool and gsutil into a package and/or
+deploy it to a remote test machine for use.
+"""
+
+__version__ = '0.9.1'
+
+
+import logging
+import optparse
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+
+import cros_gestures_utils
+
+
+color = cros_gestures_utils.Color()
+LOG = logging.getLogger('create_install_package')
+
+GESTURE_ARCHIVE = 'cros_gestures.tar.bz2'
+
+
+def RunCommand(cmd):
+  """Common command execution."""
+  LOG.debug('Running command (%s)', cmd)
+  rc = subprocess.call(cmd, shell=True)
+  if rc:
+    LOG.error('Command (%s) failed!', cmd)
+    sys.exit(1)
+  return rc
+
+
+def CopyFilesToTempDir(argv):
+  """Copy all the files in the package to a temp dir."""
+  gsutil_bin_dir, boto_config = cros_gestures_utils.FindDependencies()
+  LOG.debug('Using GSUTIL_BIN_DIR=%s and BOTO_CONFIG=%s.', gsutil_bin_dir,
+                                                           boto_config)
+  temp_dir = tempfile.mkdtemp()
+  # Copy cros_gestures
+  shutil.copytree(os.path.dirname(os.path.abspath(argv[0])),
+                  os.path.join(temp_dir, 'cros_gestures'))
+  # Copy gsutil
+  shutil.copytree(os.path.abspath(gsutil_bin_dir),
+                  os.path.join(temp_dir, 'cros_gestures', 'gsutil'))
+  # Copy .boto
+  shutil.copyfile(os.path.abspath(boto_config),
+                  os.path.join(temp_dir, 'cros_gestures', '.boto'))
+  return temp_dir
+
+
+def TarPkg(temp_dir, pkg_path, relative_file_path):
+  """Create a .tar.bz2 package of the cros_gestures files."""
+  cmd = 'tar -j -C "%s" -cf "%s" "%s"' % (temp_dir, pkg_path,
+                                          relative_file_path)
+  rc = RunCommand(cmd)
+  shutil.rmtree(temp_dir)
+  return rc
+
+
+def RemoteCopyAndInstall(remote_machine, package_path):
+  """Copy package and install script then run install script."""
+  warning_msg = ('Accessing test machine (%s), you may be prompted for a '
+                 'test machine password.' % remote_machine)
+  print color.Color(cros_gestures_utils.Color.YELLOW, warning_msg)
+  RunCommand('scp -q "%s" root@%s:/tmp' % (package_path, remote_machine))
+  install_script = 'install_cros_gestures.py'
+  print color.Color(cros_gestures_utils.Color.YELLOW, warning_msg)
+  RunCommand('scp -q "%s" root@%s:/tmp' % (os.path.join(
+      os.path.dirname(package_path), 'remote', install_script), remote_machine))
+  print color.Color(cros_gestures_utils.Color.YELLOW, warning_msg)
+  RunCommand('ssh root@%s "/tmp/%s -s /tmp"' % (remote_machine, install_script))
+
+
+def ParseArgs(argv):
+  """Process command line options."""
+  base_dir = os.path.dirname(os.path.abspath(argv[0]))
+  usage_string = (
+      'run_remote_tool\n\n'
+      'Creates and/or deploys a package of cros_gestures suitable for '
+      'test machine usage.')
+  parser = optparse.OptionParser(usage=usage_string)
+  parser.add_option('-d', '--debug',
+                    help='Show output [default: %default]',
+                    dest='debugout',
+                    action='store_true',
+                    default=False)
+  parser.add_option('-p', '--package-file',
+                    help='cros_gestures packagea file [default: %default]',
+                    dest='packagefile',
+                    default=os.path.join(base_dir, GESTURE_ARCHIVE))
+  parser.add_option('', '--remote',
+                    help='Deploy to remote machine [default: %default]',
+                    dest='remoteip',
+                    default=None)
+  options, args = parser.parse_args()
+  # Setup logging.
+  if options.debugout:
+    logging_level = logging.DEBUG
+  else:
+    logging_level = logging.INFO
+  logging.basicConfig(level=logging_level)
+  # Simple parameter checking.
+  if len(args) > 0:
+    output_and_exit('No arguments are expected to be passed.\n\n%s' %
+                    usage_string)
+  return options, base_dir
+
+
+def main(argv):
+  """Create dir and then package in it."""
+  options, base_dir = ParseArgs(argv)
+  if not os.path.isfile(options.packagefile):
+    output_dir = CopyFilesToTempDir(argv)
+    TarPkg(output_dir, options.packagefile, 'cros_gestures')
+    print '%s created.' % options.packagefile
+  if options.remoteip:
+    RemoteCopyAndInstall(options.remoteip, options.packagefile)
+    print 'Deployed to %s.' % options.remoteip
+
+
+if __name__ == '__main__':
+  main(sys.argv)
