@@ -93,7 +93,7 @@ def _PregenerateUpdates(options):
     """
     return_array = []
     # Looking for this line in the output.
-    key_line_re = re.compile('^PREGENERATED_UPDATE=([\w/.]+)')
+    key_line_re = re.compile('^PREGENERATED_UPDATE=([\w/./+]+)')
     for log_file, return_code in map(lambda x, y: (x, y), log_files,
                                      return_codes):
       log_file_handle = open(log_file)
