@@ -139,8 +139,12 @@ class CTest(object):
                    'Using target instead.')
       self.base = self.target
 
-  def GenerateUpdatePayloads(self):
-    """Generates payloads for the test harness."""
+  def GenerateUpdatePayloads(self, full):
+    """Generates payloads for the test harness.
+
+    Args:
+      full: Build payloads for full test suite.
+    """
     generator = ('../platform/crostestutils/'
                  'generate_test_payloads/cros_generate_test_payloads.py')
 
@@ -148,11 +152,12 @@ class CTest(object):
     cmd.append('--target=%s' % self.target)
     cmd.append('--base=%s' % self.base)
     cmd.append('--board=%s' % self.board)
-    cmd.append('--full_suite')
-    cmd.append('--nplus1')
-    if self.sign_payloads:
-      cmd.append('--public_key=%s' % self.public_key)
-      cmd.append('--private_key=%s' % self.private_key)
+    if full:
+      cmd.append('--full_suite')
+      cmd.append('--nplus1')
+      if self.sign_payloads:
+        cmd.append('--public_key=%s' % self.public_key)
+        cmd.append('--private_key=%s' % self.private_key)
 
     if self.type != 'vm': cmd.append('--novm')
     try:
@@ -164,13 +169,16 @@ class CTest(object):
                     'cros_generate_update_payload for error handling.')
       sys.exit(1)
 
-  def RunAUTestHarness(self):
+  def RunAUTestHarness(self, full):
     """Runs the auto update test harness.
 
     The auto update test harness encapsulates testing the auto-update mechanism
     for the latest image against the latest official image from the channel.
     This also tests images with suite_Smoke (built-in as part of its
     verification process).
+
+    Args:
+      full: Run full test suite.
     """
     cmd = ['bin/cros_au_test_harness',
            '--base_image=%s' % self.base,
@@ -178,14 +186,18 @@ class CTest(object):
            '--board=%s' % self.board,
            '--type=%s' % self.type,
            '--remote=%s' % self.remote,
+           '--verbose',
           ]
+
+    if not full: cmd.append('--test_prefix=SimpleTest')
 
     if self.test_results_root: cmd.append('--test_results_root=%s' %
                                           self.test_results_root)
     if self.no_graphics: cmd.append('--no_graphics')
 
     # Using keys is only compatible with clean.
-    if self.private_key: cmd.append('--private_key=%s' % self.private_key)
+    if full and self.sign_payloads:
+      cmd.append('--private_key=%s' % self.private_key)
     try:
       chromite_build_lib.RunCommand(cmd, cwd=self.crosutils_root)
     except chromite_build_lib.RunCommandError:
@@ -207,6 +219,9 @@ def main():
                     help='Cache payloads')
   parser.add_option('--no_graphics', action='store_true', default=False,
                     help='Disable graphics for the vm test.')
+  parser.add_option('--quick', default=True, action='store_false',
+                    dest='full_suite',
+                    help='Run the quick version of ctest.')
   parser.add_option('--remote', default='0.0.0.0',
                     help='For real tests, ip address of the target machine.')
   parser.add_option('--target_image', default=None,
@@ -227,8 +242,8 @@ def main():
   ctest = CTest(options)
   if ctest.sign_payloads: ctest.GeneratePublicKey()
   ctest.FindTargetAndBaseImages()
-  ctest.GenerateUpdatePayloads()
-  ctest.RunAUTestHarness()
+  ctest.GenerateUpdatePayloads(options.full_suite)
+  ctest.RunAUTestHarness(options.full_suite)
 
 
 if __name__ == '__main__':
