@@ -36,6 +36,22 @@ class UpdatePayload(object):
     self.target = target
     self.key = key
 
+  def __str__(self):
+    my_repr = self.target
+    if self.base:
+      my_repr = self.base + '->' + my_repr
+
+    if self.key:
+      my_repr = my_repr + '+' + self.key
+
+    return my_repr
+
+  def __eq__(self, other):
+    return str(self) == str(other)
+
+  def __hash__(self):
+    return hash(str(self))
+
 
 class UpdatePayloadGenerator(object):
   """Class responsible for generating update payloads."""
@@ -62,13 +78,13 @@ class UpdatePayloadGenerator(object):
     # Affect what payloads we create.
     self.board = options.board
     self.full_suite = options.full_suite
-    self.payloads = []
+    self.payloads = set([])
     self.nplus1 = options.nplus1
     self.vm = options.vm
 
   def _AddUpdatePayload(self, target, base, key=None):
     """Adds a new required update payload.  If base is None, a full payload."""
-    self.payloads.append(UpdatePayload(target, base, key))
+    self.payloads.add(UpdatePayload(target, base, key))
 
   def GenerateImagesForTesting(self):
     # All vm testing requires a VM'ized target.
