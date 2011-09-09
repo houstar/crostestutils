@@ -154,7 +154,6 @@ class CTest(object):
     cmd.append('--board=%s' % self.board)
     if full:
       cmd.append('--full_suite')
-      cmd.append('--nplus1')
       if self.sign_payloads:
         cmd.append('--public_key=%s' % self.public_key)
         cmd.append('--private_key=%s' % self.private_key)
