@@ -18,7 +18,7 @@ class ParallelJobTimeoutError(Exception):
 class ParallelJob(multiprocessing.Process):
   """Small wrapper for Process that stores output of its target method."""
 
-  MAX_TIMEOUT_SECONDS = 1800
+  MAX_TIMEOUT_SECONDS = 2400
   SLEEP_TIMEOUT_SECONDS = 180
 
   def __init__(self, starting_semaphore, target, args):
