@@ -158,6 +158,12 @@ def main():
     cros_lib.Die('No update cache found. Please run '
                  'cros_generate_update_payloads before running this harness.')
 
+  # Create download folder for payloads for testing.
+  download_folder = os.path.join(os.path.realpath(os.path.curdir),
+                                 'latest_download')
+  if not os.path.exists(download_folder):
+    os.makedirs(download_folder)
+
   au_worker.AUWorker.SetUpdateCache(update_cache)
   my_server = dev_server_wrapper.DevServerWrapper(options.test_results_root)
   my_server.start()

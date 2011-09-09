@@ -88,8 +88,6 @@ class AUTest(unittest.TestCase):
     self.worker = self.worker_class(self.options, AUTest.test_results_root)
     self.download_folder = os.path.join(os.path.realpath(os.path.curdir),
                                         'latest_download')
-    if not os.path.exists(self.download_folder):
-      os.makedirs(self.download_folder)
 
   def tearDown(self):
     """Overrides unittest.TestCase.tearDown and called after every test."""
