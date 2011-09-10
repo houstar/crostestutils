@@ -5,17 +5,16 @@
 """Module containing a test suite that is run to test auto updates."""
 
 import os
-import re
+import tempfile
 import time
 import unittest
-import urllib
 
 import cros_build_lib as cros_lib
 
-from crostestutils.au_test_harness import cros_test_proxy
-from crostestutils.au_test_harness import real_au_worker
-from crostestutils.au_test_harness import update_exception
-from crostestutils.au_test_harness import vm_au_worker
+import cros_test_proxy
+import dummy_au_worker
+import real_au_worker
+import vm_au_worker
 
 
 class AUTest(unittest.TestCase):
@@ -25,31 +24,62 @@ class AUTest(unittest.TestCase):
   be created to perform and validates updates on both virtual and real devices.
   See documentation for au_worker for more information.
   """
+  test_results_root = None
+  public_key_managers = []
 
   @classmethod
-  def ProcessOptions(cls, options):
+  def ProcessOptions(cls, options, use_dummy_worker):
     """Processes options for the test suite and sets up the worker class.
 
     Args:
       options: options class to be parsed from main class.
+      use_dummy_worker: If True, use a dummy_worker_class rather than deriving
+        one from options.type.
     """
     cls.base_image_path = options.base_image
-    cls.private_key = options.private_key
     cls.target_image_path = options.target_image
-    cls.test_results_root = options.test_results_root
-    if options.type == 'vm':
+    cls.clean = options.clean
+
+    assert options.type in ['real', 'vm'], 'Failed to specify either real|vm.'
+    if use_dummy_worker:
+      cls.worker_class = dummy_au_worker.DummyAUWorker
+    elif options.type == 'vm':
       cls.worker_class = vm_au_worker.VMAUWorker
     else:
       cls.worker_class = real_au_worker.RealAUWorker
+
+    # Sanity checks.
+    if not cls.base_image_path:
+      cros_lib.Die('Need path to base image for vm.')
+    elif not os.path.exists(cls.base_image_path):
+      cros_lib.Die('%s does not exist' % cls.base_image_path)
+
+    if not cls.target_image_path:
+      cros_lib.Die('Need path to target image to update with.')
+    elif not os.path.exists(cls.target_image_path):
+      cros_lib.Die('%s does not exist' % cls.target_image_path)
+
+    # Initialize test root.  Test root path must be in the chroot.
+    if not cls.test_results_root:
+      if options.test_results_root:
+        assert 'chroot/tmp' in options.test_results_root, \
+          'Must specify a test results root inside tmp in a chroot.'
+        cls.test_results_root = options.test_results_root
+      else:
+        cls.test_results_root = tempfile.mkdtemp(
+            prefix='au_test_harness',
+            dir=cros_lib.PrependChrootPath('/tmp'))
+
+      cros_lib.Info('Using %s as the test results root' % cls.test_results_root)
 
     # Cache away options to instantiate workers later.
     cls.options = options
 
   def AttemptUpdateWithPayloadExpectedFailure(self, payload, expected_msg):
-    """Attempt a payload update, expect it to fail with expected log."""
+    """Attempt a payload update, expect it to fail with expected log"""
     try:
       self.worker.UpdateUsingPayload(payload)
-    except update_exception.UpdateException as err:
+    except UpdateException as err:
       # Will raise ValueError if expected is not found.
       if re.search(re.escape(expected_msg), err.output, re.MULTILINE):
         return
@@ -59,7 +89,7 @@ class AUTest(unittest.TestCase):
 
     self.fail('We managed to update when failure was expected')
 
-  def AttemptUpdateWithFilter(self, update_filter, proxy_port=8081):
+  def AttemptUpdateWithFilter(self, filter, proxy_port=8081):
     """Update through a proxy, with a specified filter, and expect success."""
     self.worker.PrepareBase(self.target_image_path)
 
@@ -69,7 +99,7 @@ class AUTest(unittest.TestCase):
     proxy = cros_test_proxy.CrosTestProxy(port_in=proxy_port,
                                           address_out='127.0.0.1',
                                           port_out=8080,
-                                          filter=update_filter)
+                                          filter=filter)
     proxy.serve_forever_in_thread()
     try:
       self.worker.PerformUpdate(self.target_image_path, self.target_image_path,
@@ -88,6 +118,8 @@ class AUTest(unittest.TestCase):
     self.worker = self.worker_class(self.options, AUTest.test_results_root)
     self.download_folder = os.path.join(os.path.realpath(os.path.curdir),
                                         'latest_download')
+    if not os.path.exists(self.download_folder):
+      os.makedirs(self.download_folder)
 
   def tearDown(self):
     """Overrides unittest.TestCase.tearDown and called after every test."""
@@ -137,23 +169,26 @@ class AUTest(unittest.TestCase):
     """Tests what happens if we interrupt payload delivery 3 times."""
 
     class InterruptionFilter(cros_test_proxy.Filter):
-      """This filter causes the proxy to interrupt the download 3 times.
+      """This filter causes the proxy to interrupt the download 3 times
 
-      It does this by closing the first three connections after they transfer
-      2M total in the outbound direction.
+         It does this by closing the first three connections to transfer
+         2M total in the outbound connection after they transfer the
+         2M.
       """
-
       def __init__(self):
-        """Defines variable shared across all connections."""
+        """Defines variable shared across all connections"""
         self.close_count = 0
 
       def setup(self):
         """Called once at the start of each connection."""
         self.data_size = 0
 
-      # Overriden method.  The first three connections transferring more than 2M
-      # outbound will be closed.
       def OutBound(self, data):
+        """Called once per packet for outgoing data.
+
+           The first three connections transferring more than 2M
+           outbound will be closed.
+        """
         if self.close_count < 3:
           if self.data_size > (2 * 1024 * 1024):
             self.close_count += 1
@@ -166,23 +201,25 @@ class AUTest(unittest.TestCase):
     self.AttemptUpdateWithFilter(InterruptionFilter(), proxy_port=8082)
 
   def testDelayedUpdate(self):
-    """Tests what happens if some data is delayed during update delivery."""
+    """Tests what happens if some data is delayed during update delivery"""
 
     class DelayedFilter(cros_test_proxy.Filter):
       """Causes intermittent delays in data transmission.
 
-      It does this by inserting 3 20 second delays when transmitting
-      data after 2M has been sent.
+         It does this by inserting 3 20 second delays when transmitting
+         data after 2M has been sent.
       """
-
       def setup(self):
         """Called once at the start of each connection."""
         self.data_size = 0
         self.delay_count = 0
 
-      # The first three packets after we reach 2M transferred
-      # are delayed by 20 seconds.
       def OutBound(self, data):
+        """Called once per packet for outgoing data.
+
+           The first three packets after we reach 2M transferred
+           are delayed by 20 seconds.
+        """
         if self.delay_count < 3:
           if self.data_size > (2 * 1024 * 1024):
             self.delay_count += 1
@@ -194,23 +231,15 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9225)
     self.AttemptUpdateWithFilter(DelayedFilter(), proxy_port=8083)
 
-  def testSimpleSignedUpdate(self):
-    """Test that updates to itself with a signed payload."""
-    self.worker.Initialize(9226)
-    self.worker.PrepareBase(self.target_image_path, signed_base=True)
-    self.worker.PerformUpdate(self.target_image_path,
-                              self.target_image_path + '.signed',
-                              private_key_path=self.private_key)
-
   def SimpleTestUpdateAndVerify(self):
-    """Test that updates to itself.
+    """Test that updates once from a base image to a target.
 
     We explicitly don't use test prefix so that isn't run by default.  Can be
     run using test_prefix option.
     """
-    self.worker.Initialize(9227)
-    self.worker.PrepareBase(self.target_image_path)
-    self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
+    self.worker.Initialize(9226)
+    self.worker.PrepareBase(self.base_image_path)
+    self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
     self.worker.VerifyImage(self)
 
   def SimpleTestVerify(self):
@@ -219,29 +248,30 @@ class AUTest(unittest.TestCase):
     We explicitly don't use test prefix so that isn't run by default.  Can be
     run using test_prefix option.
     """
-    self.worker.Initialize(9228)
+    self.worker.Initialize(9227)
     self.worker.PrepareBase(self.target_image_path)
     self.worker.VerifyImage(self)
 
-  # --- DISABLED TESTS ---
-
   def NotestPlatformToolchainOptions(self):
-    """Tests the hardened toolchain options."""
-    self.worker.Initialize(9229)
+    """Tests the hardened toolchain options.
+    """
+    self.worker.Initialize(9228)
     self.worker.PrepareBase(self.base_image_path)
     self.worker.VerifyImage(self, 100, 'platform_ToolchainOptions')
+
+  # --- DISABLED TESTS ---
 
   # TODO(sosa): Get test to work with verbose.
   def NotestPartialUpdate(self):
     """Tests what happens if we attempt to update with a truncated payload."""
-    self.worker.Initialize(9230)
+    self.worker.Initialize(9227)
     # Preload with the version we are trying to test.
     self.worker.PrepareBase(self.target_image_path)
 
     # Image can be updated at:
     # ~chrome-eng/chromeos/localmirror/autest-images
-    url = ('http://gsdview.appspot.com/chromeos-localmirror/'
-           'autest-images/truncated_image.gz')
+    url = 'http://gsdview.appspot.com/chromeos-localmirror/' \
+          'autest-images/truncated_image.gz'
     payload = os.path.join(self.download_folder, 'truncated_image.gz')
 
     # Read from the URL and write to the local file
@@ -253,14 +283,14 @@ class AUTest(unittest.TestCase):
   # TODO(sosa): Get test to work with verbose.
   def NotestCorruptedUpdate(self):
     """Tests what happens if we attempt to update with a corrupted payload."""
-    self.worker.Initialize(9231)
+    self.worker.Initialize(9228)
     # Preload with the version we are trying to test.
     self.worker.PrepareBase(self.target_image_path)
 
     # Image can be updated at:
     # ~chrome-eng/chromeos/localmirror/autest-images
-    url = ('http://gsdview.appspot.com/chromeos-localmirror/'
-           'autest-images/corrupted_image.gz')
+    url = 'http://gsdview.appspot.com/chromeos-localmirror/' \
+          'autest-images/corrupted_image.gz'
     payload = os.path.join(self.download_folder, 'corrupted.gz')
 
     # Read from the URL and write to the local file

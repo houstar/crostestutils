@@ -4,10 +4,11 @@
 
 """Module containing class that implements an au_worker for a test device."""
 
+import unittest
+
 import cros_build_lib as cros_lib
 
-from crostestutils.au_test_harness import au_worker
-
+import au_worker
 
 class RealAUWorker(au_worker.AUWorker):
   """Test harness for updating real images."""
@@ -18,9 +19,9 @@ class RealAUWorker(au_worker.AUWorker):
     self.remote = options.remote
     if not self.remote: cros_lib.Die('We require a remote address for tests.')
 
-  def PrepareBase(self, image_path, signed_base=False):
+  def PrepareBase(self, image_path):
     """Auto-update to base image to prepare for test."""
-    self.PrepareRealBase(image_path, signed_base)
+    self.PrepareRealBase(image_path)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port=None, private_key_path=None):
@@ -49,9 +50,11 @@ class RealAUWorker(au_worker.AUWorker):
     self.RunUpdateCmd(cmd)
 
   def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
-    """Verifies an image using run_remote_tests.sh with verification suite."""
+    """Verifies an image using run_remote_tests.sh with verification suite
+    or with the test passed as parameter."""
     test_directory = self.GetNextResultsPath('verify')
-    if not test: test = self.verify_suite
+    if test == '':
+      test = self.verify_suite
 
     output = cros_lib.RunCommand(
         ['run_remote_tests.sh',

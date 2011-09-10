@@ -10,6 +10,7 @@ import threading
 import time
 
 import cros_build_lib as cros_lib
+import update_exception
 
 # Wait up to 3 minutes for the dev server to start.
 DEV_SERVER_TIMEOUT = 180
@@ -20,12 +21,6 @@ def GenerateUpdateId(target, src, key):
   if src: update_id = '->'.join([src, update_id])
   if key: update_id = '+'.join([update_id, key])
   return update_id
-
-
-class DevServerException(Exception):
-  """Thrown when the devserver fails to start up correctly."""
-  pass
-
 
 class DevServerWrapper(threading.Thread):
   """A Simple wrapper around a dev server instance."""
@@ -43,6 +38,7 @@ class DevServerWrapper(threading.Thread):
     cros_lib.RunCommand(['sudo',
                          'start_devserver',
                          '--archive_dir=./static',
+                         '--client_prefix=ChromeOSUpdateEngine',
                          '--production',
                          ], enter_chroot=True, print_cmd=False,
                          log_to_file=self._log_filename,
@@ -85,7 +81,8 @@ class DevServerWrapper(threading.Thread):
     else:
       log.close()
       self.PrintLog()
-      raise DevServerException('Timeout waiting for the devserver to startup.')
+      error = 'Timeout waiting for devserver startup.'
+      raise update_exception.UpdateException(1, error)
 
   @classmethod
   def GetDevServerURL(cls, port, sub_dir):
@@ -96,13 +93,3 @@ class DevServerWrapper(threading.Thread):
                                               'port': str(port),
                                               'dir': sub_dir}
     return url
-
-  @classmethod
-  def WipePayloadCache(cls):
-    """Cleans up devserver cache of payloads."""
-    cros_lib.Info('Cleaning up previously generated payloads.')
-    cros_lib.RunCommandCaptureOutput(
-        ['sudo', 'start_devserver', '--clear_cache', '--exit'],
-        enter_chroot=True, print_cmd=False, combine_stdout_stderr=True,
-        cwd=cros_lib.GetCrosUtilsPath())
-
