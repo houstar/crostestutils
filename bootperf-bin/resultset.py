@@ -151,10 +151,10 @@ class _KeySet(object):
   'rdbytes_kernel_to_login' is ignored).
 
   A list of all valid keyval names is stored in the `markers`
-  instance variable.  The list is sorted by the natural ordering of
-  the underlying values.  Each iteration is required to contain
-  the same set of keyvals.  This is enforced in FinalizeResults()
-  (see below).
+  instance variable.  The list is sorted by the ordering of the
+  average of the corresponding values.  Each iteration is required
+  to contain the same set of keyvals.  This is enforced in
+  FinalizeResults() (see below).
 
   """
 
@@ -187,7 +187,7 @@ class _KeySet(object):
       self.markers = []
       return False
     self.num_iterations = count
-    keylist = map(lambda k: (self._keyvals[k][0], k),
+    keylist = map(lambda k: (sum(self._keyvals[k]), k),
                   self._keyvals.keys())
     keylist.sort(key=lambda tp: tp[0])
     self.markers = map(lambda tp: tp[1], keylist)
