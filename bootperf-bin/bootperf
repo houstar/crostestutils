@@ -52,15 +52,15 @@ RESULTS_SUMMARY_FILES=(
   platform_BootPerfServer/keyval
   platform_BootPerfServer/platform_BootPerfServer/keyval
   platform_BootPerfServer/platform_BootPerfServer/platform_BootPerf/keyval
+  platform_BootPerfServer/platform_BootPerfServer/platform_BootPerf/status
   platform_BootPerfServer/platform_BootPerfServer/status
   platform_BootPerfServer/platform_BootPerfServer/status.log
-  platform_BootPerfServer/status
+  platform_BootPerfServer/platform_BootPerfServer/sysinfo/cmdline
+  platform_BootPerfServer/platform_BootPerfServer/sysinfo/cpuinfo
+  platform_BootPerfServer/platform_BootPerfServer/sysinfo/modules
+  platform_BootPerfServer/platform_BootPerfServer/sysinfo/uname
+  platform_BootPerfServer/platform_BootPerfServer/sysinfo/version
   platform_BootPerfServer/status.log
-  platform_BootPerfServer/sysinfo/cmdline
-  platform_BootPerfServer/sysinfo/cpuinfo
-  platform_BootPerfServer/sysinfo/modules
-  platform_BootPerfServer/sysinfo/uname
-  platform_BootPerfServer/sysinfo/version
 )
 
 # Structure of a results directory:
