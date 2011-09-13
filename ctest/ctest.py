@@ -119,7 +119,11 @@ def GetLatestLinkFromPage(url, regex):
   Raises:
     CrosImageDoesNotExistError if no image found using args.
   """
-  url_file = urllib.urlopen(url)
+  try:
+    url_file = urllib.urlopen(url)
+  except IOError:
+    raise CrosImageDoesNotExistError('Unable to contact %s' % url)
+
   url_html = url_file.read()
 
   url_file.close()
