@@ -353,19 +353,20 @@ ${profiled_control_file}."
 
       local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
           ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
-      if [ -n "${FLAGS_args}" ]; then
-        autoserv_args="${autoserv_args} --args=${FLAGS_args}"
-      fi
 
       sudo chmod a+w ./server/{tests,site_tests}
-      echo ./server/autoserv ${autoserv_args}
+
+      # --args must be specified as a separate parameter outside of the local
+      # autoserv_args variable, otherwise ${FLAGS_args} values with embedded
+      # spaces won't pass correctly to autoserv.
+      echo ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
 
       if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
         # run autoserv in subshell
         (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
-         ./server/autoserv ${autoserv_args})
+         ./server/autoserv ${autoserv_args} --args "${FLAGS_args}")
       else
-        ./server/autoserv ${autoserv_args}
+        ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
       fi
     done
   done
