@@ -215,9 +215,9 @@ function main() {
 
   trap cleanup EXIT
 
-  remote_access_init
+  remote_access_init >/dev/null 2>&1
   # autotest requires that an ssh-agent already be running
-  start_ssh_agent
+  start_ssh_agent >/dev/null 2>&1
 
   learn_board
   if [[ -n "${FLAGS_autotest_dir}" ]]; then

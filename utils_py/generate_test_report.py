@@ -280,9 +280,6 @@ class ReportGenerator(object):
         print line
         print 'Total unique crashes: ' + self._color.Color(Color.BOLD,
                                                            str(len(crashes)))
-      else:
-        print self._color.Color(Color.GREEN,
-                                'No crashes detected during testing.')
 
     # Print out error log for failed tests.
     if self._options.print_debug:
@@ -293,14 +290,14 @@ class ReportGenerator(object):
           try:
             fh = open(path)
             print >> sys.stderr, (
-                '\n========== ERROR FILE %s FOR TEST %s ==============\n' % (
+                '\n========== ERROR FILE %s FOR TEST %s ==============' % (
                 path, test))
             out = fh.read()
             while out:
               print >> sys.stderr, out
               out = fh.read()
             print >> sys.stderr, (
-                 '\n=========== END ERROR FILE %s FOR TEST %s ===========\n' % (
+                 '\n=========== END ERROR FILE %s FOR TEST %s ===========' % (
                  path, test))
             fh.close()
           except:
