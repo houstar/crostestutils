@@ -242,6 +242,9 @@ def GeneratePublicKey(private_key_path):
   return public_key_path
 
 
+class TestException(Exception):
+  """ Thrown by RunAUTestHarness if there's a test failure. """
+  pass
 
 def RunAUTestHarness(board, channel, zip_server_base,
                      no_graphics, type, remote, clean, target_image,
@@ -323,7 +326,13 @@ def RunAUTestHarness(board, channel, zip_server_base,
     cmd.append('--private_key=%s' % private_key_path)
     cmd.append('--public_key=%s' % public_key_path)
 
-  cros_lib.RunCommand(cmd, cwd=crosutils_root)
+
+  res = cros_lib.RunCommand(cmd, cwd=crosutils_root, error_ok=True,
+                            exit_code=True)
+  if res:
+    raise TestException('%s exited with code %d: %s' % (' '.join(res.cmd),
+                                                        res.returncode,
+                                                        res.error))
 
 
 def main():
@@ -347,6 +356,8 @@ def main():
                     help='type of test to run: [vm, real]. Default: vm.')
   parser.add_option('--remote', default='0.0.0.0',
                     help='For real tests, ip address of the target machine.')
+  parser.add_option('--verbose', default=False, action='store_true',
+                    help='Print out added debugging information')
 
   # Set the usage to include flags.
   parser.set_usage(parser.format_help())
@@ -357,12 +368,16 @@ def main():
   if not options.channel: parser.error('Need channel e.g. dev-channel.')
   if not options.zipbase: parser.error('Need zip url base to get images.')
 
-  RunAUTestHarness(options.board, options.channel, options.zipbase,
-                   options.no_graphics, options.type, options.remote,
-                   not options.cache, options.target_image,
-                   options.test_results_root)
+  try:
+    RunAUTestHarness(options.board, options.channel, options.zipbase,
+                     options.no_graphics, options.type, options.remote,
+                     not options.cache, options.target_image,
+                     options.test_results_root)
+  except TestException as e:
+    if options.verbose:
+      cros_lib.Die(str(e))
+    sys.exit(1)
 
 
 if __name__ == '__main__':
   main()
-
