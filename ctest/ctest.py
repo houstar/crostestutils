@@ -329,7 +329,7 @@ def RunAUTestHarness(board, channel, zip_server_base,
 
   res = cros_lib.RunCommand(cmd, cwd=crosutils_root, error_ok=True,
                             exit_code=True)
-  if res:
+  if res.returncode != 0:
     raise TestException('%s exited with code %d: %s' % (' '.join(res.cmd),
                                                         res.returncode,
                                                         res.error))
