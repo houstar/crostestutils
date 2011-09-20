@@ -207,15 +207,31 @@ def _CleanPreviousWork(options):
     if os.path.exists(target_vm_image_path): os.remove(target_vm_image_path)
     if os.path.exists(base_vm_image_path): os.remove(base_vm_image_path)
 
+
+def _GetTotalMemoryGB():
+   """Calculate total memory on this machine, in gigabytes."""
+   exitcode, output, error = cros_lib.RunCommandCaptureOutput(['free', '-g'],
+       print_cmd=False)
+   assert exitcode == 0
+   for line in output.splitlines():
+     if line.startswith('Mem:'):
+       return int(line.split()[1])
+   raise Exception('Could not calculate total memory')
+
+
 def _CalculateDefaultJobs():
   """Calculate how many jobs to run in parallel by default."""
 
-  # Since each job needs loop devices, limit our number of jobs to the
-  # number of loop devices divided by two. Reserve six loop devices for
-  # other processes (e.g. archiving the build in the background.)
-  loop_count = len(glob.glob('/dev/loop*')) - 6
-  cpu_count = multiprocessing.cpu_count()
-  return max(1, min(cpu_count, loop_count / 2))
+  # 1. Since each job needs two loop devices, limit our number of jobs to the
+  #    number of loop devices divided by two. Reserve six loop devices for
+  #    other processes (e.g. archiving the build in the background.)
+  # 2. Reserve 7GB RAM for background processes. After that, each job needs
+  #    ~2GB RAM.
+  # 3. Reserve half the CPUs for background processes.
+  loop_count = (len(glob.glob('/dev/loop*')) - 6) / 2
+  cpu_count = multiprocessing.cpu_count() / 2
+  mem_count = int((_GetTotalMemoryGB() - 7) / 2)
+  return max(1, min(cpu_count, mem_count, loop_count))
 
 
 def main():
