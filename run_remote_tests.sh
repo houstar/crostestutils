@@ -215,7 +215,7 @@ function main() {
 
   trap cleanup EXIT
 
-  remote_access_init >/dev/null 2>&1
+  remote_access_init
   # autotest requires that an ssh-agent already be running
   start_ssh_agent >/dev/null 2>&1
 
