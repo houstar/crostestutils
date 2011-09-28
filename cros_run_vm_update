@@ -60,6 +60,7 @@ fi
   --ssh_port=${FLAGS_ssh_port} \
   --stateful_update_flag=${FLAGS_stateful_update_flag} \
   --src_image="${FLAGS_src_image}" \
+  --noupdate_hostkey \
   --update_log="${FLAGS_update_log}" \
   --update_url="${FLAGS_update_url}" \
   --verify \
