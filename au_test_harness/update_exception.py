@@ -4,8 +4,9 @@
 
 """Module containing update exceptions."""
 
+
 class UpdateException(Exception):
-  """Exception thrown when _UpdateImage or _UpdateUsingPayload fail"""
+  """Exception thrown when _UpdateImage or _UpdateUsingPayload fail."""
   def __init__(self, code, output):
     super(UpdateException, self).__init__(output)
     self.code = code
