@@ -198,9 +198,12 @@ class AUTest(unittest.TestCase):
     """Test that updates to itself with a signed payload."""
     self.worker.Initialize(9226)
     self.worker.PrepareBase(self.target_image_path, signed_base=True)
-    self.worker.PerformUpdate(self.target_image_path,
-                              self.target_image_path + '.signed',
-                              private_key_path=self.private_key)
+    if self.private_key:
+      self.worker.PerformUpdate(self.target_image_path,
+                                self.target_image_path + '.signed',
+                                private_key_path=self.private_key)
+    else:
+      cros_lib.Info('No key found to use for signed testing.')
 
   def SimpleTestUpdateAndVerify(self):
     """Test that updates to itself.

@@ -96,7 +96,9 @@ class CTest(object):
     self.crosutils_root = os.path.join(constants.SOURCE_ROOT, 'src', 'scripts')
     self.no_graphics = options.no_graphics
     self.remote = options.remote
-    self.sign_payloads = not options.cache
+    # TODO(sosa):  Remove once signed payload bug is resolved.
+    #self.sign_payloads = not options.cache
+    self.sign_payloads = False
     self.target = options.target_image
     self.test_results_root = options.test_results_root
     self.type = options.type
