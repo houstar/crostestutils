@@ -253,10 +253,6 @@ def main():
   try:
     ctest.RunAUTestHarness(options.full_suite)
   except TestException as e:
-    logging.error('The AU Test Harness has failed. '
-                  'Please see the logs for more details.  If this is an '
-                  'automated build, check the test_results.tgz from the '
-                  'artifacts link for more information about this failure.')
     if options.verbose:
       cros_lib.Die(str(e))
 
