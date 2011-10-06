@@ -17,6 +17,8 @@ import os
 import pickle
 import sys
 import tempfile
+import traceback
+import StringIO
 import unittest
 
 # TODO(sosa): Migrate to chromite cros_build_lib.
@@ -33,6 +35,25 @@ from crostestutils.lib import test_helper
 
 # File location for update cache in given folder.
 CACHE_FILE = 'update.cache'
+
+
+class _LessBacktracingTestResult(unittest._TextTestResult):
+  """TestResult class that suppresses stacks for AssertionError."""
+  def addFailure(self, test, err):
+    """Overrides unittest.TestCase.addFailure to suppress stack traces."""
+    exc_type, exc_value = err[:2]
+    if exc_type is AssertionError:  # There's already plenty of debug output.
+      self.failures.append((test, ''))
+    else:
+      super(AUTest, self).addFailure(test, err)
+
+
+class _LessBacktracingTestRunner(unittest.TextTestRunner):
+  """TestRunner class that suppresses stacks for AssertionError."""
+  def _makeResult(self):
+    return LessBacktracingTestResult(self.stream,
+                                     self.descriptions,
+                                     self.verbosity)
 
 
 def _ReadUpdateCache(target_image):
@@ -64,7 +85,7 @@ def _RunTestsInParallel(options):
   for test in test_suite:
     test_name = test.id()
     test_case = unittest.TestLoader().loadTestsFromName(test_name)
-    threads.append(unittest.TextTestRunner().run)
+    threads.append(LessBacktracingTestRunner().run)
     args.append(test_case)
 
   cros_lib.Info('Running tests in test suite in parallel.')

@@ -106,11 +106,11 @@ class AUTest(unittest.TestCase):
 
     # Update to
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
-    self.worker.VerifyImage(self)
+    self.assertTrue(self.worker.VerifyImage())
 
     # Update from
     self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
-    self.worker.VerifyImage(self)
+    self.assertTrue(self.worker.VerifyImage())
 
   def testUpdateWipeStateful(self):
     """Tests if we can update after cleaning the stateful partition.
@@ -126,12 +126,12 @@ class AUTest(unittest.TestCase):
     # Update to
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path,
                               'clean')
-    self.worker.VerifyImage(self)
+    self.assertTrue(self.worker.VerifyImage())
 
     # Update from
     self.worker.PerformUpdate(self.target_image_path, self.target_image_path,
                               'clean')
-    self.worker.VerifyImage(self)
+    self.assertTrue(self.worker.VerifyImage())
 
   def testInterruptedUpdate(self):
     """Tests what happens if we interrupt payload delivery 3 times."""
@@ -214,7 +214,7 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9227)
     self.worker.PrepareBase(self.target_image_path)
     self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
-    self.worker.VerifyImage(self)
+    self.assertTrue(self.worker.VerifyImage())
 
   def SimpleTestVerify(self):
     """Test that only verifies the target image.
@@ -224,7 +224,7 @@ class AUTest(unittest.TestCase):
     """
     self.worker.Initialize(9228)
     self.worker.PrepareBase(self.target_image_path)
-    self.worker.VerifyImage(self)
+    self.assertTrue(self.worker.VerifyImage())
 
   # --- DISABLED TESTS ---
 
@@ -232,7 +232,7 @@ class AUTest(unittest.TestCase):
     """Tests the hardened toolchain options."""
     self.worker.Initialize(9229)
     self.worker.PrepareBase(self.base_image_path)
-    self.worker.VerifyImage(self, 100, 'platform_ToolchainOptions')
+    self.assertTrue(self.worker.VerifyImage('platform_ToolchainOptions'))
 
   # TODO(sosa): Get test to work with verbose.
   def NotestPartialUpdate(self):

@@ -83,8 +83,11 @@ class VMAUWorker(au_worker.AUWorker):
     self.TestInfo(self.GetUpdateMessage(update_path, None, True, proxy_port))
     self.RunUpdateCmd(cmd, log_directory)
 
-  def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
-    """Runs vm smoke suite or any single test to verify image."""
+  def VerifyImage(self, test=''):
+    """Runs vm smoke suite or any single test to verify image.
+
+    Returns True upon success.  Prints test output and returns False otherwise.
+    """
     log_directory = self.GetNextResultsPath('verify')
     (_, _, log_directory_in_chroot) = log_directory.rpartition('chroot')
     # image_to_live already verifies lsb-release matching.  This is just
@@ -102,9 +105,11 @@ class VMAUWorker(au_worker.AUWorker):
               ]
     if self.graphics_flag: command.append(self.graphics_flag)
     self.TestInfo('Running smoke suite to verify image.')
-    output = cros_lib.RunCommand(
-        command, error_ok=(percent_required_to_pass != 100),
-        enter_chroot=False, redirect_stdout=True, redirect_stderr=True,
-        cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
-    return self.AssertEnoughTestsPassed(unittest, output,
-                                        percent_required_to_pass)
+    try:
+        cros_lib.RunCommand(
+            command, enter_chroot=False,
+            redirect_stdout=True, redirect_stderr=True,
+            cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
+    except cros_lib.RunCommandException:
+        return False
+    return True
