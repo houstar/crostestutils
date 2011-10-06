@@ -176,8 +176,8 @@ def main():
   # Generate cache of updates to use during test harness.
   update_cache = _ReadUpdateCache(options.target_image)
   if not update_cache:
-    cros_lib.Die('No update cache found. Please run '
-                 'cros_generate_update_payloads before running this harness.')
+    cros_lib.Info('No update cache found. Update testing will not work.  Run'
+                  ' cros_generate_update_payloads if this was not intended.')
 
   # Create download folder for payloads for testing.
   download_folder = os.path.join(os.path.realpath(os.path.curdir),

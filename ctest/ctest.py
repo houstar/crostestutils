@@ -175,7 +175,7 @@ class CTest(object):
                     'cros_generate_update_payload for error handling.')
       sys.exit(1)
 
-  def RunAUTestHarness(self, full):
+  def RunAUTestHarness(self, full, only_verify):
     """Runs the auto update test harness.
 
     The auto update test harness encapsulates testing the auto-update mechanism
@@ -185,6 +185,7 @@ class CTest(object):
 
     Args:
       full: Run full test suite.
+      only_verify: Only verify the target image.
     """
     cmd = ['bin/cros_au_test_harness',
            '--base_image=%s' % self.base,
@@ -193,9 +194,14 @@ class CTest(object):
            '--type=%s' % self.type,
            '--remote=%s' % self.remote,
            '--verbose',
+
           ]
 
-    if not full: cmd.append('--test_prefix=SimpleTest')
+    if not full:
+      if only_verify:
+        cmd.append('--test_prefix=SimpleTestVerify')
+      else:
+        cmd.append('--test_prefix=SimpleTest')
 
     if self.test_results_root: cmd.append('--test_results_root=%s' %
                                           self.test_results_root)
@@ -224,6 +230,8 @@ def main():
                     help='Cache payloads')
   parser.add_option('--no_graphics', action='store_true', default=False,
                     help='Disable graphics for the vm test.')
+  parser.add_option('--only_verify', action='store_true', default=False,
+                    help='Only run basic verification suite.')
   parser.add_option('--quick', default=True, action='store_false',
                     dest='full_suite',
                     help='Run the quick version of ctest.')
@@ -249,9 +257,10 @@ def main():
   ctest = CTest(options)
   if ctest.sign_payloads: ctest.GeneratePublicKey()
   ctest.FindTargetAndBaseImages()
-  ctest.GenerateUpdatePayloads(options.full_suite)
+  if not options.only_verify:
+    ctest.GenerateUpdatePayloads(options.full_suite)
   try:
-    ctest.RunAUTestHarness(options.full_suite)
+    ctest.RunAUTestHarness(options.full_suite, options.only_verify)
   except TestException as e:
     if options.verbose:
       cros_lib.Die(str(e))
