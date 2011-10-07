@@ -203,7 +203,25 @@ class ReportGenerator(object):
       if perf:
         perf_key_width = len(max(perf, key=len))
         width = max(width, perf_key_width + self._KEYVAL_INDENT)
-    return width + 1
+    return width
+
+  def _PrintDashLine(self, width):
+    """Prints a line of dashes as a separator in output.
+
+    Args:
+      width: an integer.
+    """
+    if not self._options.csv:
+      print ''.ljust(width + 5, '-')
+
+  def _PrintEntries(self, entries):
+    """Prints a list of strings, delimited based on --csv flag.
+
+    Args:
+      entries: a list of strings, entities to output.
+    """
+    delimiter = ',' if self._options.csv else ' '
+    print delimiter.join(entries)
 
   def _GenerateReportText(self):
     """Prints a result report to stdout.
@@ -219,14 +237,14 @@ class ReportGenerator(object):
     tests_with_errors = []
 
     width = self._GetTestColumnWidth()
-    line = ''.ljust(width + 5, '-')
 
     crashes = {}
     tests_pass = 0
-    print line
+    self._PrintDashLine(width)
+
     for test in tests:
-      # Emit the test/status entry first
-      test_entry = test.ljust(width)
+      test_entry = test if self._options.csv else test.ljust(width)
+
       result = self._results[test]
       status_entry = result['status']
       if status_entry == 'PASS':
@@ -237,7 +255,7 @@ class ReportGenerator(object):
         tests_with_errors.append(test)
 
       status_entry = self._color.Color(color, status_entry)
-      print test_entry + status_entry
+      self._PrintEntries([test_entry, status_entry])
 
       # Emit the perf keyvals entries. There will be no entries if the
       # --no-perf option is specified.
@@ -246,10 +264,13 @@ class ReportGenerator(object):
       perf_keys.sort()
 
       for perf_key in perf_keys:
-        perf_key_entry = perf_key.ljust(width - self._KEYVAL_INDENT)
-        perf_key_entry = perf_key_entry.rjust(width)
+        if self._options.csv:
+          perf_key_entry = perf_key
+        else:
+          perf_key_entry = perf_key.ljust(width - self._KEYVAL_INDENT)
+          perf_key_entry = perf_key_entry.rjust(width)
         perf_value_entry = self._color.Color(Color.BOLD, perf[perf_key])
-        print perf_key_entry + perf_value_entry
+        self._PrintEntries([test_entry, perf_key_entry, perf_value_entry])
 
       # Ignore top-level entry, since it's just a combination of all the
       # individual results.
@@ -259,12 +280,13 @@ class ReportGenerator(object):
             crashes[crash] = set([])
           crashes[crash].add(test)
 
-    print line
+    self._PrintDashLine(width)
 
-    total_tests = len(tests)
-    percent_pass = 100 * tests_pass / total_tests
-    pass_str = '%d/%d (%d%%)' % (tests_pass, total_tests, percent_pass)
-    print 'Total PASS: ' + self._color.Color(Color.BOLD, pass_str)
+    if not self._options.csv:
+      total_tests = len(tests)
+      percent_pass = 100 * tests_pass / total_tests
+      pass_str = '%d/%d (%d%%)' % (tests_pass, total_tests, percent_pass)
+      print 'Total PASS: ' + self._color.Color(Color.BOLD, pass_str)
 
     if self._options.crash_detection:
       print ''
@@ -328,6 +350,8 @@ def main():
   parser.add_option('--no-crash-detection', dest='crash_detection',
                     action='store_false', default=True,
                     help='Don\'t report crashes or error out when detected')
+  parser.add_option('--csv', dest='csv', action='store_true',
+                    help='Output test result in CSV format')
   parser.add_option('--perf', dest='perf', action='store_true',
                     default=True,
                     help='Include perf keyvals in the report [default]')
