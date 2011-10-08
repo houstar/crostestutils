@@ -85,7 +85,7 @@ def _RunTestsInParallel(options):
   for test in test_suite:
     test_name = test.id()
     test_case = unittest.TestLoader().loadTestsFromName(test_name)
-    threads.append(LessBacktracingTestRunner().run)
+    threads.append(_LessBacktracingTestRunner().run)
     args.append(test_case)
 
   cros_lib.Info('Running tests in test suite in parallel.')
