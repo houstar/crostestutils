@@ -51,9 +51,9 @@ class _LessBacktracingTestResult(unittest._TextTestResult):
 class _LessBacktracingTestRunner(unittest.TextTestRunner):
   """TestRunner class that suppresses stacks for AssertionError."""
   def _makeResult(self):
-    return LessBacktracingTestResult(self.stream,
-                                     self.descriptions,
-                                     self.verbosity)
+    return _LessBacktracingTestResult(self.stream,
+                                      self.descriptions,
+                                      self.verbosity)
 
 
 def _ReadUpdateCache(target_image):
