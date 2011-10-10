@@ -228,7 +228,7 @@ class AUTest(unittest.TestCase):
 
   # --- DISABLED TESTS ---
 
-  def NotestPlatformToolchainOptions(self):
+  def testPlatformToolchainOptions(self):
     """Tests the hardened toolchain options."""
     self.worker.Initialize(9229)
     self.worker.PrepareBase(self.base_image_path)
