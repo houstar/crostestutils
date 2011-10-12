@@ -63,7 +63,7 @@ class ImageExtractor(object):
 
 
 class TestException(Exception):
-  """ Thrown by RunAUTestHarness if there's a test failure. """
+  """Thrown by RunAUTestHarness if there's a test failure."""
   pass
 
 
@@ -74,16 +74,19 @@ class CTest(object):
     base: Base image to test from.
     board: the board for the latest image.
     build_config: Build configuration we are testing.
-    crosutils_root:  Location of crosutils.
-    no_graphics: boolean - If True, disable graphics during vm test.
+    crosutils_root: Location of crosutils.
+    jobs: Numbers of threads to run in parallel.
+    no_graphics: boolean: If True, disable graphics during vm test.
+    nplus1_archive_dir: Archive directory to store nplus1 payloads.
+    private_key: Signs payloads with this key.
+    public_key: Loads key to verify signed payloads.
     remote: ip address for real test harness run.
-    type: which test harness to run.  Possible values: real, vm.
-    private_key:  Signs payloads with this key.
-    public_key:  Loads key to verify signed payloads.
     sign_payloads: Build some payloads with signed keys.
     target: Target image to test.
     test_results_root: Root directory to store au_test_harness results.
+    type: which test harness to run.  Possible values: real, vm.
   """
+
   def __init__(self, options):
     """Initializes the test object.
 
@@ -110,6 +113,9 @@ class CTest(object):
                        'unittest_key.pem'))
     else:
       self.private_key = None
+
+    self.jobs = options.jobs
+    self.nplus1_archive_dir = options.nplus1_archive_dir
 
   def GeneratePublicKey(self):
     """Returns the path to a generated public key from the UE private key."""
@@ -158,9 +164,13 @@ class CTest(object):
     cmd.append('--target=%s' % self.target)
     cmd.append('--base=%s' % self.base)
     cmd.append('--board=%s' % self.board)
+    cmd.append('--jobs=%d' % self.jobs)
     if full:
       cmd.append('--full_suite')
       cmd.append('--nplus1')
+      if self.nplus1_archive_dir:
+        cmd.append('--nplus1_archive_dir=%s' % self.nplus1_archive_dir)
+
       if self.sign_payloads:
         cmd.append('--public_key=%s' % self.public_key)
         cmd.append('--private_key=%s' % self.private_key)
@@ -186,6 +196,8 @@ class CTest(object):
     Args:
       full: Run full test suite.
       only_verify: Only verify the target image.
+    Raises:
+      TestException: If the cros_au_test_harness command returns an error code.
     """
     cmd = ['bin/cros_au_test_harness',
            '--base_image=%s' % self.base,
@@ -194,7 +206,7 @@ class CTest(object):
            '--type=%s' % self.type,
            '--remote=%s' % self.remote,
            '--verbose',
-
+           '--jobs=%d' % self.jobs,
           ]
 
     if not full:
@@ -228,6 +240,9 @@ def main():
                     help='Name for the build configuration we are archiving.')
   parser.add_option('--cache', default=False, action='store_true',
                     help='Cache payloads')
+  parser.add_option('--jobs', default=test_helper.CalculateDefaultJobs(),
+                    type=int,
+                    help='Number of threads to run in parallel.')
   parser.add_option('--no_graphics', action='store_true', default=False,
                     help='Disable graphics for the vm test.')
   parser.add_option('--only_verify', action='store_true', default=False,
@@ -235,6 +250,8 @@ def main():
   parser.add_option('--quick', default=True, action='store_false',
                     dest='full_suite',
                     help='Run the quick version of ctest.')
+  parser.add_option('--nplus1_archive_dir', default=None,
+                    help='If set, directory to archive nplus1 payloads.')
   parser.add_option('--remote', default='0.0.0.0',
                     help='For real tests, ip address of the target machine.')
   parser.add_option('--target_image', default=None,
@@ -263,7 +280,7 @@ def main():
     ctest.RunAUTestHarness(options.full_suite, options.only_verify)
   except TestException as e:
     if options.verbose:
-      cros_lib.Die(str(e))
+      chromite_build_lib.Die(str(e))
 
     sys.exit(1)
 
