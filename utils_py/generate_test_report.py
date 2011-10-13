@@ -292,14 +292,14 @@ class ReportGenerator(object):
       print ''
       if crashes:
         print self._color.Color(Color.RED, 'Crashes detected during testing:')
-        print line
+        self._PrintDashLine(width)
 
         for crash_name, crashed_tests in sorted(crashes.iteritems()):
           print self._color.Color(Color.RED, crash_name)
           for crashed_test in crashed_tests:
             print ' '*self._KEYVAL_INDENT + crashed_test
 
-        print line
+        self._PrintDashLine(width)
         print 'Total unique crashes: ' + self._color.Color(Color.BOLD,
                                                            str(len(crashes)))
 
