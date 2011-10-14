@@ -33,7 +33,7 @@ class ImageExtractor(object):
 
   def GetLatestImage(self):
     """Gets the latest archive image for the board."""
-    my_re = re.compile(r'(\d+)\.(\d+)\.(\d+).*')
+    my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+).*')
 
     def VersionCompare(version):
       return map(int, my_re.match(version).groups())
@@ -48,18 +48,28 @@ class ImageExtractor(object):
 
   def UnzipImage(self, image_dir):
     """Unzips the image.zip from the image_dir and returns the image."""
-    local_path = 'latest_image'
-    if os.path.isdir(local_path):
-      logging.info('Removing cached image from %s', local_path)
-      shutil.rmtree(local_path)
+    archive_dir = 'latest_image'
+    # We include the dirname of the image here so that we don't have to
+    # re-unzip the same one each time.
+    local_path = os.path.join(archive_dir, os.path.basename(image_dir))
+    image_to_return = os.path.abspath(os.path.join(local_path,
+                                                   self.IMAGE_TO_EXTRACT))
+    # We only unzip it if we don't have it.
+    if not os.path.exists(image_to_return):
+      # We don't want to keep test archives around.
+      if os.path.exists(archive_dir):
+        logging.info('Removing old archive from %s', archive_dir)
+        shutil.rmtree(archive_dir)
 
-    os.makedirs(local_path)
-    zip_path = os.path.join(image_dir, 'image.zip')
-    logging.info('Unzipping image from %s', zip_path)
-    chromite_build_lib.RunCommand(['unzip', '-d', local_path, zip_path],
-                                  print_cmd=False)
+      logging.info('Creating directory %s to store image for testing.',
+                   local_path)
+      os.makedirs(local_path)
+      zip_path = os.path.join(image_dir, 'image.zip')
+      logging.info('Unzipping image from %s', zip_path)
+      chromite_build_lib.RunCommand(['unzip', '-d', local_path, zip_path],
+                                    print_cmd=False)
 
-    return os.path.abspath(os.path.join(local_path, self.IMAGE_TO_EXTRACT))
+    return image_to_return
 
 
 class TestException(Exception):

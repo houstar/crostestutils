@@ -54,7 +54,7 @@ class UpdatePayload(object):
     archive_stateful: If set and archive is set, archive the stateful tarball
       for the target image.
   """
-  NAME_SPLITTER = '--'
+  NAME_SPLITTER = '_'
 
   def __init__(self, target, base, key=None, archive=False,
                archive_stateful=False):
