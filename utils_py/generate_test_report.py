@@ -19,7 +19,7 @@ import sys
 
 import constants
 sys.path.append(constants.CROSUTILS_LIB_DIR)
-from cros_build_lib import Color, Die
+from cros_build_lib import Color, Die, Warning
 
 _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 
@@ -107,17 +107,29 @@ class ResultCollector(object):
       results: Results dictionary to store results in.
     """
 
+    # Autotest makes its own job report for the top-level summary "test".
+    # Take advantage of this to ignore the results here and report the
+    # name of the suite.
+    if os.path.exists(os.path.join(testdir, 'job_report.html')):
+      return
+
     status_file = os.path.join(testdir, 'status.log')
     if not os.path.isfile(status_file):
       status_file = os.path.join(testdir, 'status')
       if not os.path.isfile(status_file):
         return
 
+    status = False
+    error_msg = None
     status_raw = open(status_file, 'r').read()
-    status = 'FAIL'
+    failures = 'ABORT|ERROR|FAIL|TEST_NA|WARN'
     if (re.search(r'GOOD.+completed successfully', status_raw) and
-        not re.search(r'ABORT|ERROR|FAIL|TEST_NA', status_raw)):
-      status = 'PASS'
+        not re.search(r'%s' % failures, status_raw)):
+      status = True
+    else:
+      match = re.search(r'^\t+(%s)\t(.+)' % failures, status_raw, re.MULTILINE)
+      if match:
+        error_msg = ': '.join([match.group(1), match.group(2).split('\t')[4]])
 
     perf = self._CollectPerf(testdir)
 
@@ -135,7 +147,10 @@ class ResultCollector(object):
           continue
       crashes.append('%s %s' % match.groups())
 
-    results[testdir] = {'crashes': crashes, 'status': status, 'perf': perf}
+    results[testdir] = {'crashes': crashes,
+                        'status': status,
+                        'error_msg': error_msg,
+                        'perf': perf}
 
   def CollectResults(self, resdir):
     """Recursively collect results into a dictionary.
@@ -165,6 +180,8 @@ class ReportGenerator(object):
   """
 
   _KEYVAL_INDENT = 2
+  _STATUS_STRINGS = {'hr':  {'pass': '[  PASSED  ]', 'fail': '[  FAILED  ]'},
+                     'csv': {'pass': 'PASS', 'fail': 'FAIL'}}
 
   def __init__(self, options, args):
     self._options = options
@@ -187,6 +204,25 @@ class ReportGenerator(object):
     if not self._results:
       Die('no test directories found')
 
+  def _GenStatusString(self, status):
+    """Given a bool indicating success or failure, return the right string.
+
+    Also takes --csv into account, returns old-style strings if it is set.
+
+    Args:
+      status: True or False, indicating success or failure.
+    Returns:
+      The appropriate string for printing..
+    """
+    success = 'pass' if status else 'fail'
+    if self._options.csv:
+      return self._STATUS_STRINGS['csv'][success]
+    return self._STATUS_STRINGS['hr'][success]
+
+  def _Indent(self, msg):
+    """Given a message, indents it appropriately."""
+    return ' ' * self._KEYVAL_INDENT + msg
+
   def _GetTestColumnWidth(self):
     """Returns the test column width based on the test data.
 
@@ -195,7 +231,7 @@ class ReportGenerator(object):
     dictionary.
 
     Returns:
-      The width for the test columnt.
+      The width for the test column.
     """
     width = len(max(self._results, key=len))
     for result in self._results.values():
@@ -212,7 +248,7 @@ class ReportGenerator(object):
       width: an integer.
     """
     if not self._options.csv:
-      print ''.ljust(width + 5, '-')
+      print ''.ljust(width + len(self._STATUS_STRINGS['hr']['pass']), '-')
 
   def _PrintEntries(self, entries):
     """Prints a list of strings, delimited based on --csv flag.
@@ -223,6 +259,35 @@ class ReportGenerator(object):
     delimiter = ',' if self._options.csv else ' '
     print delimiter.join(entries)
 
+  def _PrintErrors(self, test, error_msg):
+    """Prints an indented error message, unless the --csv flag is set.
+
+    Args:
+      test: the name of a test with which to prefix the line.
+      error_msg: a message to print.  None is allowed, but ignored.
+    """
+    if not self._options.csv and error_msg:
+      self._PrintEntries([test, self._Indent(error_msg)])
+
+  def _PrintErrorLogs(self, test, test_string):
+    """Prints the error log for |test| if --debug is set.
+
+    Args:
+      test: the name of a test suitable for embedding in a path
+      test_string: the name of a test with which to prefix the line.
+    """
+    if self._options.print_debug:
+      debug_file_regex = os.path.join(self._options.strip, test, 'debug',
+                                      '%s*.ERROR' % os.path.basename(test))
+      for path in glob.glob(debug_file_regex):
+        try:
+          with open(path) as fh:
+            for line in fh:
+              if len(line.lstrip()) > 0:  # Ensure line is not just WS.
+                self._PrintEntries([test_string, self._Indent(line.rstrip())])
+        except:
+          print 'Could not open %s' % path
+
   def _GenerateReportText(self):
     """Prints a result report to stdout.
 
@@ -231,10 +296,9 @@ class ReportGenerator(object):
     enabled, each test entry is followed by perf keyval entries from the test
     results.
     """
+
     tests = self._results.keys()
     tests.sort()
-
-    tests_with_errors = []
 
     width = self._GetTestColumnWidth()
 
@@ -246,16 +310,20 @@ class ReportGenerator(object):
       test_entry = test if self._options.csv else test.ljust(width)
 
       result = self._results[test]
-      status_entry = result['status']
-      if status_entry == 'PASS':
+      status_entry = self._GenStatusString(result['status'])
+      if result['status']:
         color = Color.GREEN
         tests_pass += 1
       else:
         color = Color.RED
-        tests_with_errors.append(test)
 
       status_entry = self._color.Color(color, status_entry)
       self._PrintEntries([test_entry, status_entry])
+      self._PrintErrors(test_entry, result['error_msg'])
+
+      # Print out error log for failed tests.
+      if not result['status']:
+        self._PrintErrorLogs(test, test_entry)
 
       # Emit the perf keyvals entries. There will be no entries if the
       # --no-perf option is specified.
@@ -272,9 +340,8 @@ class ReportGenerator(object):
         perf_value_entry = self._color.Color(Color.BOLD, perf[perf_key])
         self._PrintEntries([test_entry, perf_key_entry, perf_value_entry])
 
-      # Ignore top-level entry, since it's just a combination of all the
-      # individual results.
-      if result['crashes'] and test != tests[0]:
+      # Determine that there was a crash during this test.
+      if result['crashes']:
         for crash in result['crashes']:
           if not crash in crashes:
             crashes[crash] = set([])
@@ -297,33 +364,11 @@ class ReportGenerator(object):
         for crash_name, crashed_tests in sorted(crashes.iteritems()):
           print self._color.Color(Color.RED, crash_name)
           for crashed_test in crashed_tests:
-            print ' '*self._KEYVAL_INDENT + crashed_test
+            print self._Indent(crashed_test)
 
         self._PrintDashLine(width)
         print 'Total unique crashes: ' + self._color.Color(Color.BOLD,
                                                            str(len(crashes)))
-
-    # Print out error log for failed tests.
-    if self._options.print_debug:
-      for test in tests_with_errors:
-        debug_file_regex = os.path.join(self._options.strip, test, 'debug',
-                                        '%s*.ERROR' % os.path.basename(test))
-        for path in glob.glob(debug_file_regex):
-          try:
-            fh = open(path)
-            print >> sys.stderr, (
-                '\n========== ERROR FILE %s FOR TEST %s ==============' % (
-                path, test))
-            out = fh.read()
-            while out:
-              print >> sys.stderr, out
-              out = fh.read()
-            print >> sys.stderr, (
-                 '\n=========== END ERROR FILE %s FOR TEST %s ===========' % (
-                 path, test))
-            fh.close()
-          except:
-            print 'Could not open %s' % path
 
       # Sometimes the builders exit before these buffers are flushed.
       sys.stderr.flush()
@@ -334,8 +379,7 @@ class ReportGenerator(object):
     self._CollectResults()
     self._GenerateReportText()
     for v in self._results.itervalues():
-      if v['status'] != 'PASS' or (self._options.crash_detection
-                                   and v['crashes']):
+      if not v['status'] or (self._options.crash_detection and v['crashes']):
         sys.exit(1)
 
 
@@ -351,7 +395,8 @@ def main():
                     action='store_false', default=True,
                     help='Don\'t report crashes or error out when detected')
   parser.add_option('--csv', dest='csv', action='store_true',
-                    help='Output test result in CSV format')
+                    help='Output test result in CSV format.  '
+                    'Implies --no-debug --no-crash-detection.')
   parser.add_option('--perf', dest='perf', action='store_true',
                     default=True,
                     help='Include perf keyvals in the report [default]')
@@ -371,6 +416,11 @@ def main():
   if not args:
     parser.print_help()
     Die('no result directories provided')
+
+  if options.csv and (options.print_debug or options.crash_detection):
+    Warning('Forcing --no-debug --no-crash-detection')
+    options.print_debug = False
+    options.crash_detection = False
 
   generator = ReportGenerator(options, args)
   generator.Run()
