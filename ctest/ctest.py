@@ -1,6 +1,6 @@
 #!/usr/bin/python
 #
-# Copyright (c) 2010 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -24,8 +24,13 @@ from crostestutils.lib import test_helper
 
 class ImageExtractor(object):
   """Class used to get the latest image for the board."""
+  # Archive directory the buildbot stores images.
   LOCAL_ARCHIVE = '/var/www/archive'
+  # The image we want to test.
   IMAGE_TO_EXTRACT = 'chromiumos_test_image.bin'
+  # Archive directory in the src tree to keep latest archived image after
+  # we've unzipped them.
+  SRC_ARCHIVE_DIR = 'latest_image'
 
   def __init__(self, build_config):
     """Initializes a extractor for the build_config."""
@@ -35,31 +40,37 @@ class ImageExtractor(object):
     """Gets the latest archive image for the board."""
     my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+).*')
 
-    def VersionCompare(version):
-      return map(int, my_re.match(version).groups())
+    def VersionReduce(current_max, version):
+      if my_re.match(version):
+        if current_max:
+          return max([current_max, version],
+                     key=lambda x: map(int, my_re.match(x).groups()))
+        else:
+          return version
+      else:
+        return current_max
 
     if os.path.exists(self.archive):
       filelist = os.listdir(self.archive)
-      filelist = [f for f in filelist if not os.path.isdir(f)]
-      newest = max(filelist, key=VersionCompare)
-      return os.path.join(self.archive, newest)
+      newest = reduce(VersionReduce, filelist, None)
+      if newest: return os.path.join(self.archive, newest)
 
     return None
 
   def UnzipImage(self, image_dir):
     """Unzips the image.zip from the image_dir and returns the image."""
-    archive_dir = 'latest_image'
     # We include the dirname of the image here so that we don't have to
     # re-unzip the same one each time.
-    local_path = os.path.join(archive_dir, os.path.basename(image_dir))
+    local_path = os.path.join(self.SRC_ARCHIVE_DIR,
+                              os.path.basename(image_dir))
     image_to_return = os.path.abspath(os.path.join(local_path,
                                                    self.IMAGE_TO_EXTRACT))
     # We only unzip it if we don't have it.
     if not os.path.exists(image_to_return):
-      # We don't want to keep test archives around.
-      if os.path.exists(archive_dir):
-        logging.info('Removing old archive from %s', archive_dir)
-        shutil.rmtree(archive_dir)
+      # We don't want to keep test self.SRC_ARCHIVE_DIRs around.
+      if os.path.exists(self.SRC_ARCHIVE_DIR):
+        logging.info('Removing old archive from %s', self.SRC_ARCHIVE_DIR)
+        shutil.rmtree(self.SRC_ARCHIVE_DIR)
 
       logging.info('Creating directory %s to store image for testing.',
                    local_path)
