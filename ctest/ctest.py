@@ -6,6 +6,7 @@
 
 """Wrapper for tests that are run on builders."""
 
+import distutils.version
 import logging
 import optparse
 import os
@@ -36,7 +37,7 @@ class ImageExtractor(object):
     """Initializes a extractor for the build_config."""
     self.archive = os.path.join(self.LOCAL_ARCHIVE, build_config)
 
-  def GetLatestImage(self, target_version=None):
+  def GetLatestImage(self, target_version):
     """Gets the last image archived for the board.
 
     Args:
@@ -44,24 +45,19 @@ class ImageExtractor(object):
         directory may be being populated with the results of this version
         while we're running so we shouldn't use it as the last image archived.
     """
-    my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+).*')
-
-    def VersionReduce(current_max, version):
-      if target_version and version.startswith(target_version):
-        return current_max
-      elif my_re.match(version):
-        if current_max:
-          return max([current_max, version],
-                     key=lambda x: map(int, my_re.match(x).groups()))
-        else:
-          return version
-      else:
-        return current_max
-
     if os.path.exists(self.archive):
-      filelist = os.listdir(self.archive)
-      newest = reduce(VersionReduce, filelist, None)
-      if newest: return os.path.join(self.archive, newest)
+      my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+)-.*')
+      filelist = []
+      target_lv = distutils.version.LooseVersion(target_version)
+      for filename in os.listdir(self.archive):
+        lv = distutils.version.LooseVersion(filename)
+        if my_re.match(filename):
+          if lv < target_lv:
+            filelist.append(lv)
+          elif not filename.startswith(target_version):
+            logging.error('Version in archive dir is too new: %s' % filename)
+      if filelist:
+        return os.path.join(self.archive, str(max(filelist)))
 
     return None
 
