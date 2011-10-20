@@ -40,14 +40,16 @@ class ImageExtractor(object):
     """Gets the last image archived for the board.
 
     Args:
-      targert_version:  The version that is being tested.  The archive
+      target_version:  The version that is being tested.  The archive
         directory may be being populated with the results of this version
         while we're running so we shouldn't use it as the last image archived.
     """
     my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+).*')
 
     def VersionReduce(current_max, version):
-      if version != target_version and my_re.match(version):
+      if target_version and version.startswith(target_version):
+        return current_max
+      elif my_re.match(version):
         if current_max:
           return max([current_max, version],
                      key=lambda x: map(int, my_re.match(x).groups()))
