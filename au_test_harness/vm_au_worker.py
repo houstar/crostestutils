@@ -28,8 +28,6 @@ class VMAUWorker(au_worker.AUWorker):
                           cwd=self.crosutilsbin, print_cmd=False,
                           error_ok=True)
 
-    assert not os.path.exists(pid_file)
-
   def CleanUp(self):
     """Stop the vm after a test."""
     self._KillExistingVM(self._kvm_pid_file)
