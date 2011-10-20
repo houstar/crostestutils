@@ -74,6 +74,17 @@ class ImageExtractorTest(mox.MoxTestBase):
     latest_image = self.test_extractor.GetLatestImage()
     self.assertEqual(os.path.basename(latest_image), 'R16-158.0.10-a1')
 
+  def testGetLatestImageWithEntriesAndTarget(self):
+    """The normal case but we pass in a target_version.
+
+    Return the path to the highest entry before target.
+    """
+    self.CreateFakeArchiveDir(11)
+    # Throw in a bad directory for good measure.
+    os.makedirs(os.path.join(self.archive_dir, '0-158.0.1-a1'))
+    latest_image = self.test_extractor.GetLatestImage('R16-158.0.10-a1')
+    self.assertEqual(os.path.basename(latest_image), 'R16-158.0.9-a1')
+
   def testUnzipImageArchiveAlready(self):
     """Ensure we create a new archive and delete the old one."""
     old_entry = os.path.join(self.src_archive, 'R16-158.0.0-a1')
@@ -119,11 +130,11 @@ class CTestTest(mox.MoxTestBase):
     # TODO(sosa): Can we create mock objects but call a real method in an easier
     # way?
     ctest.CTest.__init__()
-    ctest.ImageExtractor.GetLatestImage().AndReturn(None)
+    ctest.ImageExtractor.GetLatestImage('target_version').AndReturn(None)
 
     self.mox.ReplayAll()
     ctester = ctest.CTest() # Calls mocked out __init__.
-    ctester.target = 'some_image'
+    ctester.target = 'some_image/target_version/file.bin'
     ctester.base = None
     ctester.build_config = 'x86-generic-full'
     ctester.FindTargetAndBaseImages()
@@ -145,12 +156,13 @@ class CTestTest(mox.MoxTestBase):
                                     ctest.ImageExtractor.IMAGE_TO_EXTRACT)
 
     ctest.CTest.__init__()
-    ctest.ImageExtractor.GetLatestImage().AndReturn(latest_base_dir)
+    ctest.ImageExtractor.GetLatestImage('target_version').AndReturn(
+        latest_base_dir)
     ctest.ImageExtractor.UnzipImage(latest_base_dir).AndReturn(latest_base_path)
 
     self.mox.ReplayAll()
     ctester = ctest.CTest() # Calls mocked out __init__.
-    ctester.target = 'some_image'
+    ctester.target = 'some_image/target_version/file.bin'
     ctester.base = None
     ctester.build_config = 'x86-generic-full'
     ctester.FindTargetAndBaseImages()
@@ -168,7 +180,7 @@ class CTestTest(mox.MoxTestBase):
     self.mox.StubOutWithMock(ctest.CTest, '__init__')
     self.mox.StubOutWithMock(ctest.ImageExtractor, 'GetLatestImage')
     fake_result = self.mox.CreateMock(chromite_build_lib.CommandResult)
-    fake_result.output = '/some/path_to/latest'
+    fake_result.output = '/some/path_to/latest_version'
 
     fake_crosutils = '/fake/root/src/scripts'
 
@@ -176,7 +188,7 @@ class CTestTest(mox.MoxTestBase):
     chromite_build_lib.RunCommand(
         mox.In('./get_latest_image.sh'), cwd=fake_crosutils, print_cmd=False,
         redirect_stdout=True).AndReturn(fake_result)
-    ctest.ImageExtractor.GetLatestImage().AndReturn(None)
+    ctest.ImageExtractor.GetLatestImage('latest_version').AndReturn(None)
 
     self.mox.ReplayAll()
     ctester = ctest.CTest() # Calls mocked out __init__.

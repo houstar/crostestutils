@@ -36,12 +36,18 @@ class ImageExtractor(object):
     """Initializes a extractor for the build_config."""
     self.archive = os.path.join(self.LOCAL_ARCHIVE, build_config)
 
-  def GetLatestImage(self):
-    """Gets the latest archive image for the board."""
+  def GetLatestImage(self, target_version=None):
+    """Gets the last image archived for the board.
+
+    Args:
+      targert_version:  The version that is being tested.  The archive
+        directory may be being populated with the results of this version
+        while we're running so we shouldn't use it as the last image archived.
+    """
     my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+).*')
 
     def VersionReduce(current_max, version):
-      if my_re.match(version):
+      if version != target_version and my_re.match(version):
         if current_max:
           return max([current_max, version],
                      key=lambda x: map(int, my_re.match(x).groups()))
@@ -162,8 +168,9 @@ class CTest(object):
 
     # Grab the latest official build for this board to use as the base image.
     if self.build_config:
+      target_version = os.path.realpath(self.target).rsplit('/', 2)[-2]
       extractor = ImageExtractor(self.build_config)
-      latest_image_dir = extractor.GetLatestImage()
+      latest_image_dir = extractor.GetLatestImage(target_version)
       if latest_image_dir:
         self.base = extractor.UnzipImage(latest_image_dir)
 
