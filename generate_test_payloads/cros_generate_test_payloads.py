@@ -367,8 +367,6 @@ def main():
   parser = optparse.OptionParser()
   parser.add_option('--base', help='Image we want to test updates from.')
   parser.add_option('--board', help='Board used for the images.')
-  parser.add_option('--clean', default=False, dest='clean', action='store_true',
-                    help='Clean cache of previous payloads')
   parser.add_option('--full_suite', default=False, action='store_true',
                     help='Prepare to run the full au test suite.')
   parser.add_option('--jobs', default=test_helper.CalculateDefaultJobs(),
@@ -388,8 +386,7 @@ def main():
   options = parser.parse_args()[0]
   CheckOptions(parser, options)
 
-  if options.clean:
-    dev_server_wrapper.DevServerWrapper.WipePayloadCache()
+  dev_server_wrapper.DevServerWrapper.WipePayloadCache()
 
   if options.nplus1_archive_dir and not os.path.exists(
       options.nplus1_archive_dir):
