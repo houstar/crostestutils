@@ -27,7 +27,7 @@ DEFINE_string results_dir_root "" "alternate root results directory"
 DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
     "Force use of emerged autotest packages"
-DEFINE_boolean verbose ${FLAGS_FALSE} "Show verbose autoserv output" v
+DEFINE_integer verbose 1 "{0,1,2} Max verbosity shows autoserv debug output." v
 
 RAN_ANY_TESTS=${FLAGS_FALSE}
 
@@ -320,7 +320,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
       local results_dir="${TMP}/${results_dir_name}"
       rm -rf "${results_dir}"
       local verbose=""
-      if [[ ${FLAGS_verbose} -eq $FLAGS_TRUE ]]; then
+      if [[ ${FLAGS_verbose} -eq 2 ]]; then
         verbose="--verbose"
       fi
 
@@ -361,12 +361,18 @@ ${profiled_control_file}."
       # spaces won't pass correctly to autoserv.
       echo ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
 
+      local target="/dev/null"
+      if [ ${FLAGS_verbose} -gt 0 ]; then
+        target=1
+      fi
       if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
         # run autoserv in subshell
         (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
-         ./server/autoserv ${autoserv_args} --args "${FLAGS_args}")
+         ./server/autoserv ${autoserv_args} --args "${FLAGS_args}") 2>&1 \
+           >&${target}
       else
-        ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
+        ./server/autoserv ${autoserv_args} --args "${FLAGS_args}" 2>&1 \
+           >&${target}
       fi
     done
   done
