@@ -77,6 +77,7 @@ class ParallelTestRunner(object):
                '--snapshot', # The image is shared so don't modify it.
                '--no_graphics',
                '--use_emerged',
+               '--verbose=1',
                '--ssh_port=%d' % ssh_port ]
       if self._board: args.append('--board=%s' % self._board)
       if self._image_path: args.append('--image_path=%s' % self._image_path)
@@ -85,14 +86,15 @@ class ParallelTestRunner(object):
         results_dir = '%s/%s.%d' % (self._results_dir_root, test, ssh_port)
         args.append('--results_dir_root=%s' % results_dir)
       args.append(test)
-      Info('Running %r...' % args)
       output = None
       if self._quiet:
+        args.append('--verbose=0')  # generate less output
         output = open('/dev/null', mode='w')
         Info('Log files are in %s' % results_dir)
       elif self._order_output:
         output = tempfile.NamedTemporaryFile(prefix='parallel_vm_test_')
         Info('Piping output to %s.' % output.name)
+      Info('Running %r...' % args)
       proc = subprocess.Popen(args, stdout=output, stderr=output)
       test_info = { 'test': test,
                     'proc': proc,
