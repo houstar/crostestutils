@@ -167,6 +167,16 @@ autotest-tests to continue."
   fi
 }
 
+# Convert potentially relative control file path to an absolute path.
+function normalize_control_path() {
+    local control_file=$(remove_quotes "$1")
+    if [[ ${control_file:0:1} == "/" ]]; then
+      echo "${control_file}"
+    else
+      echo "${AUTOTEST_DIR}/${control_file}"
+    fi
+}
+
 # Generate a control file which has a profiler enabled.
 function generate_profiled_control_file() {
   local control_file_path="$1"
@@ -185,6 +195,67 @@ function generate_profiled_control_file() {
 
   echo "${tmp}"
 }
+
+# Given a control_type (client or server) and a list of control files, assembles
+# them all into a single control file. Useful for reducing repeated packaging
+# between tests sharing the same resources.
+function generate_combined_control_file() {
+  local control_type="$1"
+  shift
+  local control_files="$@"
+  local control_file_count="$(echo ${control_files} | wc -w)"
+
+  info "Combining the following tests in a single control file for efficiency:"
+
+  local new_control_file="$(mktemp --tmpdir combined-control.XXXXX)"
+  echo "TEST_TYPE=\"${control_type}\"" > ${new_control_file}
+  echo "def step_init():" >> ${new_control_file}
+  for i in $(seq 1 ${control_file_count}); do
+    echo "    job.next_step('step${i}')" >> ${new_control_file}
+  done
+
+  local index=1
+  for control_file in ${control_files}; do
+    control_file=$(remove_quotes "${control_file}")
+    local control_file_path=$(normalize_control_path "${control_file}")
+    info " * ${control_file}"
+
+    echo "def step${index}():" >> ${new_control_file}
+    cat ${control_file_path} | sed "s/^/    /" >> ${new_control_file}
+    let index=index+1
+  done
+  echo "${new_control_file}"
+}
+
+# Given a list of control files, returns "client", "server", or "" respectively
+# if there are only client, only server, or both types of control files.
+function check_control_file_types() {
+  # Check to make sure only client or only server control files have been
+  # requested, otherwise fall back to uncombined execution.
+  local client_controls=${FLAGS_FALSE}
+  local server_controls=${FLAGS_FALSE}
+
+  for control_file in ${control_files_to_run}; do
+    local control_file_path=$(normalize_control_path "${control_file}")
+    local test_type=$(read_test_type "${control_file_path}")
+    if [[ "${test_type}" == "client" ]]; then
+      client_controls=${FLAGS_TRUE}
+    else
+      server_controls=${FLAGS_TRUE}
+    fi
+  done
+
+  if [[ ${client_controls}^${server_controls} -eq ${FLAGS_FALSE} ]]; then
+    if [[ ${client_controls} -eq ${FLAGS_TRUE} ]]; then
+      echo "client"
+    else
+      echo "server"
+    fi
+  else
+    echo ""
+  fi
+}
+
 
 function main() {
   cd "${SCRIPTS_DIR}"
@@ -271,6 +342,24 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
 
   [ ${FLAGS_build} -eq ${FLAGS_TRUE} ] && prepare_build_env
 
+  # If profiling is disabled and we're running more than one test, attempt to
+  # combine them for packaging efficiency.
+  local new_control_file
+  if [ "${FLAGS_profile}" -eq ${FLAGS_FALSE} ]; then
+    if [[ "$(echo ${control_files_to_run} | wc -w)" -gt 1 ]]; then
+      # Check to make sure only client or only server control files have been
+      # requested, otherwise fall back to uncombined execution.
+      local control_type=$(check_control_file_types ${control_files_to_run})
+      if [[ -n ${control_type} ]]; then
+        # Keep track of local control file for cleanup later.
+        new_control_file="$(generate_combined_control_file ${control_type} \
+            ${control_files_to_run})"
+        control_files_to_run="${new_control_file}"
+        echo ""
+      fi
+    fi
+  fi
+
   info "Running the following control files ${FLAGS_iterations} times:"
   for control_file in ${control_files_to_run}; do
     info " * ${control_file}"
@@ -278,16 +367,8 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
 
   for i in $(seq 1 $FLAGS_iterations); do
     for control_file in ${control_files_to_run}; do
-      # Assume a line starts with TEST_TYPE =
       control_file=$(remove_quotes "${control_file}")
-
-      # Check if the control file is an absolute path (i.e. chrome autotests).
-      if [[ ${control_file:0:1} == "/" ]]; then
-        local control_file_path="${control_file}"
-      else
-        local control_file_path="${AUTOTEST_DIR}/${control_file}"
-      fi
-
+      local control_file_path=$(normalize_control_path "${control_file}")
       local test_type=$(read_test_type "${control_file_path}")
 
       local option
@@ -376,6 +457,10 @@ ${profiled_control_file}."
       fi
     done
   done
+  # Cleanup temporary combined control file.
+  if [[ -n ${new_control_file} ]]; then
+    rm ${new_control_file}
+  fi
   popd > /dev/null
 
   echo ""
