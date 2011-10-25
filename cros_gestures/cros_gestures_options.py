@@ -32,11 +32,10 @@ else:
     cros_gestures_utils.OutputAndExit(
         'Unable to determine where the hardware_Trackpad test resides.'
         '\nPlease check the TRACKPAD_TEST_DIR environment variable.')
-conf_file_executed = False
-trackpad_test_conf = 'trackpad_test.conf'
 
 sys.path.insert(0, trackpad_test_dir)
 from trackpad_util import read_trackpad_test_conf
+from trackpad_util import trackpad_test_conf
 
 
 def GetConfigOptions(current_dir):
