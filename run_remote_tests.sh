@@ -211,7 +211,11 @@ function generate_combined_control_file() {
   echo "TEST_TYPE=\"${control_type}\"" > ${new_control_file}
   echo "def step_init():" >> ${new_control_file}
   for i in $(seq 1 ${control_file_count}); do
-    echo "    job.next_step('step${i}')" >> ${new_control_file}
+    if [[ "${control_type}" == "client" ]]; then
+      echo "    job.next_step('step${i}')" >> ${new_control_file}
+    else
+      echo "    step${i}()" >> ${new_control_file}
+    fi
   done
 
   local index=1
@@ -224,6 +228,9 @@ function generate_combined_control_file() {
     cat ${control_file_path} | sed "s/^/    /" >> ${new_control_file}
     let index=index+1
   done
+  if [[ "${control_type}" == "server" ]]; then
+    echo "step_init()" >> ${new_control_file}
+  fi
   echo "${new_control_file}"
 }
 
