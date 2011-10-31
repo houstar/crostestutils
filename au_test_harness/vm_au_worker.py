@@ -99,6 +99,7 @@ class VMAUWorker(au_worker.AUWorker):
                '--kvm_pid=%s' % self._kvm_pid_file,
                '--ssh_port=%s' % self._ssh_port,
                '--results_dir_root=%s' % log_directory_in_chroot,
+               '--verbose=0',
                test,
               ]
     if self.graphics_flag: command.append(self.graphics_flag)
