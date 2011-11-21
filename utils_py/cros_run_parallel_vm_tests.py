@@ -17,7 +17,7 @@ from cros_build_lib import Die
 from cros_build_lib import Info
 
 
-_DEFAULT_BASE_SSH_PORT = 9222
+_DEFAULT_BASE_SSH_PORT = 9322
 
 class ParallelTestRunner(object):
   """Runs tests on VMs in parallel.
