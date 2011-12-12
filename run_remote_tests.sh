@@ -23,6 +23,8 @@ DEFINE_boolean profile ${FLAGS_FALSE} \
     "Enable profiling for the autotest using perf."
 DEFINE_string profiler_args "-e cycles" \
     "Arguments to pass to perf record."
+DEFINE_string profile_type "record" \
+    "The type of profile data to collect. Either 'record' or 'stat'."
 DEFINE_string results_dir_root "" "alternate root results directory"
 DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
@@ -187,7 +189,8 @@ function generate_profiled_control_file() {
   local profiler_args="${FLAGS_profiler_args}"
 
   echo "job.default_profile_only = True" > ${tmp}
-  echo "job.profilers.add('cros_perf', options='${profiler_args}')" >> ${tmp}
+  echo "job.profilers.add('cros_perf', options='${profiler_args}',\
+profile_type='${FLAGS_profile_type}')" >> ${tmp}
   cat "${control_file_path}" >> ${tmp}
   # Ensure newline after main control file.
   echo "" >> ${tmp}
