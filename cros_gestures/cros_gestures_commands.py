@@ -40,11 +40,13 @@ def AddOptions(parser, config_options, admin=False):
   in this file.
 
   -F, --force-rm: [invalidate/rm] confirmation of irreversible file removal.
-  -U, --user-override: [all] substitute an alternate user tag in file namespace.
   -L, --list-metadata: [ls] most verbose ls command.
+  -U, --user-override: [all] substitute an alternate user tag in file namespace.
   --print-filenames: [cat] include filename (helps cat of multiple cat files).
+  --download-dir: [download] place downloaded files out of current dir.
   --upload-functionality: [upload]: override filename functionality.
   --upload-fwversion: [upload]: override filename fwversion.
+  --upload-tag: [upload] set a tag (to arbitrarily group files).
   """
   group = optparse.OptionGroup(parser, 'Command Options')
   group.add_option('-F', '--force-rm',
@@ -54,17 +56,17 @@ def AddOptions(parser, config_options, admin=False):
                     dest='forcerm',
                     action='store_true',
                     default=False)
-  group.add_option('-U', '--user-override',
-                    help='Override filename user of file [default: %s]' %
-                        '%default',
-                    dest='useroverride',
-                    action='store_true',
-                    default=False)
   group.add_option('-L', '--list-metadata',
                     help='Show file metadata with %s [default: %s]' % (
                         color.Color(cros_gestures_utils.Color.BOLD, 'list'),
                         '%default'),
                     dest='listmetadata',
+                    action='store_true',
+                    default=False)
+  group.add_option('-U', '--user-override',
+                    help='Override filename user of file [default: %s]' %
+                        '%default',
+                    dest='useroverride',
                     action='store_true',
                     default=False)
   group.add_option('', '--print-filenames',
@@ -76,6 +78,13 @@ def AddOptions(parser, config_options, admin=False):
                     default=False)
   # Admin commands use different options.
   if not admin:
+    group.add_option('', '--download-dir',
+                      help='Set %s directory [default: %s]' % (
+                          color.Color(cros_gestures_utils.Color.BOLD,
+                                      'download'),
+                          '%default'),
+                      dest='downloaddir',
+                      default=None)
     group.add_option('', '--upload-functionality',
                       help='Set functionality during %s: %s [default: %s]' % (
                           color.Color(cros_gestures_utils.Color.BOLD, 'upload'),
@@ -88,6 +97,12 @@ def AddOptions(parser, config_options, admin=False):
                           color.Color(cros_gestures_utils.Color.BOLD, 'upload'),
                           '%default'),
                       dest='uploadfwversion',
+                      default=None)
+    group.add_option('', '--upload-tag',
+                      help='Supply %s tag for custom grouping [default: %s]' % (
+                          color.Color(cros_gestures_utils.Color.BOLD, 'upload'),
+                          '%default'),
+                      dest='uploadtag',
                       default=None)
   parser.add_option_group(group)
 
@@ -265,6 +280,10 @@ class GestureCommand(object):
             cros_gestures_utils.Color.RED, 'File %s not found.' % remote_file))
         continue
       local_file = local_files[i]
+      if options.downloaddir:
+        if not os.path.exists(options.downloaddir):
+          os.makedirs(options.downloaddir)
+        local_file = os.path.join(options.downloaddir, local_file)
       if os.path.isfile(local_file):
         raise CrosGesturesException('Local file %s already exists.' %
                                     local_file)
@@ -345,6 +364,8 @@ class GestureCommand(object):
                '"%s-fw_version:%s"' % (hprefix, options.uploadfwversion),
                '"%s-model:%s"' % (hprefix, options.model),
                '"%s-created:%s"' % (hprefix, options.uploadcreated)]
+    if options.uploadtag:
+      headers.append('"%s-tag:%s"' % (hprefix, options.uploadtag))
     return self.RunGSUtil(cmd='cp', headers=headers, sub_opts=sub_opts,
                             args=[local_file, remote_file])
 
