@@ -297,6 +297,13 @@ def main():
   if args: parser.error('Extra args found %s.' % args)
   if not options.board: parser.error('Need board for image to compare against.')
 
+  # force absolute path for these options, since a chdir occurs deeper in the
+  # codebase.
+  for x in ('nplus1_archive_dir', 'target_image', 'test_results_root'):
+    val = getattr(options, x)
+    if val is not None:
+      setattr(options, x, os.path.abspath(val))
+
   ctest = CTest(options)
   if ctest.sign_payloads: ctest.GeneratePublicKey()
   ctest.FindTargetAndBaseImages()
