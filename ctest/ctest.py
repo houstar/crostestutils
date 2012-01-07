@@ -130,7 +130,6 @@ class CTest(object):
     self.target = options.target_image
     self.test_results_root = options.test_results_root
     self.type = options.type
-    self.retry = options.retry
 
     self.public_key = None
     if self.sign_payloads:
@@ -242,33 +241,17 @@ class CTest(object):
       else:
         cmd.append('--test_prefix=SimpleTest')
 
+    if self.test_results_root: cmd.append('--test_results_root=%s' %
+                                          self.test_results_root)
     if self.no_graphics: cmd.append('--no_graphics')
 
     # Using keys is only compatible with clean.
     if full and self.sign_payloads:
       cmd.append('--private_key=%s' % self.private_key)
 
-    results_root = self.test_results_root
-
-    for attempt in xrange(self.retry + 1):
-      cmd_attempt = cmd[:]
-      if self.test_results_root:
-         cmd_attempt.append('--test_results_root=%s/attempt-%i' %
-                            (results_root, attempt + 1))
-
-      res = chromite_build_lib.RunCommand(self.retry, cmd_attempt,
-                                          cwd=self.crosutils_root,
-                                          error_ok=True,
-                                          exit_code=True)
-
-      if res.returncode == 0:
-        break
-      elif self.retry:
-        chromite_build_lib.Warning('failed executing %r, exit code %i, '
-                                   'attempt %i of %i' %
-                                   (cmd_attempt, res.returncode,
-                                   attempt + 1, self.retry + 1))
-    else:
+    res = chromite_build_lib.RunCommand(cmd, cwd=self.crosutils_root,
+                                        error_ok=True, exit_code=True)
+    if res.returncode != 0:
       raise TestException('%s exited with code %d: %s' % (' '.join(res.cmd),
                                                           res.returncode,
                                                           res.error))
@@ -293,8 +276,6 @@ def main():
   parser.add_option('--quick', default=True, action='store_false',
                     dest='full_suite',
                     help='Run the quick version of ctest.')
-  parser.add_option('--retry', default=0, type='int',
-                    help="Retry failing tests N times before giving up")
   parser.add_option('--nplus1_archive_dir', default=None,
                     help='If set, directory to archive nplus1 payloads.')
   parser.add_option('--remote', default='0.0.0.0',
