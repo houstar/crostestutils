@@ -327,7 +327,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
   pushd ${AUTOTEST_DIR} > /dev/null
   for test_request in $FLAGS_ARGV; do
     test_request=$(remove_quotes "${test_request}")
-    ! finds=$(find ${search_path} -maxdepth 2 -type f \( -name control.\* -or \
+    ! finds=$(find ${search_path} -maxdepth 2 -xtype f \( -name control.\* -or \
       -name control \) | egrep -v "~$" | egrep "${test_request}")
     if [[ -z "${finds}" ]]; then
       die "Cannot find match for \"${test_request}\""
