@@ -186,9 +186,8 @@ class AUWorker(object):
       See PerformUpdate for description of args.
     """
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
-    update_id = dev_server_wrapper.GenerateUpdateId(
-        image_path, src_image_path, private_key_path,
-        for_vm=self.vm_image_path is not None)
+    update_id = dev_server_wrapper.GenerateUpdateId(image_path, src_image_path,
+                                                    private_key_path)
     cache_path = self.update_cache.get(update_id)
     if cache_path:
       update_url = dev_server_wrapper.DevServerWrapper.GetDevServerURL(

@@ -57,13 +57,12 @@ class UpdatePayload(object):
   NAME_SPLITTER = '_'
 
   def __init__(self, target, base, key=None, archive=False,
-               archive_stateful=False, for_vm=False):
+               archive_stateful=False):
     self.base = base
     self.target = target
     self.key = key
     self.archive = archive
     self.archive_stateful = archive_stateful
-    self.for_vm = for_vm
 
   def GetNameForBin(self):
     """Returns the path we should name an archived payload."""
@@ -84,7 +83,7 @@ class UpdatePayload(object):
   def UpdateId(self):
     """Generates a unique update id the test harness can understand."""
     return dev_server_wrapper.GenerateUpdateId(self.target, self.base,
-                                               self.key, self.for_vm)
+                                               self.key)
 
   def __str__(self):
     my_repr = self.target
@@ -93,9 +92,6 @@ class UpdatePayload(object):
 
     if self.key:
       my_repr = my_repr + '+' + self.key
-
-    if self.for_vm:
-      my_repr = my_repr + '+' + 'for_vm'
 
     return my_repr
 
@@ -140,10 +136,10 @@ class UpdatePayloadGenerator(object):
     self.vm = options.vm
 
   def _AddUpdatePayload(self, target, base, key=None, archive=False,
-                        archive_stateful=False, for_vm=False):
+                        archive_stateful=False):
     """Adds a new required update payload.  If base is None, a full payload."""
     self.payloads.add(UpdatePayload(target, base, key, archive,
-                                    archive_stateful, for_vm))
+                                    archive_stateful))
 
   def GenerateImagesForTesting(self):
     # All vm testing requires a VM'ized target.
@@ -166,20 +162,18 @@ class UpdatePayloadGenerator(object):
 
     def AddPayloadsForAUTestHarness():
       if self.full_suite:
-        self._AddUpdatePayload(self.target_no_vm, self.base, for_vm=self.vm)
-        self._AddUpdatePayload(self.base_no_vm, self.target_no_vm,
-                               for_vm=self.vm)
-        self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
+        self._AddUpdatePayload(self.target_no_vm, self.base)
+        self._AddUpdatePayload(self.base_no_vm, self.target_no_vm)
+        self._AddUpdatePayload(self.target_no_vm, self.target)
 
         # Need a signed payload for the signed payload test.
         if self.target_signed:
           self._AddUpdatePayload(self.target_no_vm, self.target_signed,
-                                 self.private_key, for_vm=self.vm)
+                                 self.private_key)
       else:
-        self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
+        self._AddUpdatePayload(self.target_no_vm, self.target)
 
     def AddNPlus1Updates():
-      # These should never be for_vm.
       self._AddUpdatePayload(self.target_no_vm, self.base_no_vm, archive=True)
       self._AddUpdatePayload(self.target_no_vm, self.target_no_vm, archive=True)
       self._AddUpdatePayload(self.target_no_vm, None, archive=True,
@@ -215,7 +209,7 @@ class UpdatePayloadGenerator(object):
 
       command.append('--image=%s' % in_chroot_target)
       if payload.base: command.append('--src_image=%s' % in_chroot_base)
-      if payload.for_vm: command.append('--for_vm')
+      if self.vm: command.append('--for_vm')
       if payload.key: command.append('--private_key=%s' % in_chroot_key)
 
       if payload.base:
@@ -223,9 +217,6 @@ class UpdatePayloadGenerator(object):
                                                          payload.target)
       else:
         debug_message = 'full payload to %s' % payload.target
-
-      if payload.for_vm:
-        debug_message += ' and not patching the kernel.'
 
       if in_chroot_key:
         debug_message = 'Generating a signed %s' % debug_message
