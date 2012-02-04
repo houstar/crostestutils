@@ -81,19 +81,6 @@ class VMAUWorker(au_worker.AUWorker):
     self.TestInfo(self.GetUpdateMessage(update_path, None, True, proxy_port))
     self.RunUpdateCmd(cmd, log_directory)
 
-  def AppendUpdateFlags(self, cmd, image_path, src_image_path, proxy_port,
-                        private_key_path, for_vm=False):
-    """Appends common args to an update cmd defined by an array.
-
-    Calls super function with for_vm set to True.
-
-    Args:
-      See AppendUpdateFlags for description of args.
-    """
-    super(VMAUWorker, self).AppendUpdateFlags(
-        cmd, image_path, src_image_path, proxy_port, private_key_path,
-        for_vm=True)
-
   def VerifyImage(self, test=''):
     """Runs vm smoke suite or any single test to verify image.
 

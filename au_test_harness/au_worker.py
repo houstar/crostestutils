@@ -177,20 +177,17 @@ class AUWorker(object):
     return stateful_change_flag
 
   def AppendUpdateFlags(self, cmd, image_path, src_image_path, proxy_port,
-                        private_key_path, for_vm=False):
+                        private_key_path):
     """Appends common args to an update cmd defined by an array.
 
     Modifies cmd in places by appending appropriate items given args.
 
     Args:
       See PerformUpdate for description of args.
-      for_vm: Additional optional argument to say that the payload is intended
-        for vm usage (so we don't patch the kernel).
     """
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
-    update_id = dev_server_wrapper.GenerateUpdateId(
-        image_path, src_image_path, private_key_path,
-        for_vm=for_vm)
+    update_id = dev_server_wrapper.GenerateUpdateId(image_path, src_image_path,
+                                                    private_key_path)
     cache_path = self.update_cache.get(update_id)
     if cache_path:
       update_url = dev_server_wrapper.DevServerWrapper.GetDevServerURL(
