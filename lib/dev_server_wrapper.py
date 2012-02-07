@@ -14,11 +14,12 @@ import cros_build_lib as cros_lib
 # Wait up to 3 minutes for the dev server to start.
 DEV_SERVER_TIMEOUT = 180
 
-def GenerateUpdateId(target, src, key):
+def GenerateUpdateId(target, src, key, for_vm):
   """Returns a simple representation id of target and src paths."""
   update_id = target
   if src: update_id = '->'.join([src, update_id])
   if key: update_id = '+'.join([update_id, key])
+  if not for_vm: update_id = '+'.join([update_id, 'patched_kernel'])
   return update_id
 
 
