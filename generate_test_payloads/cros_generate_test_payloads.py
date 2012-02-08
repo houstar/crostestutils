@@ -166,9 +166,14 @@ class UpdatePayloadGenerator(object):
 
     def AddPayloadsForAUTestHarness():
       if self.full_suite:
+        # N-1->N.
         self._AddUpdatePayload(self.target_no_vm, self.base, for_vm=self.vm)
-        self._AddUpdatePayload(self.base_no_vm, self.target_no_vm,
+
+        # N->N after N-1->N.
+        self._AddUpdatePayload(self.target_no_vm, self.target_no_vm,
                                for_vm=self.vm)
+
+        # N->N From VM base.
         self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
 
         # Need a signed payload for the signed payload test.
@@ -176,6 +181,7 @@ class UpdatePayloadGenerator(object):
           self._AddUpdatePayload(self.target_no_vm, self.target_signed,
                                  self.private_key, for_vm=self.vm)
       else:
+        # Update image to itself from VM base.
         self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
 
     def AddNPlus1Updates():
