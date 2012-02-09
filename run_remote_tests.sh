@@ -452,7 +452,7 @@ ${profiled_control_file}."
       # spaces won't pass correctly to autoserv.
       echo ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
 
-      local target="/dev/null"
+      local target="${TMP}/autoserv-log.txt"
       if [ ${FLAGS_verbose} -gt 0 ]; then
         target=1
       fi
