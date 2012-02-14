@@ -30,6 +30,8 @@ DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
     "Force use of emerged autotest packages"
 DEFINE_integer verbose 1 "{0,1,2} Max verbosity shows autoserv debug output." v
+DEFINE_boolean whitelist_chrome_crashes ${FLAGS_FALSE} \
+    "Treat Chrome crashes as non-fatal."
 
 RAN_ANY_TESTS=${FLAGS_FALSE}
 
@@ -475,7 +477,11 @@ ${profiled_control_file}."
 
   echo ""
   info "Test results:"
-  generate_test_report "${TMP}" --strip="${TMP}/"
+  local report_args=("${TMP}" --strip="${TMP}/")
+  if [[ ${FLAGS_whitelist_chrome_crashes} -eq ${FLAGS_TRUE} ]]; then
+    report_args+=(--whitelist_chrome_crashes)
+  fi
+  generate_test_report "${report_args[@]}"
 
   print_time_elapsed
 }

@@ -169,6 +169,9 @@ def main():
   parser.add_option('--verbose', default=True, action='store_true',
                     help='Print out rather than capture output as much as '
                     'possible.')
+  parser.add_option('--whitelist_chrome_crashes', default=False,
+                    dest='whitelist_chrome_crashes', action='store_true',
+                    help='Treat Chrome crashes as non-fatal.')
   (options, leftover_args) = parser.parse_args()
 
   CheckOptions(parser, options, leftover_args)

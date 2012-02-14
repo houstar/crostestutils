@@ -41,15 +41,18 @@ _CRASH_WHITELIST = {
 class ResultCollector(object):
   """Collects status and performance data from an autoserv results directory."""
 
-  def __init__(self, collect_perf=True, strip_text=''):
+  def __init__(self, collect_perf=True, strip_text='',
+               whitelist_chrome_crashes=False):
     """Initialize ResultsCollector class.
 
     Args:
       collect_perf: Should perf keyvals be collected?
       strip_text: Prefix to strip from test directory names.
+      whitelist_chrome_crashes: Treat Chrome crashes as non-fatal.
     """
     self._collect_perf = collect_perf
     self._strip_text = strip_text
+    self._whitelist_chrome_crashes = whitelist_chrome_crashes
 
   def _CollectPerf(self, testdir):
     """Parses keyval file under testdir.
@@ -138,14 +141,18 @@ class ResultCollector(object):
 
     crashes = []
     regex = re.compile('Received crash notification for ([-\w]+).+ (sig \d+)')
+    chrome_regex = re.compile(r'^supplied_[cC]hrome|^chrome$')
     for match in regex.finditer(status_raw):
-      if match.group(1) in _CRASH_WHITELIST:
-        w = _CRASH_WHITELIST[match.group(1)]
-        if match.group(2) in w.signals and w.deadline > datetime.datetime.now():
-          print 'Ignoring crash in %s for waiver that expires %s' % (
-              match.group(1), w.deadline.strftime('%Y-%b-%d'))
-          continue
-      crashes.append('%s %s' % match.groups())
+      w = _CRASH_WHITELIST.get(match.group(1))
+      if self._whitelist_chrome_crashes and chrome_regex.match(match.group(1)):
+        print '@@@STEP_WARNINGS@@@'
+        print '%s crashed with %s' % (match.group(1), match.group(2))
+      elif (w is not None and match.group(2) in w.signals and
+            w.deadline > datetime.datetime.now()):
+        print 'Ignoring crash in %s for waiver that expires %s' % (
+            match.group(1), w.deadline.strftime('%Y-%b-%d'))
+      else:
+        crashes.append('%s %s' % match.groups())
 
     results[testdir] = {'crashes': crashes,
                         'status': status,
@@ -195,7 +202,8 @@ class ReportGenerator(object):
     result data (status, perf keyvals) as values.
     """
     self._results = {}
-    collector = ResultCollector(self._options.perf, self._options.strip)
+    collector = ResultCollector(self._options.perf, self._options.strip,
+                                self._options.whitelist_chrome_crashes)
     for resdir in self._args:
       if not os.path.isdir(resdir):
         Die('\'%s\' does not exist' % resdir)
@@ -411,6 +419,10 @@ def main():
   parser.add_option('--no-debug', dest='print_debug', action='store_false',
                     default=True,
                     help='Don\'t print out logs when tests fail.')
+  parser.add_option('--whitelist_chrome_crashes',
+                    dest='whitelist_chrome_crashes',
+                    action='store_true', default=False,
+                    help='Treat Chrome crashes as non-fatal.')
   (options, args) = parser.parse_args()
 
   if not args:

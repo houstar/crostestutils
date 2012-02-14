@@ -20,6 +20,7 @@ class VMAUWorker(au_worker.AUWorker):
     self.graphics_flag = ''
     if options.no_graphics: self.graphics_flag = '--no_graphics'
     if not self.board: cros_lib.Die('Need board to convert base image to vm.')
+    self.whitelist_chrome_crashes = options.whitelist_chrome_crashes
 
   def _KillExistingVM(self, pid_file):
     """Kills an existing VM specified by the pid_file."""
@@ -116,12 +117,19 @@ class VMAUWorker(au_worker.AUWorker):
                test,
               ]
     if self.graphics_flag: command.append(self.graphics_flag)
+    if self.whitelist_chrome_crashes:
+      command.append('--whitelist_chrome_crashes')
     self.TestInfo('Running smoke suite to verify image.')
     try:
-        cros_lib.RunCommand(
-            command, enter_chroot=False,
-            redirect_stdout=True, redirect_stderr=True,
-            cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
+      output = cros_lib.RunCommand(
+          command, enter_chroot=False,
+          redirect_stdout=True, redirect_stderr=True,
+          cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
     except cros_lib.RunCommandException:
-        return False
+      return False
+
+    # If the output contains warnings, print the output.
+    if '@@@STEP_WARNINGS@@@' in output:
+      print output
+
     return True

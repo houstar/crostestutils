@@ -110,6 +110,7 @@ class CTest(object):
     target: Target image to test.
     test_results_root: Root directory to store au_test_harness results.
     type: which test harness to run.  Possible values: real, vm.
+    whitelist_chrome_crashes: Whether to treat Chrome crashes as non-fatal.
   """
 
   def __init__(self, options):
@@ -130,6 +131,7 @@ class CTest(object):
     self.target = options.target_image
     self.test_results_root = options.test_results_root
     self.type = options.type
+    self.whitelist_chrome_crashes = options.whitelist_chrome_crashes
 
     self.public_key = None
     if self.sign_payloads:
@@ -244,6 +246,7 @@ class CTest(object):
     if self.test_results_root: cmd.append('--test_results_root=%s' %
                                           self.test_results_root)
     if self.no_graphics: cmd.append('--no_graphics')
+    if self.whitelist_chrome_crashes: cmd.append('--whitelist_chrome_crashes')
 
     # Using keys is only compatible with clean.
     if full and self.sign_payloads:
@@ -289,6 +292,9 @@ def main():
                     help='type of test to run: [vm, real]. Default: vm.')
   parser.add_option('--verbose', default=False, action='store_true',
                     help='Print out added debugging information')
+  parser.add_option('--whitelist_chrome_crashes', default=False,
+                    dest='whitelist_chrome_crashes', action='store_true',
+                    help='Treat Chrome crashes as non-fatal.')
 
   # Set the usage to include flags.
   parser.set_usage(parser.format_help())
