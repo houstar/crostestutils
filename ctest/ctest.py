@@ -253,7 +253,7 @@ class CTest(object):
       cmd.append('--private_key=%s' % self.private_key)
 
     res = chromite_build_lib.RunCommand(cmd, cwd=self.crosutils_root,
-                                        error_ok=True, exit_code=True)
+                                        error_ok=True)
     if res.returncode != 0:
       raise TestException('%s exited with code %d: %s' % (' '.join(res.cmd),
                                                           res.returncode,
