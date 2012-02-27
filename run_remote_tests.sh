@@ -33,6 +33,16 @@ DEFINE_integer verbose 1 "{0,1,2} Max verbosity shows autoserv debug output." v
 DEFINE_boolean whitelist_chrome_crashes ${FLAGS_FALSE} \
     "Treat Chrome crashes as non-fatal."
 
+# The prefix to look for in an argument that determines we're talking about a
+# new-style suite.
+SUITES_PREFIX='suite:'
+FLAGS_HELP="
+Usage: $0 --remote=[hostname] [[test...] ..]:
+Each 'test' argument either has a '${SUITES_PREFIX}' prefix to specify a suite
+or a regexp pattern that must uniquely match a control file.
+For example:
+  $0 --remote=MyMachine BootPerfServer suite:bvt"
+
 RAN_ANY_TESTS=${FLAGS_FALSE}
 
 function stop_ssh_agent() {
@@ -247,7 +257,7 @@ function check_control_file_types() {
   local client_controls=${FLAGS_FALSE}
   local server_controls=${FLAGS_FALSE}
 
-  for control_file in ${control_files_to_run}; do
+  for control_file in $*; do
     local control_file_path=$(normalize_control_path "${control_file}")
     local test_type=$(read_test_type "${control_file_path}")
     if [[ "${test_type}" == "client" ]]; then
@@ -275,9 +285,7 @@ function main() {
   FLAGS "$@" || exit 1
 
   if [[ -z "${FLAGS_ARGV}" ]]; then
-    echo "Usage: $0 --remote=[hostname] [regexp...]:"
-    echo "Each regexp pattern must uniquely match a control file. For example:"
-    echo "  $0 --remote=MyMachine BootPerfServer"
+    echo ${FLAGS_HELP}
     exit 1
   fi
 
@@ -326,9 +334,16 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     search_path="${search_path} ${chrome_autotests}/client/site_tests"
   fi
 
+  is_suite() {
+    expr match "${1}" "^${SUITES_PREFIX}" &> /dev/null
+  }
+
   pushd ${AUTOTEST_DIR} > /dev/null
   for test_request in $FLAGS_ARGV; do
     test_request=$(remove_quotes "${test_request}")
+    # Skip suites here.
+    is_suite "${test_request}" && continue
+
     ! finds=$(find ${search_path} -maxdepth 2 -xtype f \( -name control.\* -or \
       -name control \) | egrep -v "~$" | egrep "${test_request}")
     if [[ -z "${finds}" ]]; then
@@ -346,9 +361,35 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     control_files_to_run="${control_files_to_run} '${finds}'"
   done
 
+  # Do the suite enumeration upfront, rather than fail in the middle of the
+  # process.
+  ENUMERATOR_PATH="${AUTOTEST_DIR}/site_utils/"
+  suites=()
+  local control_type new_control_file
+  for test_request in $FLAGS_ARGV; do
+    test_request=$(remove_quotes "${test_request}")
+    # Skip regular tests here.
+    is_suite "${test_request}" || continue
+    suite="${test_request/${SUITES_PREFIX}/}"
+
+    info "Enumerating suite ${suite}"
+    suites+=("${suite}")
+    suite_bvt="$(${ENUMERATOR_PATH}/suite_enumerator.py \
+                 --autotest_dir=${AUTOTEST_DIR} ${suite})" || \
+        die "Cannot enumerate ${suite}"
+    # Combine into a single control file if possible.
+    control_type="$(check_control_file_types ${suite_bvt})"
+    info "Control type: ${control_type}"
+    if [[ -n "${control_type}" ]]; then
+      new_control_file="$(generate_combined_control_file ${control_type} \
+                          ${suite_bvt})"
+      suite_bvt="${new_control_file}"
+    fi
+  done
+
   echo ""
 
-  if [[ -z "${control_files_to_run}" ]]; then
+  if [[ -z "${control_files_to_run}" ]] && [[ -z "${suites[@]}" ]]; then
     die "Found no control files"
   fi
 
@@ -377,96 +418,111 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     info " * ${control_file}"
   done
 
-  for i in $(seq 1 $FLAGS_iterations); do
-    for control_file in ${control_files_to_run}; do
-      control_file=$(remove_quotes "${control_file}")
-      local control_file_path=$(normalize_control_path "${control_file}")
-      local test_type=$(read_test_type "${control_file_path}")
+  test_control_file() {
+    control_file=$(remove_quotes "${control_file}")
+    local control_file_path=$(normalize_control_path "${control_file}")
+    local test_type=$(read_test_type "${control_file_path}")
 
-      local option
-      if [[ "${test_type}" == "client" ]]; then
-        option="-c"
+    local option
+    if [[ "${test_type}" == "client" ]]; then
+      option="-c"
+    else
+      option="-s"
+    fi
+    echo ""
+    info "Running ${test_type} test ${control_file}"
+    local control_file_name=$(basename "${control_file}")
+    local short_name=$(basename "$(dirname "${control_file}")")
+
+    # testName/control --> testName
+    # testName/control.bvt --> testName.bvt
+    # testName/control.regression --> testName.regression
+    # testName/some_control --> testName.some_control
+    if [[ "${control_file_name}" != control ]]; then
+      if [[ "${control_file_name}" == control.* ]]; then
+        short_name=${short_name}.${control_file_name/control./}
       else
-        option="-s"
+        short_name=${short_name}.${control_file_name}
       fi
-      echo ""
-      info "Running ${test_type} test ${control_file}"
-      local control_file_name=$(basename "${control_file}")
-      local short_name=$(basename "$(dirname "${control_file}")")
+    fi
 
-      # testName/control --> testName
-      # testName/control.bvt --> testName.bvt
-      # testName/control.regression --> testName.regression
-      # testName/some_control --> testName.some_control
-      if [[ "${control_file_name}" != control ]]; then
-        if [[ "${control_file_name}" == control.* ]]; then
-          short_name=${short_name}.${control_file_name/control./}
-        else
-          short_name=${short_name}.${control_file_name}
-        fi
-      fi
+    local results_dir_name="${short_name}"
+    if [ "${FLAGS_iterations}" -ne 1 ]; then
+      results_dir_name="${results_dir_name}.${i}"
+    fi
+    local results_dir="${TMP}/${results_dir_name}"
+    rm -rf "${results_dir}"
+    local verbose=""
+    if [[ ${FLAGS_verbose} -eq 2 ]]; then
+      verbose="--verbose"
+    fi
 
-      local results_dir_name="${short_name}"
-      if [ "${FLAGS_iterations}" -ne 1 ]; then
-        results_dir_name="${results_dir_name}.${i}"
-      fi
-      local results_dir="${TMP}/${results_dir_name}"
-      rm -rf "${results_dir}"
-      local verbose=""
-      if [[ ${FLAGS_verbose} -eq 2 ]]; then
-        verbose="--verbose"
-      fi
+    local image=""
+    if [[ -n "${FLAGS_update_url}" ]]; then
+      image="--image ${FLAGS_update_url}"
+    fi
 
-      local image=""
-      if [[ -n "${FLAGS_update_url}" ]]; then
-        image="--image ${FLAGS_update_url}"
-      fi
+    RAN_ANY_TESTS=${FLAGS_TRUE}
 
-      RAN_ANY_TESTS=${FLAGS_TRUE}
+    # Remove chrome autotest location prefix from control_file if needed
+    if [[ ${control_file:0:${#chrome_autotests}} == \
+          "${chrome_autotests}" ]]; then
+      control_file="${control_file:${#chrome_autotests}+1}"
+      info "Running chrome autotest ${control_file}"
+    fi
 
-      # Remove chrome autotest location prefix from control_file if needed
-      if [[ ${control_file:0:${#chrome_autotests}} == \
-            "${chrome_autotests}" ]]; then
-        control_file="${control_file:${#chrome_autotests}+1}"
-        info "Running chrome autotest ${control_file}"
-      fi
-
-      # If profiling is enabled, wrap up control file in profiling code.
-      if [ "${FLAGS_profile}" -eq ${FLAGS_TRUE} ]; then
-        if [[ "${test_type}" == "server" ]]; then
-          die "Profiling enabled, but a server test was specified. \
+    # If profiling is enabled, wrap up control file in profiling code.
+    if [ "${FLAGS_profile}" -eq ${FLAGS_TRUE} ]; then
+      if [[ "${test_type}" == "server" ]]; then
+        die "Profiling enabled, but a server test was specified. \
 Profiling only works with client tests."
-        fi
-        local profiled_control_file=$(generate_profiled_control_file \
-            "${control_file_path}" "${results_dir}")
-        info "Profiling enabled. Using generated control file at \
+      fi
+      local profiled_control_file=$(generate_profiled_control_file \
+          "${control_file_path}" "${results_dir}")
+      info "Profiling enabled. Using generated control file at \
 ${profiled_control_file}."
-        control_file="${profiled_control_file}"
-      fi
+      control_file="${profiled_control_file}"
+    fi
 
-      local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
-          ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
+    local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
+        ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
 
-      sudo chmod a+w ./server/{tests,site_tests}
+    sudo chmod a+w ./server/{tests,site_tests}
 
-      # --args must be specified as a separate parameter outside of the local
-      # autoserv_args variable, otherwise ${FLAGS_args} values with embedded
-      # spaces won't pass correctly to autoserv.
-      echo ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
+    # --args must be specified as a separate parameter outside of the local
+    # autoserv_args variable, otherwise ${FLAGS_args} values with embedded
+    # spaces won't pass correctly to autoserv.
+    echo ./server/autoserv ${autoserv_args} --args "${FLAGS_args}"
 
-      local target="${TMP}/autoserv-log.txt"
-      if [ ${FLAGS_verbose} -gt 0 ]; then
-        target=1
-      fi
-      if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
-        # run autoserv in subshell
-        (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
-         ./server/autoserv ${autoserv_args} --args "${FLAGS_args}") 2>&1 \
-           >&${target}
-      else
-        ./server/autoserv ${autoserv_args} --args "${FLAGS_args}" 2>&1 \
-           >&${target}
-      fi
+    local target="${TMP}/autoserv-log.txt"
+    if [ ${FLAGS_verbose} -gt 0 ]; then
+      target=1
+    fi
+    if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
+      # run autoserv in subshell
+      (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
+       ./server/autoserv ${autoserv_args} --args "${FLAGS_args}") 2>&1 \
+         >&${target}
+    else
+      ./server/autoserv ${autoserv_args} --args "${FLAGS_args}" 2>&1 \
+         >&${target}
+    fi
+  }
+
+  local control_file i suite
+  # Number of global test iterations as defined with CLI.
+  for i in $(seq 1 $FLAGS_iterations); do
+    # Run regular tests.
+    for control_file in ${control_files_to_run}; do
+      test_control_file
+    done
+    # Run suites, pre-enumerated above.
+    for suite in "${suites[@]}"; do
+      info "Running suite ${s}:"
+      suite=suite_${suite}
+      for control_file in ${!suite}; do
+        test_control_file
+      done
     done
   done
   # Cleanup temporary combined control file.
