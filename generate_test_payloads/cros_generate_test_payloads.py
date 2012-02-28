@@ -131,6 +131,7 @@ class UpdatePayloadGenerator(object):
 
     # Affect what payloads we create.
     self.board = options.board
+    self.basic_suite = options.basic_suite
     self.full_suite = options.full_suite
     self.payloads = set([])
     self.nplus1_archive_dir = options.nplus1_archive_dir
@@ -159,40 +160,39 @@ class UpdatePayloadGenerator(object):
         public_key_manager.PublicKeyManager(self.target_signed,
                                             self.public_key).AddKeyToImage()
 
+      # The full suite may not have a VM image produced for the test image yet.
+      # Ensure this is created.
       self.base = test_helper.CreateVMImage(self.base, self.board)
 
   def GeneratePayloadRequirements(self):
     """Generate Payload Requirements for AUTestHarness and NPlus1 Testing."""
 
-    def AddPayloadsForAUTestHarness():
-      if self.full_suite:
-        # N-1->N.
-        self._AddUpdatePayload(self.target_no_vm, self.base, for_vm=self.vm)
+    if self.full_suite:
+      # N-1->N.
+      self._AddUpdatePayload(self.target_no_vm, self.base, for_vm=self.vm)
 
-        # N->N after N-1->N.
-        self._AddUpdatePayload(self.target_no_vm, self.target_no_vm,
-                               for_vm=self.vm)
+      # N->N after N-1->N.
+      self._AddUpdatePayload(self.target_no_vm, self.target_no_vm,
+                             for_vm=self.vm)
 
-        # N->N From VM base.
-        self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
+      # N->N From VM base.
+      self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
 
-        # Need a signed payload for the signed payload test.
-        if self.target_signed:
-          self._AddUpdatePayload(self.target_no_vm, self.target_signed,
-                                 self.private_key, for_vm=self.vm)
-      else:
-        # Update image to itself from VM base.
-        self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
+      # Need a signed payload for the signed payload test.
+      if self.target_signed:
+        self._AddUpdatePayload(self.target_no_vm, self.target_signed,
+                               self.private_key, for_vm=self.vm)
 
-    def AddNPlus1Updates():
-      # These should never be for_vm.
+    if self.basic_suite:
+      # Update image to itself from VM base.
+      self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
+
+    if self.nplus1:
       self._AddUpdatePayload(self.target_no_vm, self.base_no_vm, archive=True)
       self._AddUpdatePayload(self.target_no_vm, self.target_no_vm, archive=True)
       self._AddUpdatePayload(self.target_no_vm, None, archive=True,
                              archive_stateful=True)
 
-    if self.nplus1: AddNPlus1Updates()
-    AddPayloadsForAUTestHarness()
 
   def GeneratePayloads(self):
     """Iterates through payload requirements and generates them.
@@ -339,12 +339,16 @@ class UpdatePayloadGenerator(object):
 
   def DumpCacheToDisk(self, cache):
     """Dumps the cache to the same folder as the images."""
-    path_to_dump = os.path.dirname(self.target)
-    cache_file = os.path.join(path_to_dump, cros_au_test_harness.CACHE_FILE)
+    if not self.basic_suite and not self.full_suite:
+      logging.info('Not dumping payload cache to disk as payloads for the '
+                   'test harness were not requested.')
+    else:
+      path_to_dump = os.path.dirname(self.target)
+      cache_file = os.path.join(path_to_dump, cros_au_test_harness.CACHE_FILE)
 
-    logging.info('Dumping %s', cache_file)
-    with open(cache_file, 'w') as file_handle:
-      pickle.dump(cache, file_handle)
+      logging.info('Dumping %s', cache_file)
+      with open(cache_file, 'w') as file_handle:
+        pickle.dump(cache, file_handle)
 
 
 def CheckOptions(parser, options):
@@ -380,24 +384,35 @@ def CheckOptions(parser, options):
 def main():
   test_helper.SetupCommonLoggingFormat()
   parser = optparse.OptionParser()
-  parser.add_option('--base', help='Image we want to test updates from.')
-  parser.add_option('--board', help='Board used for the images.')
+
+  # Optional related to which payloads to generate.
+  parser.add_option('--basic_suite', default=False, action='store_true',
+                    help='Prepare to run the basic au test suite.')
   parser.add_option('--full_suite', default=False, action='store_true',
                     help='Prepare to run the full au test suite.')
-  parser.add_option('--jobs', default=test_helper.CalculateDefaultJobs(),
-                    type=int,
-                    help='Number of payloads to generate in parallel.')
-  parser.add_option('--novm', default=True, action='store_false', dest='vm',
-                    help='Test Harness payloads will not be tested in a VM.')
   parser.add_option('--nplus1', default=False, action='store_true',
                     help='Produce nplus1 updates for testing in lab.')
   parser.add_option('--nplus1_archive_dir', default=None,
                     help='If set, archive nplu1 updates in this directory.')
+
+  # Options related to how to generate test payloads for the test harness.
+  parser.add_option('--novm', default=True, action='store_false', dest='vm',
+                    help='Test Harness payloads will not be tested in a VM.')
   parser.add_option('--private_key',
-                    help='Private key to sign payloads.')
+                    help='Private key to sign payloads for test harness.')
   parser.add_option('--public_key',
-                    help='Public key to verify signed payloads.')
+                    help='Public key to verify payloads for test harness.')
+
+  # Options related to the images to test.
+  parser.add_option('--board', help='Board used for the images.')
+  parser.add_option('--base', help='Image we want to test updates from.')
   parser.add_option('--target', help='Image we want to test updates to.')
+
+  # Miscellaneous options.
+  parser.add_option('--jobs', default=test_helper.CalculateDefaultJobs(),
+                    type=int,
+                    help='Number of payloads to generate in parallel.')
+
   options = parser.parse_args()[0]
   CheckOptions(parser, options)
 

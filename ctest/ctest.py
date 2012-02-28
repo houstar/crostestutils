@@ -193,15 +193,18 @@ class CTest(object):
     cmd.append('--base=%s' % self.base)
     cmd.append('--board=%s' % self.board)
     cmd.append('--jobs=%d' % self.jobs)
+    if self.nplus1_archive_dir:
+      cmd.append('--nplus1')
+      cmd.append('--nplus1_archive_dir=%s' % self.nplus1_archive_dir)
+
     if full:
       cmd.append('--full_suite')
-      cmd.append('--nplus1')
-      if self.nplus1_archive_dir:
-        cmd.append('--nplus1_archive_dir=%s' % self.nplus1_archive_dir)
-
+      # This only is compatible with payload signing.
       if self.sign_payloads:
         cmd.append('--public_key=%s' % self.public_key)
         cmd.append('--private_key=%s' % self.private_key)
+    else:
+      cmd.append('--basic_suite')
 
     if self.type != 'vm': cmd.append('--novm')
     try:
