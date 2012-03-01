@@ -29,11 +29,12 @@ import tempfile
 import constants
 sys.path.append(constants.CROSUTILS_LIB_DIR)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
+sys.path.append(constants.SOURCE_ROOT)
 import cros_build_lib as cros_lib
-
 from crostestutils.au_test_harness import cros_au_test_harness
 from crostestutils.generate_test_payloads import payload_generation_exception
 from crostestutils.lib import dev_server_wrapper
+from crostestutils.lib import image_extractor
 from crostestutils.lib import parallel_test_job
 from crostestutils.lib import public_key_manager
 from crostestutils.lib import test_helper
@@ -361,7 +362,21 @@ def CheckOptions(parser, options):
   if not options.target or not os.path.isfile(options.target):
     parser.error('Target image must exist.')
 
-  if not options.base:
+  # Determine the base image. If latest_from_config specified, find the latest
+  # image from the given config. If it doesn't exist, use the target image.
+  target_version = os.path.realpath(options.target).rsplit('/', 2)[-2]
+  if options.base_latest_from_config:
+    # Extract the latest build.
+    extractor = image_extractor.ImageExtractor(options.base_latest_from_config)
+    latest_image_dir = extractor.GetLatestImage(target_version)
+    if latest_image_dir:
+      options.base = extractor.UnzipImage(latest_image_dir)
+    else:
+      logging.info('Config specified but no previous images found. '
+                   'Using target.')
+      options.base = options.target
+
+  elif not options.base:
     logging.info('Base image not specified. Using target as base image.')
     options.base = options.target
 
@@ -406,6 +421,10 @@ def main():
   # Options related to the images to test.
   parser.add_option('--board', help='Board used for the images.')
   parser.add_option('--base', help='Image we want to test updates from.')
+  parser.add_option('--base_latest_from_config', help='Ignore the base '
+                    'option and use the latest image from the specified config '
+                    'as the base image. If none exists, default to target '
+                    'image.')
   parser.add_option('--target', help='Image we want to test updates to.')
 
   # Miscellaneous options.
