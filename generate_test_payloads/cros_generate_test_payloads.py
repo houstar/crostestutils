@@ -31,6 +31,7 @@ sys.path.append(constants.CROSUTILS_LIB_DIR)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
 import cros_build_lib as cros_lib
+from chromite.lib import locking
 from crostestutils.au_test_harness import cros_au_test_harness
 from crostestutils.generate_test_payloads import payload_generation_exception
 from crostestutils.lib import dev_server_wrapper
@@ -434,18 +435,19 @@ def main():
 
   options = parser.parse_args()[0]
   CheckOptions(parser, options)
-
-  dev_server_wrapper.DevServerWrapper.WipePayloadCache()
-
   if options.nplus1_archive_dir and not os.path.exists(
       options.nplus1_archive_dir):
     os.makedirs(options.nplus1_archive_dir)
 
-  generator = UpdatePayloadGenerator(options)
-  generator.GenerateImagesForTesting()
-  generator.GeneratePayloadRequirements()
-  cache = generator.GeneratePayloads()
-  generator.DumpCacheToDisk(cache)
+  # Don't allow this code to be run more than once at a time.
+  lock_path = os.path.join(os.path.dirname(__file__), '.lock_file')
+  with locking.FileLock(lock_path, 'generate payloads lock') as lock:
+    lock.write_lock()
+    generator = UpdatePayloadGenerator(options)
+    generator.GenerateImagesForTesting()
+    generator.GeneratePayloadRequirements()
+    cache = generator.GeneratePayloads()
+    generator.DumpCacheToDisk(cache)
 
 
 if __name__ == '__main__':
