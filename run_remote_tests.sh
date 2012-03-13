@@ -364,7 +364,8 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
   # Do the suite enumeration upfront, rather than fail in the middle of the
   # process.
   ENUMERATOR_PATH="${AUTOTEST_DIR}/site_utils/"
-  suites=()
+  suite_list=()
+  suite_map=()
   local control_type new_control_file
   for test_request in $FLAGS_ARGV; do
     test_request=$(remove_quotes "${test_request}")
@@ -373,23 +374,23 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     suite="${test_request/${SUITES_PREFIX}/}"
 
     info "Enumerating suite ${suite}"
-    suites+=("${suite}")
-    suite_bvt="$(${ENUMERATOR_PATH}/suite_enumerator.py \
-                 --autotest_dir=${AUTOTEST_DIR} ${suite})" || \
+    suite_list+=("${suite}")
+    suite_map[${suite}]="$(${ENUMERATOR_PATH}/suite_enumerator.py \
+                 --autotest_dir="${AUTOTEST_DIR}" ${suite})" ||
         die "Cannot enumerate ${suite}"
     # Combine into a single control file if possible.
-    control_type="$(check_control_file_types ${suite_bvt})"
+    control_type="$(check_control_file_types ${suite_map[${suite}]})"
     info "Control type: ${control_type}"
     if [[ -n "${control_type}" ]]; then
       new_control_file="$(generate_combined_control_file ${control_type} \
-                          ${suite_bvt})"
-      suite_bvt="${new_control_file}"
+                          ${suite_map[${suite}]})"
+      suite_map[${suite}]="${new_control_file}"
     fi
   done
 
   echo ""
 
-  if [[ -z "${control_files_to_run}" ]] && [[ -z "${suites[@]}" ]]; then
+  if [[ -z "${control_files_to_run}" ]] && [[ -z "${suite_map[@]}" ]]; then
     die "Found no control files"
   fi
 
@@ -517,10 +518,9 @@ ${profiled_control_file}."
       test_control_file
     done
     # Run suites, pre-enumerated above.
-    for suite in "${suites[@]}"; do
-      info "Running suite ${s}:"
-      suite=suite_${suite}
-      for control_file in ${!suite}; do
+    for suite in "${suite_list[@]}"; do
+      info "Running suite ${suite}:"
+      for control_file in ${suite_map[${suite}]}; do
         test_control_file
       done
     done
