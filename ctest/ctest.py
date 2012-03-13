@@ -156,7 +156,7 @@ class CTest(object):
 
     The auto update test harness encapsulates testing the auto-update mechanism
     for the latest image against the latest official image from the channel.
-    This also tests images with suite_Smoke (built-in as part of its
+    This also tests images with suite:smoke (built-in as part of its
     verification process).
 
     Args:

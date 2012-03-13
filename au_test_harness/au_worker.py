@@ -1,4 +1,4 @@
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -36,7 +36,7 @@ class AUWorker(object):
     if options.quick_test:
       self.verify_suite = 'build_RootFilesystemSize'
     else:
-      self.verify_suite = 'suite_Smoke'
+      self.verify_suite = 'suite:smoke'
 
     # Set these up as they are used often.
     self.crosutils = cros_lib.GetCrosUtilsPath()
