@@ -29,12 +29,12 @@ def CalculateDefaultJobs():
   # 1. Since each job needs two loop devices, limit our number of jobs to the
   #    number of loop devices divided by two. Reserve six loop devices for
   #    other processes (e.g. archiving the build in the background.)
-  # 2. Reserve 7GB RAM for background processes. After that, each job needs
+  # 2. Reserve 10GB RAM for background processes. After that, each job needs
   #    ~2GB RAM.
   # 3. Reserve half the CPUs for background processes.
   loop_count = (len(glob.glob('/dev/loop*')) - 6) / 2
   cpu_count = multiprocessing.cpu_count() / 2
-  mem_count = int((_GetTotalMemoryGB() - 7) / 2)
+  mem_count = int((_GetTotalMemoryGB() - 10) / 2)
   return max(1, min(cpu_count, mem_count, loop_count))
 
 
