@@ -501,12 +501,17 @@ ${profiled_control_file}."
     fi
     if [ ${FLAGS_build} -eq ${FLAGS_TRUE} ]; then
       # run autoserv in subshell
+      # NOTE: We're being scrutinized by set -e. We must prevail. The whole
+      # build depends on us. Failure is not an option.
+      # The real failure is generated below by generate_test_report that
+      # fails if complex conditions on test results are met, while printing
+      # a summary at the same time.
       (. ${BUILD_ENV} && tc-export CC CXX PKG_CONFIG &&
        ./server/autoserv ${autoserv_args} --args "${FLAGS_args}") 2>&1 \
-         >&${target}
+         >&${target} || true
     else
       ./server/autoserv ${autoserv_args} --args "${FLAGS_args}" 2>&1 \
-         >&${target}
+         >&${target} || true
     fi
   }
 
