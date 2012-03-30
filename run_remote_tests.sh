@@ -19,12 +19,12 @@ DEFINE_string board "" \
 DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
 DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
 DEFINE_integer iterations 1 "Iterations to run every top level test" i
-DEFINE_boolean profile ${FLAGS_FALSE} \
-    "Enable profiling for the autotest using perf."
-DEFINE_string profiler_args "-e cycles" \
-    "Arguments to pass to perf record."
-DEFINE_string profile_type "record" \
-    "The type of profile data to collect. Either 'record' or 'stat'."
+# These are passed directly so if strings are to be passed they need to be
+# quoted with \". Example --profiler_args="options=\"hello\"".
+DEFINE_string profiler_args "" \
+    "Arguments to pass to the profiler."
+DEFINE_string profiler "" \
+    "The name of the profiler to use. Ex: cros_perf, pgo, etc."
 DEFINE_string results_dir_root "" "alternate root results directory"
 DEFINE_string update_url "" "Full url of an update image."
 DEFINE_boolean use_emerged ${FLAGS_FALSE} \
@@ -198,15 +198,15 @@ function generate_profiled_control_file() {
 
   mkdir -p "${results_dir}"
   local tmp="${results_dir}/$(basename "${control_file_path}").with_profiling"
-  local profiler_args="${FLAGS_profiler_args}"
 
-  echo "job.default_profile_only = True" > ${tmp}
-  echo "job.profilers.add('cros_perf', options='${profiler_args}',\
-profile_type='${FLAGS_profile_type}')" >> ${tmp}
-  cat "${control_file_path}" >> ${tmp}
-  # Ensure newline after main control file.
-  echo "" >> ${tmp}
-  echo "job.profilers.delete('cros_perf')" >> ${tmp}
+  cat > "${tmp}" <<EOF
+job.default_profile_only = True
+job.profilers.add('${FLAGS_profiler}',
+${FLAGS_profiler_args})
+$(cat ${control_file_path})
+
+job.profilers.delete('${FLAGS_profiler}')
+EOF
 
   echo "${tmp}"
 }
@@ -399,7 +399,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
   # If profiling is disabled and we're running more than one test, attempt to
   # combine them for packaging efficiency.
   local new_control_file
-  if [ "${FLAGS_profile}" -eq ${FLAGS_FALSE} ]; then
+  if [[ -z ${FLAGS_profiler} ]]; then
     if [[ "$(echo ${control_files_to_run} | wc -w)" -gt 1 ]]; then
       # Check to make sure only client or only server control files have been
       # requested, otherwise fall back to uncombined execution.
@@ -473,7 +473,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     fi
 
     # If profiling is enabled, wrap up control file in profiling code.
-    if [ "${FLAGS_profile}" -eq ${FLAGS_TRUE} ]; then
+    if [[ -n ${FLAGS_profiler} ]]; then
       if [[ "${test_type}" == "server" ]]; then
         die "Profiling enabled, but a server test was specified. \
 Profiling only works with client tests."
