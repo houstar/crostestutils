@@ -16,7 +16,7 @@ import chromite.lib.cros_build_lib as chromite_build_lib
 class ImageExtractor(object):
   """Class used to get the latest image for the board."""
   # Archive directory the buildbot stores images.
-  LOCAL_ARCHIVE = '/var/www/archive'
+  LOCAL_ARCHIVE = '/b/archive'
   # The image we want to test.
   IMAGE_TO_EXTRACT = 'chromiumos_test_image.bin'
   # Archive directory in the src tree to keep latest archived image after
