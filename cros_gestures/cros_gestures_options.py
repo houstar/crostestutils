@@ -50,7 +50,11 @@ def GetConfigOptions(current_dir):
     msg = 'Unable to find config file: %s.' % trackpad_test_conf
     cros_gestures_utils.OutputAndExit(msg, red=True)
 
-  config_options = {}
+  # 'dir':['mix'] is a custom config entry for a handmade manifest file
+  # with an area of 'mix' and a functionality of 'dir'.
+  # examples: 'mix-dir.all-alex-mary_tut1-20111215_233052'
+  #           'mix-dir.all-alex-user_tut1-20111215_233052'
+  config_options = {'dir': ['mix']}
   for f in read_trackpad_test_conf('functionality_list', path):
     if f.name in config_options.iteritems():
       msg = ('Found a repeated functionality. Please check the conf file '

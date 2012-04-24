@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -15,7 +15,7 @@ import subprocess
 import sys
 import traceback
 
-import constants
+import cros_gestures_constants
 
 
 FILE_PREFIX = 'file://'
@@ -104,7 +104,7 @@ def FindDependencies(boto_environ_var='BOTO_CONFIG'):
 
   # .boto enforces the trustworthiness - this is just a hint.
   if boto_config.find('untrusted') > -1:
-    constants.trusted = False
+    cros_gestures_constants.trusted = False
 
   # Before importing boto, find where gsutil is installed and include its
   # boto sub-directory at the start of the PYTHONPATH, to ensure the versions of
@@ -132,7 +132,7 @@ def HandleUnknownFailure(e):
   """Called if we fall through all known/handled exceptions.
   Allows us to # print a stacktrace if -D option used.
   """
-  if constants.debug > 2:
+  if cros_gestures_constants.debug > 2:
     stack_trace = traceback.format_exc()
     prefix = color.Color(Color.RED, 'DEBUG: Exception stack trace:')
     OutputAndExit('%s\n    %s\n' % (prefix, re.sub('\\n', '\n    ',
@@ -154,7 +154,7 @@ def HandleControlC(signal_num, cur_stack_frame):
   """Called when user hits ^C so we can print a brief message.
   This is instead of the normal Python stack trace (unless -D option is used).
   """
-  if constants.debug > 2:
+  if cros_gestures_constants.debug > 2:
     stack_trace = ''.join(traceback.format_list(traceback.extract_stack()))
     prefix = color.Color(Color.RED, 'DEBUG: Caught signal %d - '
                                     'Exception stack trace:' % signal_num)
@@ -218,8 +218,8 @@ def RunGSUtil(bin_dir, logger, cmd, headers=None, sub_opts=None, args=None,
   else:
     args = ''
   cmd = ('%s %s %s %s %s %s' % (os.path.join(bin_dir, 'gsutil'),
-                                debug_options[constants.debug], headers,
-                                cmd, sub_opts, args)).strip()
+                                debug_options[cros_gestures_constants.debug],
+                                headers, cmd, sub_opts, args)).strip()
   logger.debug('Running command "%s"', cmd)
   try:
     p = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,

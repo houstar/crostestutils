@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -9,7 +9,7 @@ This code is modeled after and derived from the Command class in
 gsutil/gslib/command.py for maximum re-use.
 """
 
-__version__ = '0.9.1'
+__version__ = '1.0.0'
 
 import datetime
 import hashlib
@@ -19,7 +19,7 @@ import os
 import re
 import sys
 
-import constants
+import cros_gestures_constants
 import cros_gestures_utils
 from exception import CrosGesturesException
 
@@ -122,8 +122,6 @@ def FixupOptionsFromFilename(source_file, options):
   """
   options.uploadarea = None  # Create nonexistent attributes
   options.uploadcreated = None
-  # TODO(Truty): handle firmware version in the filename.
-  #              also, possible for no sub-name
   filename_parse = re.compile(
       '([\w]+)-([\w]+)\.[\w.]+-([\w]+)-([\w]+)-([\w]+)')
   m = re.match(filename_parse, source_file)
@@ -153,7 +151,7 @@ def FixupOptionsFromFilename(source_file, options):
   if gs_time:
     options.uploadcreated = datetime.datetime.strptime(
         gs_time, FILE_TIME_FORMAT).strftime(DISPLAY_TIME_FORMAT)
-  # Extra validations
+  # Extra validations.
   if options.uploadfunctionality not in options.config_options:
       raise CrosGesturesException('The config file does not expect this '
                                   'functionality: %s' %
@@ -201,7 +199,7 @@ class GestureUri(object):
       raise CrosGesturesException('Please supply a user to MakeGestureUri.')
     if not uri_str:
       raise CrosGesturesException('Unexpected empty uri.')
-    if constants.trusted:
+    if cros_gestures_constants.trusted:
       user_type = 'trusted-dev'
     else:
       user_type = 'untrusted-dev'

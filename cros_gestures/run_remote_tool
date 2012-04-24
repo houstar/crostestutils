@@ -51,9 +51,10 @@ def CopyFilesToTempDir(argv):
   # Copy gsutil
   shutil.copytree(os.path.abspath(gsutil_bin_dir),
                   os.path.join(temp_dir, 'cros_gestures', 'gsutil'))
-  # Copy .boto
-  shutil.copyfile(os.path.abspath(boto_config),
-                  os.path.join(temp_dir, 'cros_gestures', '.boto'))
+  # Copy .boto if trusted - otherwise untrusted one already present.
+  if os.environ['BOTO_CONFIG'].find('untrusted') == -1:
+    shutil.copyfile(os.path.abspath(boto_config),
+                    os.path.join(temp_dir, 'cros_gestures', '.boto'))
   return temp_dir
 
 

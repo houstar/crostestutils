@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -12,7 +12,7 @@ gsutil and boto libraries.
 import logging
 import sys
 
-import constants
+import cros_gestures_constants
 
 
 class NoLoggingFilter(logging.Filter):
@@ -27,9 +27,9 @@ def SetupLogging(options):
   if options.detaileddebugout or options.debugout:
     logging_level = logging.DEBUG
     if options.detaileddebugout:
-      constants.debug = 3  # from gsutil show httplib headers
+      cros_gestures_constants.debug = 3  # from gsutil show httplib headers
     else:
-      constants.debug = 2  # from gsutil
+      cros_gestures_constants.debug = 2  # from gsutil
   else:
     logging_level = logging.INFO
     # Mute verbose oauth logging.

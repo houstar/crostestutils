@@ -4,31 +4,43 @@ to make files available for touchpad gesture testing.
 The command line tool is modeled very closely on (and depends) on the Google
 Storage command line client (gsutil).
 
-Contents:
+CONTENTS:
  - cros_gestures is the command line tool
  - setup_cros_gestures.sh helps establish proper environment variables to find
    both gsutil and the needed .boto file for authentication.
+ - run_remote_tool builds a bundle to install on a test machine (and can
+   run it on a test machine).
+ - remote/install_cros_gestures.py can setup a test machine from the public,
+   untrusted bundle.
 
-For more information on installing and using gsutil, see
+FOR MORE INFORMATION ON INSTALLING AND USING GSUTIL, SEE:
 <http://code.google.com/apis/storage/docs/gsutil.html>.
 
-To install gsutils:
+TO INSTALL GSUTILS:
  - cd ~
  - wget http://commondatastorage.googleapis.com/pub/gsutil.tar.gz
  - gzip -d gsutil.tar.gz
  - tar -xvf gsutil.tar
 
-To install cros_gestures:
-...git clone
+TO BUILD A TRUSTED PACKAGE TO ./CROS_GESTURES.TAR.BZ2:
+ - . ./setup_cros_gestures.sh trusted
+ - ./run_remote_tool
 
-To install cros_gestures_boto:
-...git clone
+TO BUILD AN UNTRUSTED PACKAGE TO ./CROS_GESTURES.TAR.BZ2:
+ - . ./setup_cros_gestures.sh untrusted
+ - ./run_remote_tool
 
-DEPLOYMENT PLAN:
+TO DEPLOY THE BUNDLES:
+ - gsutil cp /tmp/cros_gestures.tar.bz2  \
+       gs://chromeos-gestures-valid/downloads/untrusted/cros_gestures.tar.bz2
+ - gsutil cp /tmp/install_cros_gestures.py  \
+       gs://chromeos-gestures-valid/downloads/untrusted/install_cros_gestures.py
+ - gsutil setacl public-read \
+       gs://chromeos-gestures-valid/downloads/untrusted/cros_gestures.tar.bz2
+ - gsutil setacl public-read \
+       gs://chromeos-gestures-valid/downloads/untrusted/install_cros_gestures.py
 
-cros_gestures
--cros_gestures
--cros_gestures_boto
--gsutil
-
-Fix environment variables in ./setup_cros_gestures.sh.
+TO INSTALL CROS_GESTURES TO /USR/LOCAL/CROS_GESTURES (TEST MACHINES):
+ - cd /tmp
+ - wget http://chromeos-gestures-valid.commondatastorage.googleapis.com/downloads/untrusted/install_cros_gestures.py
+ - python ./install_cros_gestures.py

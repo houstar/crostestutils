@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -18,7 +18,7 @@ import pprint
 import signal
 import sys
 
-import constants
+import cros_gestures_constants
 import cros_gestures_logging
 import cros_gestures_utils
 from exception import CrosGesturesException
@@ -87,7 +87,7 @@ if len(sys.argv) == 1:
 options, args, command_string = cros_gestures_options.ParseArgs(USAGE_STRING,
                                                                 commands)
 cros_gestures_logging.SetupLogging(options)
-if constants.debug > 1:
+if cros_gestures_constants.debug > 1:
   LOG.debug('Using\n\tGSUTIL_BIN_DIR=%s\n\tBOTO_CONFIG=%s.', gsutil_bin_dir,
                                                              boto_config)
   LOG.debug('Accepted funtionalities:\n%s.',

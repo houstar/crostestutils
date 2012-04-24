@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -10,7 +10,7 @@ Package download/extract code loosely based on Autotest packaging utils.
 """
 
 __author__ = 'truty@chromium.org (Mike Truty)'
-__version__ = '0.9.1'
+__version__ = '1.0.0'
 
 
 import logging
@@ -20,13 +20,15 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import urlparse
 
 
 LOG = logging.getLogger('cros_gestures')
 
 GESTURES_INSTALL_DIR = '/usr/local/cros_gestures'
 GESTURE_SERVER_URL = (
-    'http://chromeos-gestures.commondatastorage.googleapis.com/downloads')
+    'http://chromeos-gestures-valid.commondatastorage.googleapis.com/'
+    'downloads/untrusted')
 GESTURE_ARCHIVE = 'cros_gestures.tar.bz2'
 
 
@@ -74,7 +76,7 @@ class HttpFetcher(object):
         self.url = repository_url
 
 
-    def _QuickHttpTest(self, custom_quick_url=None):
+    def _QuickHttpTest(self):
         """ Run a simple 30 second wget on the repository to see if it is
         reachable. This avoids the need to wait for a full 10min timeout.
         """
@@ -84,8 +86,10 @@ class HttpFetcher(object):
 
         try:
             # build up a wget command
-            if custom_quick_url:
-                try_url = custom_quick_url
+            if self.url == GESTURE_SERVER_URL:
+                parts = urlparse.urlparse(self.url)
+                try_url = urlparse.urlunparse([parts.scheme, parts.netloc, '',
+                                               None, None, None])
             else:
                 try_url = self.url
             http_cmd = self.wget_cmd_pattern % (try_url, dest_file_path)
@@ -99,12 +103,12 @@ class HttpFetcher(object):
             temp_file.close()
 
 
-    def FetchPkgFile(self, filename, dest_path, custom_quick_url=None):
+    def FetchPkgFile(self, filename, dest_path):
         logging.info('Fetching %s from %s to %s', filename, self.url,
                      dest_path)
 
         # do a quick test to verify the repo is reachable
-        self._QuickHttpTest(custom_quick_url=custom_quick_url)
+        self._QuickHttpTest()
 
         # try to retrieve the package via http
         package_url = os.path.join(self.url, filename)
@@ -157,10 +161,7 @@ def CopyPackage(repo_url, package_name, install_dir):
 def DownloadPackage(repo_url, package_name, install_dir):
     """Download a package."""
     fetcher = HttpFetcher(repo_url)
-    # gs urls don't allow quick fetch because directories are not full
-    # download targets - rather they are just members of a namespace hierarchy.
-    fetcher.FetchPkgFile(package_name, install_dir,
-                         custom_quick_url='/'.join(repo_url.split('/')[0:-1]))
+    fetcher.FetchPkgFile(package_name, install_dir)
 
 
 def InstallPackage(source_dir, package_name, install_dir):
