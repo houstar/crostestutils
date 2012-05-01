@@ -108,10 +108,9 @@ class AUTest(unittest.TestCase):
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
     self.assertTrue(self.worker.VerifyImage())
 
-    # TODO(dgarrett): Doing and verifying a double update is good...
-    #                 after binary postinst works for this on VMs.
-    #self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
-    #self.assertTrue(self.worker.VerifyImage())
+    # Update from
+    self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
+    self.assertTrue(self.worker.VerifyImage())
 
   def testUpdateWipeStateful(self):
     """Tests if we can update after cleaning the stateful partition.
@@ -126,6 +125,11 @@ class AUTest(unittest.TestCase):
 
     # Update to
     self.worker.PerformUpdate(self.target_image_path, self.base_image_path,
+                              'clean')
+    self.assertTrue(self.worker.VerifyImage())
+
+    # Update from
+    self.worker.PerformUpdate(self.target_image_path, self.target_image_path,
                               'clean')
     self.assertTrue(self.worker.VerifyImage())
 
