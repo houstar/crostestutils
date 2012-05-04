@@ -136,11 +136,13 @@ class UpdatePayloadGenerator(object):
     self.basic_suite = options.basic_suite
     self.full_suite = options.full_suite
     self.payloads = set([])
+    self.full_payload = options.full_payload
     self.nplus1_archive_dir = options.nplus1_archive_dir
 
     self.jobs = options.jobs
     self.nplus1 = options.nplus1
-    self.vm = options.vm
+
+    self.vm = _ShouldGenerateVM(options)
 
   def _AddUpdatePayload(self, target, base, key=None, archive=False,
                         archive_stateful=False, for_vm=False):
@@ -150,7 +152,8 @@ class UpdatePayloadGenerator(object):
 
   def GenerateImagesForTesting(self):
     # All vm testing requires a VM'ized target.
-    if self.vm: self.target = test_helper.CreateVMImage(self.target, self.board)
+    if self.vm:
+      self.target = test_helper.CreateVMImage(self.target, self.board)
 
     if self.full_suite:
       if self.public_key:
@@ -168,7 +171,6 @@ class UpdatePayloadGenerator(object):
 
   def GeneratePayloadRequirements(self):
     """Generate Payload Requirements for AUTestHarness and NPlus1 Testing."""
-
     if self.full_suite:
       # N-1->N.
       self._AddUpdatePayload(self.target_no_vm, self.base, for_vm=self.vm)
@@ -189,9 +191,13 @@ class UpdatePayloadGenerator(object):
       # Update image to itself from VM base.
       self._AddUpdatePayload(self.target_no_vm, self.target, for_vm=self.vm)
 
+    # Add deltas for m minus 1 to n and n to n.
     if self.nplus1:
       self._AddUpdatePayload(self.target_no_vm, self.base_no_vm, archive=True)
       self._AddUpdatePayload(self.target_no_vm, self.target_no_vm, archive=True)
+
+    # Add the full payload.
+    if self.nplus1 or self.full_payload:
       self._AddUpdatePayload(self.target_no_vm, None, archive=True,
                              archive_stateful=True)
 
@@ -353,6 +359,13 @@ class UpdatePayloadGenerator(object):
         pickle.dump(cache, file_handle)
 
 
+def _ShouldGenerateVM(options):
+  """Returns true if we will need a VM version of our images."""
+  # This is a combination of options.vm and whether or not we are generating
+  # payloads for vm testing.
+  return options.vm and (options.basic_suite or options.full_suite)
+
+
 def CheckOptions(parser, options):
   """Checks that given options are valid.
 
@@ -391,25 +404,34 @@ def CheckOptions(parser, options):
     if not os.path.isfile(options.public_key):
       parser.error('Public key must exist.')
 
-  if options.vm:
+  if _ShouldGenerateVM(options):
     if not options.board:
       parser.error('Board must be set to generate update '
                    'payloads for vm.')
+
+  if options.full_payload or options.nplus1:
+    if not options.nplus1_archive_dir:
+      parser.error('Must specify an archive directory if nplus1 or '
+                   'full payload are specified.')
 
 
 def main():
   test_helper.SetupCommonLoggingFormat()
   parser = optparse.OptionParser()
 
-  # Optional related to which payloads to generate.
+  # Options related to which payloads to generate.
   parser.add_option('--basic_suite', default=False, action='store_true',
                     help='Prepare to run the basic au test suite.')
   parser.add_option('--full_suite', default=False, action='store_true',
                     help='Prepare to run the full au test suite.')
+  parser.add_option('--full_payload', default=False, action='store_true',
+                    help='Generate the full update payload and store it in '
+                    'the nplus1 archive dir.')
   parser.add_option('--nplus1', default=False, action='store_true',
-                    help='Produce nplus1 updates for testing in lab.')
+                    help='Produce nplus1 updates for testing in lab and store '
+                    'them in the nplus1 archive dir.')
   parser.add_option('--nplus1_archive_dir', default=None,
-                    help='If set, archive nplu1 updates in this directory.')
+                    help='Archive nplus1 updates into this directory.')
 
   # Options related to how to generate test payloads for the test harness.
   parser.add_option('--novm', default=True, action='store_false', dest='vm',
