@@ -45,7 +45,7 @@ For example:
 
 RAN_ANY_TESTS=${FLAGS_FALSE}
 
-function stop_ssh_agent() {
+stop_ssh_agent() {
   # Call this function from the exit trap of the main script.
   # Iff we started ssh-agent, be nice and clean it up.
   # Note, only works if called from the main script - no subshells.
@@ -55,7 +55,7 @@ function stop_ssh_agent() {
   fi
 }
 
-function start_ssh_agent() {
+start_ssh_agent() {
   local tmp_private_key=$TMP/autotest_key
   if [ -z "$SSH_AGENT_PID" ]; then
     eval $(ssh-agent)
@@ -68,7 +68,7 @@ function start_ssh_agent() {
   ssh-add $tmp_private_key
 }
 
-function cleanup() {
+cleanup() {
   # Always remove the build path in case it was used.
   [[ -n "${BUILD_DIR}" ]] && sudo rm -rf "${BUILD_DIR}"
   if [[ $FLAGS_cleanup -eq ${FLAGS_TRUE} ]] || \
@@ -87,7 +87,7 @@ function cleanup() {
 # either "server" or "client".
 # Arguments:
 #   $1 - control file path
-function read_test_type() {
+read_test_type() {
   local control_file=$1
   # Assume a line starts with TEST_TYPE =
   local test_type=$(egrep -m1 \
@@ -102,7 +102,7 @@ function read_test_type() {
   echo ${test_type}
 }
 
-function create_tmp() {
+create_tmp() {
   # Set global TMP for remote_access.sh's sake
   # and if --results_dir_root is specified,
   # set TMP and create dir appropriately
@@ -114,7 +114,7 @@ function create_tmp() {
   fi
 }
 
-function prepare_build_env() {
+prepare_build_env() {
   info "Pilfering toolchain shell environment from Portage."
   local ebuild_dir="${TMP}/chromeos-base/autotest-build"
   mkdir -p "${ebuild_dir}"
@@ -131,7 +131,7 @@ EOF
   export BUILD_ENV="${P_tmp}/${E_dir}/temp/environment"
 }
 
-function autodetect_build() {
+autodetect_build() {
   if [ ${FLAGS_use_emerged} -eq ${FLAGS_TRUE} ]; then
     AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/autotest"
     FLAGS_build=${FLAGS_FALSE}
@@ -182,7 +182,7 @@ autotest-tests to continue."
 }
 
 # Convert potentially relative control file path to an absolute path.
-function normalize_control_path() {
+normalize_control_path() {
     local control_file=$(remove_quotes "$1")
     if [[ ${control_file:0:1} == "/" ]]; then
       echo "${control_file}"
@@ -192,7 +192,7 @@ function normalize_control_path() {
 }
 
 # Generate a control file which has a profiler enabled.
-function generate_profiled_control_file() {
+generate_profiled_control_file() {
   local control_file_path="$1"
   local results_dir="$2"
 
@@ -214,7 +214,7 @@ EOF
 # Given a control_type (client or server) and a list of control files, assembles
 # them all into a single control file. Useful for reducing repeated packaging
 # between tests sharing the same resources.
-function generate_combined_control_file() {
+generate_combined_control_file() {
   local control_type="$1"
   shift
   local control_files="$@"
@@ -251,7 +251,7 @@ function generate_combined_control_file() {
 
 # Given a list of control files, returns "client", "server", or "" respectively
 # if there are only client, only server, or both types of control files.
-function check_control_file_types() {
+check_control_file_types() {
   # Check to make sure only client or only server control files have been
   # requested, otherwise fall back to uncombined execution.
   local client_controls=${FLAGS_FALSE}
@@ -279,7 +279,7 @@ function check_control_file_types() {
 }
 
 
-function main() {
+main() {
   cd "${SCRIPTS_DIR}"
 
   FLAGS "$@" || exit 1

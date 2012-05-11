@@ -14,7 +14,7 @@ declare TESTBOTO=\
 "${SRC_BASE}/src/third_party/autotest-private/cros_gestures_boto"
 declare AUTOTEST_SRC="${SRC_BASE}/src/third_party/autotest/files"
 
-function check_and_set_var() {
+check_and_set_var() {
   local var_name=$1
   local var_value=$2
   local dir_or_file=$3
@@ -26,7 +26,7 @@ function check_and_set_var() {
   fi
 }
 
-function clear_vars() {
+clear_vars() {
   for v in BOTO_CONFIG BOTO_VALIDATE_CONFIG GSUTIL_BIN_DIR TRACKPAD_TEST_DIR
   do
     unset $v

@@ -34,7 +34,7 @@ DEFINE_boolean withdebug "${FLAGS_TRUE}" \
 # List of packages with no unit tests.
 NO_UNITTESTS=""
 
-function check_src_test() {
+check_src_test() {
   egrep '^src_test()' "${1}" > /dev/null
 }
 
