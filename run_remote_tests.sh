@@ -174,8 +174,9 @@ start autotest and repo sync to continue."
     AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/autotest"
     if [ ! -d "${AUTOTEST_DIR}" ]; then
       die \
-"Autotest was not emerged. Run emerge-${FLAGS_board} autotest \
-autotest-tests to continue."
+"Autotest was not emerged, ${AUTOTEST_DIR} does not exist. You should \
+initilize it by either running 'build_packages' at least once, or running \
+emerge-${FLAGS_board} autotest autotest-tests."
     fi
     info "Using emerged autotests already installed at ${AUTOTEST_DIR}."
   fi
