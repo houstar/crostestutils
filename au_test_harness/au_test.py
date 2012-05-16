@@ -165,35 +165,6 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9224)
     self.AttemptUpdateWithFilter(InterruptionFilter(), proxy_port=8082)
 
-  def testDelayedUpdate(self):
-    """Tests what happens if some data is delayed during update delivery."""
-
-    class DelayedFilter(cros_test_proxy.Filter):
-      """Causes intermittent delays in data transmission.
-
-      It does this by inserting 3 20 second delays when transmitting
-      data after 2M has been sent.
-      """
-
-      def setup(self):
-        """Called once at the start of each connection."""
-        self.data_size = 0
-        self.delay_count = 0
-
-      # The first three packets after we reach 2M transferred
-      # are delayed by 20 seconds.
-      def OutBound(self, data):
-        if self.delay_count < 3:
-          if self.data_size > (2 * 1024 * 1024):
-            self.delay_count += 1
-            time.sleep(20)
-
-        self.data_size += len(data)
-        return data
-
-    self.worker.Initialize(9225)
-    self.AttemptUpdateWithFilter(DelayedFilter(), proxy_port=8083)
-
   def testSimpleSignedUpdate(self):
     """Test that updates to itself with a signed payload."""
     self.worker.Initialize(9226)
@@ -227,6 +198,35 @@ class AUTest(unittest.TestCase):
     self.assertTrue(self.worker.VerifyImage())
 
   # --- DISABLED TESTS ---
+
+  def NoTestDelayedUpdate(self):
+    """Tests what happens if some data is delayed during update delivery."""
+
+    class DelayedFilter(cros_test_proxy.Filter):
+      """Causes intermittent delays in data transmission.
+
+      It does this by inserting 3 20 second delays when transmitting
+      data after 2M has been sent.
+      """
+
+      def setup(self):
+        """Called once at the start of each connection."""
+        self.data_size = 0
+        self.delay_count = 0
+
+      # The first three packets after we reach 2M transferred
+      # are delayed by 20 seconds.
+      def OutBound(self, data):
+        if self.delay_count < 3:
+          if self.data_size > (2 * 1024 * 1024):
+            self.delay_count += 1
+            time.sleep(20)
+
+        self.data_size += len(data)
+        return data
+
+    self.worker.Initialize(9225)
+    self.AttemptUpdateWithFilter(DelayedFilter(), proxy_port=8083)
 
   def NotestPlatformToolchainOptions(self):
     """Tests the hardened toolchain options."""
