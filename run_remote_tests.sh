@@ -9,12 +9,16 @@ CROSUTILS=/usr/lib/crosutils
 . "${CROSUTILS}/common.sh" || exit 1
 . "${CROSUTILS}/remote_access.sh" || die "Unable to load remote_access.sh"
 
+get_default_board
+
 DEFINE_string args "" \
     "Command line arguments for test. Quoted and space separated if multiple." a
 DEFINE_string autotest_dir "" \
     "Skip autodetection of autotest and use the specified location (must be in \
 chroot)."
-DEFINE_string board "" \
+DEFINE_boolean servo ${FLAGS_FALSE} \
+    "Run servod for a locally attached servo board while testing."
+DEFINE_string board "${DEFAULT_BOARD}" \
     "The board for which you are building autotest"
 DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
 DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
@@ -82,6 +86,7 @@ cleanup() {
   fi
   stop_ssh_agent
   cleanup_remote_access
+  stop_servod
 }
 
 # Determine if a control is for a client or server test.  Echos
@@ -280,6 +285,44 @@ check_control_file_types() {
   fi
 }
 
+# If the user requested it, start a 'servod' process in the
+# background in order to serve Servo-based tests.  Wait until
+# the process is up and serving, or die trying.
+start_servod() {
+  if [ ${FLAGS_servo} -eq ${FLAGS_FALSE} ]; then
+    return
+  fi
+
+  sudo servod --board=${FLAGS_board} >${TMP}/servod.log 2>&1 &
+  SERVOD=$!
+  echo
+  info "Started servod; pid = ${SERVOD}."
+  info "For the log, see ${TMP}/servod.log"
+  local timeout=10
+  while [ ${timeout} -gt 0 ]; do
+    if dut-control >/dev/null 2>&1; then
+      return
+    fi
+    timeout=$(( timeout - 1 ))
+    sleep 1
+  done
+  error "'servod' not working after 10 seconds of trying.  Log file:"
+  cat ${TMP}/servod.log
+  die_notrace "Giving up."
+}
+
+# If there's a servod running in the background from `start_servod`,
+# terminate it.
+stop_servod() {
+  if [ -n "$SERVOD" ]; then
+    # The 'if kill -0 ...' allows us to ignore an already dead
+    # process, but still report other errors on stderr.
+    if kill -0 $SERVOD 2>/dev/null; then
+      kill $SERVOD || true
+    fi
+    SERVOD=
+  fi
+}
 
 main() {
   cd "${SCRIPTS_DIR}"
@@ -289,6 +332,12 @@ main() {
   if [[ -z "${FLAGS_ARGV}" ]]; then
     echo ${FLAGS_HELP}
     exit 1
+  fi
+
+  if [ ${FLAGS_servo} -eq ${FLAGS_TRUE} ]; then
+    if [ -z "${FLAGS_board}" ]; then
+      die "Must specify board when using --servo"
+    fi
   fi
 
   # Check the validity of the user-specified result directory
@@ -492,6 +541,8 @@ ${profiled_control_file}."
         ${FLAGS_label:+ -l $FLAGS_label}"
 
     sudo chmod a+w ./server/{tests,site_tests}
+
+    start_servod
 
     # --args must be specified as a separate parameter outside of the local
     # autoserv_args variable, otherwise ${FLAGS_args} values with embedded
