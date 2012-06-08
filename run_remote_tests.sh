@@ -19,6 +19,7 @@ DEFINE_string board "" \
 DEFINE_boolean build ${FLAGS_FALSE} "Build tests while running" b
 DEFINE_boolean cleanup ${FLAGS_FALSE} "Clean up temp directory"
 DEFINE_integer iterations 1 "Iterations to run every top level test" i
+DEFINE_string label "" "The label to use for the test job."
 # These are passed directly so if strings are to be passed they need to be
 # quoted with \". Example --profiler_args="options=\"hello\"".
 DEFINE_string profiler_args "" \
@@ -487,7 +488,8 @@ ${profiled_control_file}."
     fi
 
     local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
-        ${image} ${option} ${control_file} -r ${results_dir} ${verbose}"
+        ${image} ${option} ${control_file} -r ${results_dir} ${verbose} \
+        ${FLAGS_label:+ -l $FLAGS_label}"
 
     sudo chmod a+w ./server/{tests,site_tests}
 
