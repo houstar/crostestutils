@@ -43,7 +43,7 @@ DEFINE_string output_dir "" "output directory for results" o
 DEFINE_boolean keep_logs "$FLAGS_FALSE" "keep autotest results" k
 
 RUN_TEST="run_remote_tests.sh"
-TEST=server/site_tests/platform_BootPerfServer/control
+TEST='server/site_tests/platform_BootPerfServer/control$'
 TMP_RESULTS="$(mktemp -d /tmp/bootperf.XXXXXX)"
 RESULTS_DIR=platform_BootPerfServer/platform_BootPerfServer/results
 RESULTS_KEYVAL=$RESULTS_DIR/keyval
