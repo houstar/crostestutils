@@ -386,12 +386,10 @@ def CheckOptions(parser, options):
     if latest_image_dir:
       options.base = extractor.UnzipImage(latest_image_dir)
     else:
-      logging.info('Config specified but no previous images found. '
-                   'Using target.')
-      options.base = options.target
+      logging.warning('No previous image.zip found in local archive.')
 
-  elif not options.base:
-    logging.info('Base image not specified. Using target as base image.')
+  if not options.base:
+    logging.info('Using target image as base image.')
     options.base = options.target
 
   if not os.path.isfile(options.base):

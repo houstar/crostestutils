@@ -46,6 +46,14 @@ class ImageExtractorTest(mox.MoxTestBase):
   def tearDown(self):
     shutil.rmtree(self.work_dir)
 
+  @staticmethod
+  def _TouchImageZip(directory):
+    if not os.path.exists(directory):
+      os.makedirs(directory)
+
+    with open(os.path.join(directory, 'image.zip'), 'w') as f:
+      f.write('oogabooga')
+
   def CreateFakeArchiveDir(self, number_of_entries, add_build_number=False):
     """Creates a fake archive dir with specified number of entries."""
     # Create local board directory e.g. /var/archive/x86-generic-full.
@@ -57,6 +65,7 @@ class ImageExtractorTest(mox.MoxTestBase):
     for i in range(number_of_entries):
       new_dir = os.path.join(self.archive_dir, version_s % i)
       os.makedirs(new_dir)
+      ImageExtractorTest._TouchImageZip(new_dir)
 
   def testGetLatestImageWithNoEntries(self):
     """Should return None if the directory has no entries."""
@@ -111,15 +120,16 @@ class ImageExtractorTest(mox.MoxTestBase):
   def testUnzipImageArchiveAlready(self):
     """Ensure we create a new archive and delete the old one."""
     old_entry = os.path.join(self.src_archive, 'R16-158.0.0-a1')
-    new_entry = os.path.join(self.src_archive, 'R16-158.0.1-a1')
     os.makedirs(old_entry)
+    new_entry = os.path.join(self.src_archive, 'R16-158.0.1-a1')
+    archived_image_dir = os.path.join(self.archive_dir, 'R16-158.0.1-a1')
+    ImageExtractorTest._TouchImageZip(archived_image_dir)
 
     self.mox.StubOutWithMock(chromite_build_lib, 'RunCommand')
     chromite_build_lib.RunCommand(mox.In('unzip'), print_cmd=False)
 
     self.mox.ReplayAll()
-    self.test_extractor.UnzipImage(os.path.join(self.archive_dir,
-                                                'R16-158.0.1-a1'))
+    self.test_extractor.UnzipImage(archived_image_dir)
     self.mox.VerifyAll()
     self.assertFalse(os.path.exists(old_entry))
     self.assertTrue(os.path.exists(new_entry))
@@ -127,13 +137,14 @@ class ImageExtractorTest(mox.MoxTestBase):
   def testUnzipImageNoArchive(self):
     """Ensure we create a new archive with none before."""
     new_entry = os.path.join(self.src_archive, 'R16-158.0.1-a1')
+    archived_image_dir = os.path.join(self.archive_dir, 'R16-158.0.1-a1')
+    ImageExtractorTest._TouchImageZip(archived_image_dir)
 
     self.mox.StubOutWithMock(chromite_build_lib, 'RunCommand')
     chromite_build_lib.RunCommand(mox.In('unzip'), print_cmd=False)
 
     self.mox.ReplayAll()
-    self.test_extractor.UnzipImage(os.path.join(self.archive_dir,
-                                                'R16-158.0.1-a1'))
+    self.test_extractor.UnzipImage(archived_image_dir)
     self.mox.VerifyAll()
     self.assertTrue(os.path.exists(new_entry))
 

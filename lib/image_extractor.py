@@ -35,6 +35,8 @@ class ImageExtractor(object):
         directory may be being populated with the results of this version
         while we're running so we shouldn't use it as the last image archived.
     """
+    logging.info('Searching for previously generated images in %s ... ',
+                 self.archive)
     if os.path.exists(self.archive):
       my_re = re.compile(r'R\d+-(\d+)\.(\d+)\.(\d+).*')
       filelist = []
@@ -42,36 +44,49 @@ class ImageExtractor(object):
       for filename in os.listdir(self.archive):
         lv = distutils.version.LooseVersion(filename)
         if my_re.match(filename):
-          if lv < target_lv:
+          zip_image = os.path.join(self.archive, filename, 'image.zip')
+          if lv < target_lv and os.path.exists(zip_image):
             filelist.append(lv)
           elif not filename.startswith(target_version):
-            logging.error('Version in archive dir is too new: %s' % filename)
+            logging.error('Version in archive dir is too new: %s', filename)
       if filelist:
         return os.path.join(self.archive, str(max(filelist)))
 
+    logging.warn('Could not find a previously generated image on this host.')
     return None
 
   def UnzipImage(self, image_dir):
-    """Unzips the image.zip from the image_dir and returns the image."""
-    # We include the dirname of the image here so that we don't have to
-    # re-unzip the same one each time.
-    local_path = os.path.join(self.SRC_ARCHIVE_DIR,
-                              os.path.basename(image_dir))
-    image_to_return = os.path.abspath(os.path.join(local_path,
-                                                   self.IMAGE_TO_EXTRACT))
-    # We only unzip it if we don't have it.
-    if not os.path.exists(image_to_return):
-      # We don't want to keep test self.SRC_ARCHIVE_DIRs around.
-      if os.path.exists(self.SRC_ARCHIVE_DIR):
-        logging.info('Removing old archive from %s', self.SRC_ARCHIVE_DIR)
-        shutil.rmtree(self.SRC_ARCHIVE_DIR)
+    """Unzips the image.zip from the image_dir and returns the image.
 
-      logging.info('Creating directory %s to store image for testing.',
-                   local_path)
-      os.makedirs(local_path)
+    This method unzips the image under SRC_ARCHIVE_DIR along with its version
+    string. In order to save time, if it is attempting
+    to re-unzip the same image with the same version string, it uses the
+    cached image in SRC_ARCHIVE_DIR. It determines the version string based
+    on the basename of the image_dir.
+
+    Returns: the path to the image.bin file after it has been unzipped.
+    Raises: MissingImageZipException if there is nothing to unzip within
+      the image_dir.
+    """
+    version_string = os.path.basename(image_dir)
+    cached_dir = os.path.join(ImageExtractor.SRC_ARCHIVE_DIR, version_string)
+    cached_image = os.path.abspath(os.path.join(
+        cached_dir, ImageExtractor.IMAGE_TO_EXTRACT))
+    # If we previously unzipped the image, we're done.
+    if os.path.exists(cached_image):
+      logging.info('Re-using image with version %s that we previously '
+                   'unzipped to %s.', version_string, cached_image)
+    else:
+      # Cached image for version not found. Unzipping image from archive.
+      if os.path.exists(ImageExtractor.SRC_ARCHIVE_DIR):
+        logging.info('Removing previously archived images from %s',
+                     ImageExtractor.SRC_ARCHIVE_DIR)
+        shutil.rmtree(ImageExtractor.SRC_ARCHIVE_DIR)
+
+      os.makedirs(cached_dir)
       zip_path = os.path.join(image_dir, 'image.zip')
-      logging.info('Unzipping image from %s', zip_path)
-      chromite_build_lib.RunCommand(['unzip', '-d', local_path, zip_path],
+      logging.info('Unzipping image from %s to %s', zip_path, cached_dir)
+      chromite_build_lib.RunCommand(['unzip', '-d', cached_dir, zip_path],
                                     print_cmd=False)
 
-    return image_to_return
+    return cached_image
