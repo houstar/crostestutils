@@ -9,8 +9,6 @@ CROSUTILS=/usr/lib/crosutils
 . "${CROSUTILS}/common.sh" || exit 1
 . "${CROSUTILS}/remote_access.sh" || die "Unable to load remote_access.sh"
 
-get_default_board
-
 DEFINE_string args "" \
     "Command line arguments for test. Quoted and space separated if multiple." a
 DEFINE_string autotest_dir "" \
