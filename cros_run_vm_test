@@ -13,6 +13,8 @@
 . "${SCRIPT_ROOT}/lib/cros_vm_constants.sh" ||
   die "Unable to load cros_vm_constants.sh"
 
+DEFINE_string args "" \
+    "Command line arguments for test. Quoted and space separated if multiple." a
 DEFINE_string board "$DEFAULT_BOARD" \
     "The board for which you built autotest." b
 DEFINE_string image_path "" "Full path of the VM image"
@@ -76,4 +78,5 @@ ${GCLIENT_ROOT}/chromite/bin/cros_sdk -- run_remote_tests.sh \
     --remote=127.0.0.1 \
     --results_dir_root="${FLAGS_results_dir_root}" \
     --verbose=${FLAGS_verbose} \
+    --args="${FLAGS_args}" \
     "${test_args[@]}"
