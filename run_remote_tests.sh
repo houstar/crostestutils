@@ -357,7 +357,7 @@ main() {
 
   remote_access_init
   # autotest requires that an ssh-agent already be running
-  start_ssh_agent >/dev/null 2>&1
+  start_ssh_agent >/dev/null
 
   learn_board
   if [[ -n "${FLAGS_autotest_dir}" ]]; then
