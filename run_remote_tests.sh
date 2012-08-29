@@ -35,6 +35,8 @@ DEFINE_boolean use_emerged ${FLAGS_FALSE} \
 DEFINE_integer verbose 1 "{0,1,2} Max verbosity shows autoserv debug output." v
 DEFINE_boolean whitelist_chrome_crashes ${FLAGS_FALSE} \
     "Treat Chrome crashes as non-fatal."
+DEFINE_boolean allow_offline_remote ${FLAGS_FALSE} \
+    "Proceed with testing even if remote is offline; useful when using servo"
 
 # The prefix to look for in an argument that determines we're talking about a
 # new-style suite.
@@ -355,7 +357,7 @@ main() {
 
   trap cleanup EXIT
 
-  remote_access_init
+  remote_access_init || [ ${FLAGS_allow_offline_remote} -eq ${FLAGS_TRUE} ]
   # autotest requires that an ssh-agent already be running
   start_ssh_agent >/dev/null
 
