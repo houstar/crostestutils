@@ -50,6 +50,9 @@ For example:
 
 RAN_ANY_TESTS=${FLAGS_FALSE}
 
+TMP_BASE=/tmp/run_remote_tests
+TMP_LATEST="${TMP_BASE}.latest"
+
 stop_ssh_agent() {
   # Call this function from the exit trap of the main script.
   # Iff we started ssh-agent, be nice and clean it up.
@@ -78,10 +81,12 @@ cleanup() {
   [[ -n "${BUILD_DIR}" ]] && sudo rm -rf "${BUILD_DIR}"
   if [[ $FLAGS_cleanup -eq ${FLAGS_TRUE} ]] || \
      [[ ${RAN_ANY_TESTS} -eq ${FLAGS_FALSE} ]]; then
+    # Remove the directory and the "latest" softlink, if present.
+    if [ -h "${TMP_LATEST}" ]; then
+      rm -f "${TMP_LATEST}"
+    fi
     rm -rf "${TMP}"
   else
-    ln -nsf "${TMP}" /tmp/run_remote_tests.latest ||
-        warn "Could not link latest test directory."
     echo ">>> Details stored under ${TMP}"
   fi
   stop_ssh_agent
@@ -116,7 +121,13 @@ create_tmp() {
     TMP=${FLAGS_results_dir_root}
     mkdir -p -m 777 ${TMP}
   else
-    TMP=$(mktemp -d /tmp/run_remote_tests.XXXX)
+    TMP=$(mktemp -d "${TMP_BASE}.XXXX")
+    # Create a "latest" symlink upfront, but only if there isn't a non-symlink
+    # file of the same name.
+    if [ -h "${TMP_LATEST}" -o ! -e "${TMP_LATEST}" ]; then
+      ln -nsf "${TMP}" "${TMP_LATEST}" ||
+        warn "Could not link latest test directory."
+    fi
   fi
 }
 
