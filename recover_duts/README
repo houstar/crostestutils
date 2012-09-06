@@ -1,0 +1,15 @@
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+Recover DUTS is a Python Utility that runs on test images. It periodically runs
+a set of hooks to ensure that we can correctly connect / recover a bricked DUT
+without requiring manual recovery.
+
+In order to add a hook, add an executable script in the hooks/ dir that ends with
+.hook suffix. It can be written in anything that is executable by a test image --
+Python, Dash script or a binary program.
+
+Hooks that fail result in logs @ /var/log/recover_duts_log.
+
+The init script for this tool is stored in platform/init.

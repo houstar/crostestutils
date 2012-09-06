@@ -1,0 +1,43 @@
+#!/bin/sh
+#
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+set -e
+
+# Only run this script on test machines that run in the lab.
+# See autotest/server/hosts/site_host.py for more information.
+if [ ! -f /mnt/stateful_partition/.labmachine ]; then
+  exit 0
+fi
+
+# Ping itself doesn't work on test images in a VM.
+PING="curl --interface eth0 -o /dev/null www.google.com"
+
+if ${PING};  then
+  exit 0
+fi
+
+ifconfig eth0 down
+ifconfig eth0 up
+sleep 5
+
+if ${PING}; then
+  echo "Reconfigured using ifconfig down/up."
+  exit 1
+fi
+
+initctl stop flimflam || echo "Flimflam was not running."
+initctl start flimflam
+
+sleep 5
+
+if ${PING}; then
+  exit 1
+fi
+
+# Last chance - reboot if we can't get any connectivity.
+echo "All efforts to recover ethernet have been exhausted. Rebooting."
+(sleep 5 && reboot) &
+exit 1
