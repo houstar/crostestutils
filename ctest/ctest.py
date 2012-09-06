@@ -165,7 +165,8 @@ class CTest(object):
     Raises:
       TestException: If the cros_au_test_harness command returns an error code.
     """
-    cmd = ['bin/cros_au_test_harness',
+    path = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+    cmd = [os.path.join(path, 'au_test_harness', 'cros_au_test_harness.py'),
            '--base_image=%s' % self.base,
            '--target_image=%s' % self.target,
            '--board=%s' % self.board,
