@@ -41,8 +41,8 @@ _CRASH_WHITELIST = {
 class ResultCollector(object):
   """Collects status and performance data from an autoserv results directory."""
 
-  def __init__(self, collect_perf=True, strip_text='',
-               whitelist_chrome_crashes=False):
+  def __init__(self, collect_perf=True, collect_info=False, escape_error=False,
+               strip_text='', whitelist_chrome_crashes=False):
     """Initialize ResultsCollector class.
 
     Args:
@@ -51,6 +51,8 @@ class ResultCollector(object):
       whitelist_chrome_crashes: Treat Chrome crashes as non-fatal.
     """
     self._collect_perf = collect_perf
+    self._collect_info = collect_info
+    self._escape_error = escape_error
     self._strip_text = strip_text
     self._whitelist_chrome_crashes = whitelist_chrome_crashes
 
@@ -68,7 +70,6 @@ class ResultCollector(object):
       testdir, returns an empty dictionary. Otherwise, returns a dictionary of
       parsed keyvals. Duplicate keys are uniquified by their instance number.
     """
-
     perf = {}
     if not self._collect_perf:
       return perf
@@ -98,47 +99,18 @@ class ResultCollector(object):
 
     return perf
 
-  def _CollectResult(self, testdir, results):
-    """Adds results stored under testdir to the self._results dictionary.
+  def _CollectCrashes(self, status_raw):
+    """Parses status_raw file for crashes.
 
-    If testdir contains 'status.log' or 'status' files, assume it's a test
-    result directory and add the results data to the self._results dictionary.
-    The test directory name is used as a key into the results dictionary.
+    Saves crash details if crashes are discovered.  If a whitelist is
+    present, only records whitelisted crashes.
 
     Args:
-      testdir: The autoserv test result directory.
-      results: Results dictionary to store results in.
+      status_raw: The contents of the status.log or status file from the test.
+
+    Returns:
+      A list of crash entries to be reported.
     """
-
-    # Autotest makes its own job report for the top-level summary "test".
-    # Take advantage of this to ignore the results here and report the
-    # name of the suite.
-    if os.path.exists(os.path.join(testdir, 'job_report.html')):
-      return
-
-    status_file = os.path.join(testdir, 'status.log')
-    if not os.path.isfile(status_file):
-      status_file = os.path.join(testdir, 'status')
-      if not os.path.isfile(status_file):
-        return
-
-    status = False
-    error_msg = None
-    status_raw = open(status_file, 'r').read()
-    failures = 'ABORT|ERROR|FAIL|TEST_NA|WARN'
-    if (re.search(r'GOOD.+completed successfully', status_raw) and
-        not re.search(r'%s' % failures, status_raw)):
-      status = True
-    else:
-      match = re.search(r'^\t+(%s)\t(.+)' % failures, status_raw, re.MULTILINE)
-      if match:
-        error_msg = ': '.join([match.group(1), match.group(2).split('\t')[4]])
-
-    perf = self._CollectPerf(testdir)
-
-    if testdir.startswith(self._strip_text):
-      testdir = testdir.replace(self._strip_text, '', 1)
-
     crashes = []
     regex = re.compile('Received crash notification for ([-\w]+).+ (sig \d+)')
     chrome_regex = re.compile(r'^supplied_[cC]hrome|^chrome$')
@@ -153,14 +125,142 @@ class ResultCollector(object):
             match.group(1), w.deadline.strftime('%Y-%b-%d'))
       else:
         crashes.append('%s %s' % match.groups())
+    return crashes
 
-    results[testdir] = {'crashes': crashes,
-                        'status': status,
-                        'error_msg': error_msg,
-                        'perf': perf}
+  def _CollectInfo(self, testdir, custom_info={}):
+    """Parses *_info files under testdir/sysinfo/var/log.
+
+    If the sysinfo/var/log/*info files exist, save information that shows
+    hw, ec and bios version info.
+
+    This collection of extra info is disabled by default (this funtion is
+    a no-op).  It is enabled only if the --info command-line option is
+    explicitly supplied.  Normal job parsing does not supply this option.
+
+    Args:
+      testdir: The autoserv test result directory.
+      custom_info: Dictionary to collect detailed ec/bios info.
+
+    Returns:
+      Returns a dictionary of info that was discovered.
+    """
+    if not self._collect_info:
+      return {}
+    info = custom_info
+
+    sysinfo_dir = os.path.join(testdir, 'sysinfo', 'var', 'log')
+    for info_file, info_keys in {'ec_info.txt': ['fw_version'],
+                                 'bios_info.txt': ['fwid', 'hwid']}.iteritems():
+      info_file_path = os.path.join(sysinfo_dir, info_file)
+      if not os.path.isfile(info_file_path):
+        continue
+      # Some example raw text that might be matched include:
+      #
+      # fw_version           | snow_v1.1.332-cf20b3e
+      # fwid = Google_Snow.2711.0.2012_08_06_1139 # Active firmware ID
+      # hwid = DAISY TEST A-A 9382                # Hardware ID
+      info_regex = re.compile(r'^(%s)\s*[|=]\s*(.*)' % '|'.join(info_keys))
+      with open(info_file_path, 'r') as f:
+        for line in f:
+          line = line.strip()
+          line = line.split('#')[0]
+          match = info_regex.match(line)
+          if match:
+            info[match.group(1)] = str(match.group(2)).strip()
+    return info
+
+  def _MakeResultKey(self, testdir):
+    """Parses keyval file under testdir.
+
+    If testdir contains a result folder, process the keyval file and return
+    a dictionary of perf keyval pairs.
+
+    Args:
+      testdir: The autoserv test result directory.
+
+    Returns:
+      If the perf option is disabled or the there's no keyval file under
+      testdir, returns an empty dictionary. Otherwise, returns a dictionary of
+      parsed keyvals. Duplicate keys are uniquified by their instance number.
+    """
+    if testdir.startswith(self._strip_text):
+      return testdir.replace(self._strip_text, '', 1)
+    return testdir
+
+  def _CollectResult(self, testdir, results):
+    """Adds results stored under testdir to the self._results dictionary.
+
+    The presence/location of status files (status.log, status and
+    job_report.html) varies depending on whether the job is a simple
+    client test, simple server test, old-style suite or new-style
+    suite.  For example:
+    -In some cases a single job_report.html may exist but many times
+     multiple instances are produced in a result tree.
+    -Most tests will produce a status.log but client tests invoked
+     by a server test will only emit a status file.
+
+    The two common criteria that seem to define the presence of a
+    valid test result are:
+    1. Existence of a 'status.log' or 'status' file. Note that if both a
+       'status.log' and 'status' file exist for a test, the 'status' file
+       is always a subset of the 'status.log' fle contents.
+    2. Presence of a 'debug' directory.
+
+    In some cases multiple 'status.log' files will exist where the parent
+    'status.log' contains the contents of multiple subdirectory 'status.log'
+    files.  Parent and subdirectory 'status.log' files are always expected
+    to agree on the outcome of a given test.
+
+    The test results discovered from the 'status*' files are added/udpated
+    into the self._results dictionary.  The test directory name is used as
+    a key into the results dictionary.
+
+    Args:
+      testdir: The autoserv test result directory.
+      results: Results dictionary to store results in.
+    """
+    status_file = os.path.join(testdir, 'status.log')
+    if not os.path.isfile(status_file):
+      status_file = os.path.join(testdir, 'status')
+      if not os.path.isfile(status_file):
+        return
+
+    # Status is True if GOOD, else False for all others.
+    status = False
+    error_msg = None
+    status_raw = open(status_file, 'r').read()
+    failures = 'ABORT|ERROR|FAIL|TEST_NA|WARN'
+    if (re.search(r'GOOD.+completed successfully', status_raw) and
+        not re.search(r'%s' % failures, status_raw)):
+      status = True
+    else:
+      match = re.search(r'^\t+(%s)\t(.+)' % failures, status_raw, re.MULTILINE)
+      if match:
+        failure_type = match.group(1)
+        reason = match.group(2).split('\t')[4]
+        if self._escape_error:
+          reason = re.escape(reason)
+        error_msg = ': '.join([failure_type, reason])
+
+    # Grab the localtime - it may be printed to enable line filtering by date.
+    test_localtime = ''
+    match = re.search(r'^\s*END\s+(GOOD|%s).*localtime=(.*)$' % failures,
+                      status_raw, re.MULTILINE)
+    if match:
+      test_localtime = str(match.group(2).strip())
+
+    results[self._MakeResultKey(testdir)] = {
+        'crashes': self._CollectCrashes(status_raw),
+        'status': status,
+        'error_msg': error_msg,
+        'perf': self._CollectPerf(testdir),
+        'info': self._CollectInfo(testdir, {'localtime': test_localtime})}
 
   def CollectResults(self, resdir):
     """Recursively collect results into a dictionary.
+
+    Only recurses into directories that possess a 'debug' subdirectory
+    because anything else is not considered a 'test' directory.
 
     Args:
       resdir: results/test directory to parse results from and recurse into.
@@ -202,7 +302,8 @@ class ReportGenerator(object):
     result data (status, perf keyvals) as values.
     """
     self._results = {}
-    collector = ResultCollector(self._options.perf, self._options.strip,
+    collector = ResultCollector(self._options.perf, self._options.info,
+                                self._options.escape_error, self._options.strip,
                                 self._options.whitelist_chrome_crashes)
     for resdir in self._args:
       if not os.path.isdir(resdir):
@@ -296,6 +397,31 @@ class ReportGenerator(object):
         except:
           print 'Could not open %s' % path
 
+  def _PrintResultDictKeyVals(self, test_entry, result_dict):
+    """Formatted print a dict of keyvals like 'perf' or 'info'.
+
+    This function emits each keyval on a single line for uncompressed review.
+    The 'perf' dictionary contains performance keyvals while the 'info'
+    dictionary contains ec info, bios info and some test timestamps.
+
+    Args:
+      test_entry: The unique name of the test (dir) - matches other test output.
+      result_dict: A dict of keyvals to be presented.
+    """
+    if not result_dict:
+      return
+    dict_keys = result_dict.keys()
+    dict_keys.sort()
+    width = self._GetTestColumnWidth()
+    for dict_key in dict_keys:
+      if self._options.csv:
+        key_entry = dict_key
+      else:
+        key_entry = dict_key.ljust(width - self._KEYVAL_INDENT)
+        key_entry = key_entry.rjust(width)
+      value_entry = self._color.Color(Color.BOLD, result_dict[dict_key])
+      self._PrintEntries([test_entry, key_entry, value_entry])
+
   def _GenerateReportText(self):
     """Prints a result report to stdout.
 
@@ -325,8 +451,16 @@ class ReportGenerator(object):
       else:
         color = Color.RED
 
-      status_entry = self._color.Color(color, status_entry)
-      self._PrintEntries([test_entry, status_entry])
+      test_entries = [test_entry, self._color.Color(color, status_entry)]
+
+      info = result.get('info', {})
+      if self._options.csv and self._options.info:
+        if info:
+          test_entries.extend([info[k] for k in sorted(info.keys())])
+        if not result['status'] and result['error_msg']:
+          test_entries.append('"%s"' % result['error_msg'])
+
+      self._PrintEntries(test_entries)
       self._PrintErrors(test_entry, result['error_msg'])
 
       # Print out error log for failed tests.
@@ -335,18 +469,7 @@ class ReportGenerator(object):
 
       # Emit the perf keyvals entries. There will be no entries if the
       # --no-perf option is specified.
-      perf = result['perf']
-      perf_keys = perf.keys()
-      perf_keys.sort()
-
-      for perf_key in perf_keys:
-        if self._options.csv:
-          perf_key_entry = perf_key
-        else:
-          perf_key_entry = perf_key.ljust(width - self._KEYVAL_INDENT)
-          perf_key_entry = perf_key_entry.rjust(width)
-        perf_value_entry = self._color.Color(Color.BOLD, perf[perf_key])
-        self._PrintEntries([test_entry, perf_key_entry, perf_value_entry])
+      self._PrintResultDictKeyVals(test_entry, result['perf'])
 
       # Determine that there was a crash during this test.
       if result['crashes']:
@@ -354,6 +477,10 @@ class ReportGenerator(object):
           if not crash in crashes:
             crashes[crash] = set([])
           crashes[crash].add(test)
+
+      # Emit extra test metadata info on separate lines if not --csv.
+      if not self._options.csv:
+        self._PrintResultDictKeyVals(test_entry, info)
 
     self._PrintDashLine(width)
 
@@ -405,6 +532,12 @@ def main():
   parser.add_option('--csv', dest='csv', action='store_true',
                     help='Output test result in CSV format.  '
                     'Implies --no-debug --no-crash-detection.')
+  parser.add_option('--info', dest='info', action='store_true',
+                    default=False,
+                    help='Include info keyvals in the report')
+  parser.add_option('--escape-error', dest='escape_error', action='store_true',
+                    default=False,
+                    help='Escape error message text for tools.')
   parser.add_option('--perf', dest='perf', action='store_true',
                     default=True,
                     help='Include perf keyvals in the report [default]')
