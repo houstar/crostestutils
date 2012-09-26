@@ -41,6 +41,11 @@ from crostestutils.lib import public_key_manager
 from crostestutils.lib import test_helper
 
 
+class InvalidDevserverOutput(Exception):
+  """If we are unable to parse devserver output, this is raised."""
+  pass
+
+
 class UpdatePayload(object):
   """Wrapper around an update payload.
 
@@ -295,7 +300,11 @@ class UpdatePayloadGenerator(object):
               return_array.append('/'.join(['update', path_to_update_dir]))
               break
           else:
-            logging.error('Could not find update string in log.')
+            logging.error('Could not find PREGENERATED_UPDATE in log:')
+            for line in output.splitlines():
+              logging.error('  log: %s', line)
+            # this is not a recoverable error
+            raise InvalidDevserverOutput('Could not parse devserver log')
 
       return return_array
 
