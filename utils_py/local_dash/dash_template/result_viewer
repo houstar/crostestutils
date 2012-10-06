@@ -1,0 +1,201 @@
+#!/usr/bin/python
+# Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+"""Local dash result viewer - http server.
+
+Allows easy review of multiple runs of run_remote_tests.sh via http pages.
+By default pages are shown
+"""
+
+import glob, json, operator, optparse, os, socket, sys, time
+
+# Bottle is a fast, simple and lightweight WSGI micro web-framework for Python.
+# It enables simple webpage rendering from a single file (bottle.py) with no
+# other dependencies.
+# Until a proper repo is identified where bottle.py may reside, download
+# and install a recent copy.
+try:
+  import bottle
+except ImportError:
+  print 'Bottle library not found. Please install from http://bottlepy.org.'
+  print 'You can use:'
+  if not os.path.exists('/etc/debian_chroot'):
+    # Outside chroot
+    print '$ sudo apt-get install python-setuptools'
+  print '$ sudo easy_install bottle'
+  sys.exit(1)
+
+
+base_cmd = os.path.realpath(sys.argv[0])
+base_dir = os.path.dirname(base_cmd)
+static_root = os.path.join(base_dir, 'static')
+
+default_logs_dir = '/tmp'
+usage = ('USAGE: %s [result_dir]\n           e.g. %s'
+         % (os.path.basename(base_cmd), default_logs_dir))
+
+
+# Handle command line arguments.
+parser = optparse.OptionParser(usage=usage)
+parser.add_option('', '--run-debug',
+                  help='Enable host debug messages [default: %default]',
+                  dest='run_debug', action='store_true', default=False)
+parser.add_option('', '--run-host',
+                  help='Supply host, e.g. w.x.y.z [default: %default]',
+                  dest='run_host', default=socket.gethostname())
+parser.add_option('', '--run-port',
+                  help='Supply host port [default: %default]',
+                  dest='run_port', type='int', default=8080)
+options, args = parser.parse_args()
+
+
+# Need to cd to base_dir so Bottle may find it's templates under ./views.
+saved_path = os.getcwd()
+os.chdir(base_dir)
+
+
+app = bottle.Bottle()
+
+
+def _cleanup():
+  """Helper to ensure we return to the path where we started."""
+  os.chdir(saved_path)
+
+
+def _safe_exit():
+  """Helper to make sure cleanup occurs on success."""
+  _cleanup()
+  sys.exit(0)
+
+
+def _error_exit():
+  """Helper to make sure cleanup occurs on failure."""
+  _cleanup()
+  sys.exit(-1)
+
+
+def _check_logs_dir(args_):
+  """Helper to verify that the result directory is properly established."""
+  if len(args_) == 1:
+    logs_dir = args_[0]
+  else:
+    logs_dir = default_logs_dir
+  if not os.path.isdir(logs_dir):
+    print 'ERROR: cannot find result dir %s.\n%s' % (logs_dir, usage)
+    _error_exit()
+  return logs_dir
+
+
+# Need to bind our base url '/logs' to the root of the logs tree
+# for result folder traversal.
+result_dir = _check_logs_dir(args)
+print 'Using logs from: %s' % result_dir
+
+
+def _make_local_link(filepath, is_dir=False):
+  """Helper to populate the directory view with clickable links to folders."""
+  # Show only the base file/dir name in the list.
+  base_name = os.path.basename(filepath)
+
+  # Distinguish dirs from files with a trailing '/'.
+  if is_dir:
+    dir_char = '/'
+  else:
+    dir_char = ''
+
+  link_template = '<a href="/logs/%s%s">%s%s</a>'
+  return link_template % (filepath.lstrip('/'), dir_char, base_name, dir_char)
+
+
+def _server_result_dir(filepath, match=''):
+  """Traverses a folder and renders a view for easy review of results files.
+
+  Uses the 'dir_view' template to format the resulting view.
+  """
+  # Bottle can use '*' as an url terminator and we use '/' for dirs.
+  filepath = filepath.strip('/*')
+  result_subdir = os.path.join(result_dir, filepath)
+  if not os.path.isdir(result_subdir):
+    return bottle.HTTPError(404, "Directory does not exist.")
+  glob_results = glob.glob(os.path.join(result_subdir, match) + '*')
+  body_lines = []
+  len_prefix = len(result_dir)
+  for dir_or_file in glob_results:
+    if os.path.islink(dir_or_file):
+      continue
+    is_dir = os.path.isdir(dir_or_file)
+    dir_or_file_link = _make_local_link(dir_or_file[len_prefix:],
+                                        is_dir=is_dir)
+    unformatted = time.localtime(os.stat(dir_or_file).st_mtime)
+    dir_or_file_time = time.strftime("%a, %d %b %Y %H:%M:%S", unformatted)
+    # Use 'd' to indicate directory vs '-' for a file.
+    body_lines.append(['d' if is_dir else '-', dir_or_file_link,
+                       dir_or_file_time, unformatted])
+    # Sort reverse-chronological top-down to see latest first.
+    body_lines = sorted(body_lines, key=operator.itemgetter(3), reverse=True)
+  return bottle.template('dir_view', filepath=filepath, body_lines=body_lines)
+
+
+def read_test_results():
+  test_results = []
+  test_results_file = os.path.join(base_dir, 'test_results.json')
+  try:
+    with open(test_results_file) as jf:
+      test_results = json.load(jf)
+  except Exception as e:
+    # If no test_results.json or file is corrupted, serve empty results.
+    print '****\nError retrieving test results:\n%s.\n****' % str(e)
+  return test_results
+
+
+# -----------------------------------------------------------------------------
+# URL request handlers defined as routes.
+# -----------------------------------------------------------------------------
+@app.route('/favicon.ico')
+def favicon_view():
+  """Return the favicon.ico."""
+  return bottle.static_file('favicon.ico', root=static_root)
+
+
+@app.route('/static/<filepath:path>')
+def server_static(filepath):
+  """Serve static files from within a 'static' folder (for css)."""
+  return bottle.static_file(filepath, root=static_root)
+
+
+@app.route('/help')
+def urls_view():
+  """Render a view that shows possible urls for help."""
+  return bottle.template('urlhelp')
+
+
+@app.route('/logs/<filepath:path>')
+def server_result_file(filepath):
+  """Render a view of a file or directory view for results debugging."""
+  if filepath.endswith('*') or filepath.endswith('/'):
+    return _server_result_dir(filepath=filepath)
+  return bottle.static_file(filepath, mimetype='text/plan', root=result_dir)
+
+
+@app.route('/logs')
+@app.route('/logs/')
+def server_logs_root():
+  """Render a view of the physical run_remote_tests result folders."""
+  return _server_result_dir(filepath='', match='run_remote_tests')
+
+
+@app.route('/')
+@app.route('/tests')
+def tests_view():
+  """Render a logical view of the suites and tests of run_remote_tests."""
+  return bottle.template('test_view', test_results=read_test_results())
+
+
+# Run the http server that serves the local dashboard.
+if options.run_debug:
+  print 'Serving with "debug" enabled.'
+bottle.run(app, host=options.run_host, port=options.run_port,
+           debug=options.run_debug)
+_safe_exit()
