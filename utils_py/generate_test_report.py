@@ -12,6 +12,7 @@ generates test reports.
 
 import datetime
 import glob
+import operator
 import optparse
 import os
 import re
@@ -127,7 +128,7 @@ class ResultCollector(object):
         crashes.append('%s %s' % match.groups())
     return crashes
 
-  def _CollectInfo(self, testdir, custom_info={}):
+  def _CollectInfo(self, testdir, custom_info):
     """Parses *_info files under testdir/sysinfo/var/log.
 
     If the sysinfo/var/log/*info files exist, save information that shows
@@ -170,25 +171,36 @@ class ResultCollector(object):
     return info
 
   def _MakeResultKey(self, testdir):
-    """Parses keyval file under testdir.
+    """Helper to shorten directory for easier review of long printed lines.
 
-    If testdir contains a result folder, process the keyval file and return
-    a dictionary of perf keyval pairs.
+    WITHOUT --strip [all lines exceed 80 characters]
+
+    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH
+                               [  FAILED  ]
+    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH/firmware_SoftwareSync.
+    normal                     [  PASSED  ]
+    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH/firmware_SoftwareSync.
+    normal/firmware_FAFTClient [  PASSED  ]
+
+    WITH --strip
+
+    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH [  FAILED  ]
+    firmware_SoftwareSync.normal                          [  PASSED  ]
+    firmware_SoftwareSync.normal/firmware_FAFTClient      [  PASSED  ]
 
     Args:
       testdir: The autoserv test result directory.
 
     Returns:
-      If the perf option is disabled or the there's no keyval file under
-      testdir, returns an empty dictionary. Otherwise, returns a dictionary of
-      parsed keyvals. Duplicate keys are uniquified by their instance number.
+      If the option for shortening the directory is provided, truncates the
+      long directory path for a cleaner output report.
     """
     if testdir.startswith(self._strip_text):
       return testdir.replace(self._strip_text, '', 1)
     return testdir
 
   def _CollectResult(self, testdir, results):
-    """Adds results stored under testdir to the self._results dictionary.
+    """Collects results stored under testdir into a dictionary.
 
     The presence/location of status files (status.log, status and
     job_report.html) varies depending on whether the job is a simple
@@ -211,13 +223,14 @@ class ResultCollector(object):
     files.  Parent and subdirectory 'status.log' files are always expected
     to agree on the outcome of a given test.
 
-    The test results discovered from the 'status*' files are added/udpated
-    into the self._results dictionary.  The test directory name is used as
-    a key into the results dictionary.
+    The test results discovered from the 'status*' files are included
+    in the result dictionary.  The test directory name and a test directory
+    timestamp/localtime are saved to be used as sort keys for the results.
 
     Args:
       testdir: The autoserv test result directory.
-      results: Results dictionary to store results in.
+      results: A list to which a populated test-result-dictionary will
+               be appended if a status file is found.
     """
     status_file = os.path.join(testdir, 'status.log')
     if not os.path.isfile(status_file):
@@ -242,22 +255,34 @@ class ResultCollector(object):
           reason = re.escape(reason)
         error_msg = ': '.join([failure_type, reason])
 
+    # Grab the timestamp - it can be used for sorting the test runs.
     # Grab the localtime - it may be printed to enable line filtering by date.
+    test_timestamp = ''
     test_localtime = ''
-    match = re.search(r'^\s*END\s+(GOOD|%s).*localtime=(.*)$' % failures,
-                      status_raw, re.MULTILINE)
-    if match:
-      test_localtime = str(match.group(2).strip())
+    # Designed to match a line like this:
+    #   END GOOD  test_name ... timestamp=1347324321  localtime=Sep 10 17:45:21
+    status_re = r'GOOD|%s' % failures
+    localtime_re = r'\w+\s+\w+\s+[:\w]+'
+    matches = re.findall(r'^\s*END\s+(?:%s).*timestamp=(\d*).*localtime=(%s).*$'
+                         % (status_re, localtime_re), status_raw, re.MULTILINE)
+    if matches:
+      # There may be multiple lines with timestamp/localtime info.
+      # The last one found is selected because it will reflect the end time.
+      test_timestamp, test_localtime = matches[-1]
 
-    results[self._MakeResultKey(testdir)] = {
+    results.append({
+        'testdir': self._MakeResultKey(testdir),
         'crashes': self._CollectCrashes(status_raw),
         'status': status,
         'error_msg': error_msg,
+        'localtime': test_localtime,
+        'timestamp': test_timestamp,
         'perf': self._CollectPerf(testdir),
-        'info': self._CollectInfo(testdir, {'localtime': test_localtime})}
+        'info': self._CollectInfo(testdir, {'localtime': test_localtime,
+                                            'timestamp': test_timestamp})})
 
-  def CollectResults(self, resdir):
-    """Recursively collect results into a dictionary.
+  def RecursivelyCollectResults(self, resdir):
+    """Recursively collect results into a list of dictionaries.
 
     Only recurses into directories that possess a 'debug' subdirectory
     because anything else is not considered a 'test' directory.
@@ -266,16 +291,16 @@ class ResultCollector(object):
       resdir: results/test directory to parse results from and recurse into.
 
     Returns:
-      Dictionary of results.
+      List of dictionaries of results.
     """
-    results = {}
+    results = []
     self._CollectResult(resdir, results)
     for testdir in glob.glob(os.path.join(resdir, '*')):
       # Remove false positives that are missing a debug dir.
       if not os.path.exists(os.path.join(testdir, 'debug')):
         continue
 
-      results.update(self.CollectResults(testdir))
+      results.extend(self.RecursivelyCollectResults(testdir))
     return results
 
 
@@ -294,21 +319,23 @@ class ReportGenerator(object):
     self._options = options
     self._args = args
     self._color = Color(options.color)
+    self._results = []
 
-  def _CollectResults(self):
-    """Parses results into the self._results dictionary.
+  def _CollectAllResults(self):
+    """Parses results into the self._results list.
 
-    Initializes a dictionary (self._results) with test folders as keys and
-    result data (status, perf keyvals) as values.
+    Builds a list (self._results) where each entry is a dictionary of result
+    data from one test (which may contain other tests). Each dictionary will
+    contain values such as: test folder, status, localtime, crashes, error_msg,
+    perf keyvals [optional], info [optional].
     """
-    self._results = {}
     collector = ResultCollector(self._options.perf, self._options.info,
                                 self._options.escape_error, self._options.strip,
                                 self._options.whitelist_chrome_crashes)
     for resdir in self._args:
       if not os.path.isdir(resdir):
         Die('\'%s\' does not exist' % resdir)
-      self._results.update(collector.CollectResults(resdir))
+      self._results.extend(collector.RecursivelyCollectResults(resdir))
 
     if not self._results:
       Die('no test directories found')
@@ -320,6 +347,7 @@ class ReportGenerator(object):
 
     Args:
       status: True or False, indicating success or failure.
+
     Returns:
       The appropriate string for printing..
     """
@@ -335,16 +363,16 @@ class ReportGenerator(object):
   def _GetTestColumnWidth(self):
     """Returns the test column width based on the test data.
 
-    Aligns the test results by formatting the test directory entry based on
-    the longest test directory or perf key string stored in the self._results
-    dictionary.
+    The test results are aligned by discovering the longest width test
+    directory name or perf key stored in the list of result dictionaries.
 
     Returns:
       The width for the test column.
     """
-    width = len(max(self._results, key=len))
-    for result in self._results.values():
-      perf = result['perf']
+    width = 0
+    for result in self._results:
+      width = max(width, len(result['testdir']))
+      perf = result.get('perf')
       if perf:
         perf_key_width = len(max(perf, key=len))
         width = max(width, perf_key_width + self._KEYVAL_INDENT)
@@ -394,7 +422,7 @@ class ReportGenerator(object):
             for line in fh:
               if len(line.lstrip()) > 0:  # Ensure line is not just WS.
                 self._PrintEntries([test_string, self._Indent(line.rstrip())])
-        except:
+        except IOError:
           print 'Could not open %s' % path
 
   def _PrintResultDictKeyVals(self, test_entry, result_dict):
@@ -420,7 +448,31 @@ class ReportGenerator(object):
         key_entry = dict_key.ljust(width - self._KEYVAL_INDENT)
         key_entry = key_entry.rjust(width)
       value_entry = self._color.Color(Color.BOLD, result_dict[dict_key])
-      self._PrintEntries([test_entry, key_entry, value_entry])
+      if self._options.csv:
+        self._PrintEntries([test_entry, '%s=%s' % (key_entry, value_entry)])
+      else:
+        self._PrintEntries([test_entry, key_entry, value_entry])
+
+  def _GetSortedTests(self):
+    """Sort the test result dictionaries in preparation for results printing.
+
+    By default sorts the results directionaries by their test names.
+    However, when running long suites, it is useful to see if an early test
+    has wedged the system and caused the remaining tests to abort/fail. The
+    datetime-based chronological sorting allows this view.
+
+    Uses the --sort-chron command line option to control.
+    """
+    if self._options.sort_chron:
+      # Need to reverse sort the test dirs to ensure the suite folder shows
+      # at the bottom. Because the suite folder shares its datetime with the
+      # last test it shows second-to-last without the reverse sort first.
+      tests = sorted(self._results, key=operator.itemgetter('testdir'),
+                     reverse=True)
+      tests = sorted(tests, key=operator.itemgetter('timestamp'))
+    else:
+      tests = sorted(self._results, key=operator.itemgetter('testdir'))
+    return tests
 
   def _GenerateReportText(self):
     """Prints a result report to stdout.
@@ -430,20 +482,17 @@ class ReportGenerator(object):
     enabled, each test entry is followed by perf keyval entries from the test
     results.
     """
-
-    tests = self._results.keys()
-    tests.sort()
-
+    tests = self._GetSortedTests()
     width = self._GetTestColumnWidth()
 
     crashes = {}
     tests_pass = 0
     self._PrintDashLine(width)
 
-    for test in tests:
-      test_entry = test if self._options.csv else test.ljust(width)
+    for result in tests:
+      testdir = result['testdir']
+      test_entry = testdir if self._options.csv else testdir.ljust(width)
 
-      result = self._results[test]
       status_entry = self._GenStatusString(result['status'])
       if result['status']:
         color = Color.GREEN
@@ -456,16 +505,17 @@ class ReportGenerator(object):
       info = result.get('info', {})
       if self._options.csv and self._options.info:
         if info:
-          test_entries.extend([info[k] for k in sorted(info.keys())])
+          test_entries.extend(['%s=%s' % (k, info[k])
+                               for k in sorted(info.keys())])
         if not result['status'] and result['error_msg']:
-          test_entries.append('"%s"' % result['error_msg'])
+          test_entries.append('reason="%s"' % result['error_msg'])
 
       self._PrintEntries(test_entries)
       self._PrintErrors(test_entry, result['error_msg'])
 
       # Print out error log for failed tests.
       if not result['status']:
-        self._PrintErrorLogs(test, test_entry)
+        self._PrintErrorLogs(testdir, test_entry)
 
       # Emit the perf keyvals entries. There will be no entries if the
       # --no-perf option is specified.
@@ -476,7 +526,7 @@ class ReportGenerator(object):
         for crash in result['crashes']:
           if not crash in crashes:
             crashes[crash] = set([])
-          crashes[crash].add(test)
+          crashes[crash].add(testdir)
 
       # Emit extra test metadata info on separate lines if not --csv.
       if not self._options.csv:
@@ -511,10 +561,10 @@ class ReportGenerator(object):
 
   def Run(self):
     """Runs report generation."""
-    self._CollectResults()
+    self._CollectAllResults()
     self._GenerateReportText()
-    for v in self._results.itervalues():
-      if not v['status'] or (self._options.crash_detection and v['crashes']):
+    for d in self._results:
+      if not d['status'] or (self._options.crash_detection and d['crashes']):
         sys.exit(1)
 
 
@@ -549,6 +599,9 @@ def main():
                     ' [default: \'%default\']')
   parser.add_option('--no-strip', dest='strip', const='', action='store_const',
                     help='Don\'t strip a prefix from test directory names')
+  parser.add_option('--sort-chron', dest='sort_chron', action='store_true',
+                    default=False,
+                    help='Sort results by datetime instead of by test name.')
   parser.add_option('--no-debug', dest='print_debug', action='store_false',
                     default=True,
                     help='Don\'t print out logs when tests fail.')
