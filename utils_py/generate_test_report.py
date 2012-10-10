@@ -448,10 +448,7 @@ class ReportGenerator(object):
         key_entry = dict_key.ljust(width - self._KEYVAL_INDENT)
         key_entry = key_entry.rjust(width)
       value_entry = self._color.Color(Color.BOLD, result_dict[dict_key])
-      if self._options.csv:
-        self._PrintEntries([test_entry, '%s=%s' % (key_entry, value_entry)])
-      else:
-        self._PrintEntries([test_entry, key_entry, value_entry])
+      self._PrintEntries([test_entry, key_entry, value_entry])
 
   def _GetSortedTests(self):
     """Sort the test result dictionaries in preparation for results printing.
