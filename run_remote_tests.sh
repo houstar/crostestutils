@@ -427,7 +427,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
   # process.
   ENUMERATOR_PATH="${AUTOTEST_DIR}/site_utils/"
   suite_list=()
-  suite_map=()
+  declare -A suite_map=()
   local control_type new_control_file
   for test_request in $FLAGS_ARGV; do
     test_request=$(remove_quotes "${test_request}")
