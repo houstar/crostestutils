@@ -380,6 +380,9 @@ def retrieve_test_results(gtr_dir, folder):
 
   result_model = ResultModel()
   for d in all_run_dirs:
+    if os.path.islink(d):
+      # skip sym-links like run_remote_tests.latest
+      continue
     args =  '%s %s' % (' '.join(['--csv', '--info', '--sort-chron']), d)
     lines = simple_system_output('%s %s' % (cmd, args))
     if not lines:
