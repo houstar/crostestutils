@@ -187,6 +187,7 @@ class ResultModel(object):
     # single folder of results. This structure is filled by parsing multiple
     # lines of output.
     self._current_suite = {}
+    self._previous_suite_folder = None
 
     # A list of unique hardware used. Could be a board but is hwid at this time.
     self._hardware_set = set()
@@ -250,9 +251,21 @@ class ResultModel(object):
       return
 
     if is_suite:
-      if self._current_suite.get('path'):
-        # Save the suite results just collected.
+      current_suite_path = self._current_suite.get('path')
+      if current_suite_path:
+        # Save the suite results just collected. If the suite resides in the
+        # same folder as the previous suite, aggregate them together.
+        # This corresponds to the existence of multiple, different
+        # combined-control files; run_remote_tests was supplied with
+        # multiple suite:xxx targets.
+        current_folder = os.path.dirname(current_suite_path)
+        if self._previous_suite_folder == current_folder:
+              previous_suite = self._results.pop()
+              previous_suite['path'] = current_folder
+              previous_suite['tests'].extend(self._current_suite['tests'])
+              self._current_suite = previous_suite
         self._results.append(self._current_suite)
+        self._previous_suite_folder = current_folder
         self._current_suite = {}
       return
 
