@@ -61,8 +61,8 @@ for eth in $(find_ethernet_interfaces); do
     exit 1
   fi
 
-  initctl stop flimflam || echo "Flimflam was not running."
-  initctl start flimflam
+  initctl stop shill || echo "Shill was not running."
+  initctl start shill
 
   sleep 5
 
