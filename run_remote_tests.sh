@@ -304,6 +304,11 @@ start_servod() {
     return
   fi
 
+  if  dut-control dev_mode  >/dev/null 2>&1; then
+    warn "--servo option ignored (servod already running!)"
+    return
+  fi
+
   sudo servod --board=${FLAGS_board} >${TMP}/servod.log 2>&1 &
   SERVOD=$!
   echo
@@ -311,7 +316,7 @@ start_servod() {
   info "For the log, see ${TMP}/servod.log"
   local timeout=10
   while [ ${timeout} -gt 0 ]; do
-    if dut-control >/dev/null 2>&1; then
+    if dut-control dev_mode >/dev/null 2>&1; then
       return
     fi
     timeout=$(( timeout - 1 ))
