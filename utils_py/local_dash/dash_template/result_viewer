@@ -139,13 +139,13 @@ def _server_result_dir(filepath, match=''):
 
 
 def read_test_results():
-  test_results = []
-  test_results_file = os.path.join(base_dir, 'test_results.json')
+  test_results = {}
+  test_results_file = os.path.join('/tmp', 'local_dash_test_results.latest')
   try:
     with open(test_results_file) as jf:
       test_results = json.load(jf)
   except Exception as e:
-    # If no test_results.json or file is corrupted, serve empty results.
+    # If no local_dash_test_results.json or file is corrupted, serve empty.
     print '****\nError retrieving test results:\n%s.\n****' % str(e)
   return test_results
 
@@ -197,5 +197,5 @@ def tests_view():
 if options.run_debug:
   print 'Serving with "debug" enabled.'
 bottle.run(app, host=options.run_host, port=options.run_port,
-           debug=options.run_debug)
+           debug=options.run_debug, reloader=True)
 _safe_exit()

@@ -117,29 +117,28 @@ def get_json_config(current_dir, json_file):
   return json_contents
 
 
-def write_json_file(output_file, json_data):
+def write_json_file(json_data):
   """Write data-structure output to a file in json format.
 
-  If the destination output file already exists, write the json to a
-  named temp file (with a randomized name).
+  Write the json to a named temp file (with a randomized name).
+  Then, update a sym-link so the viewer can find it.
 
   Args:
-    output_file: file name including path.
     json_data: data-structure to be serialized out.
 
   Returns:
     The file name of the file written.
   """
-  if os.path.isfile(output_file):
-    f = tempfile.NamedTemporaryFile('w', prefix='test_results_', suffix='.json',
-                                    delete=False)
-    LOG.error('Output file (%s) already exists.\nWriting test results to (%s).',
-              output_file, f.name)
-    output_file = f.name
-  else:
-    f = open(output_file, 'w')
+  f = tempfile.NamedTemporaryFile('w', prefix='local_dash_test_results_',
+                                  suffix='.json', delete=False)
+  output_file = f.name
   json.dump(json_data, f)
   f.close()
+  result_link = os.path.join('/tmp', 'local_dash_test_results.latest')
+  if os.path.islink(result_link):
+    os.remove(os.readlink(result_link))
+    os.unlink(result_link)
+  os.symlink(output_file, result_link)
   return output_file
 
 
@@ -431,12 +430,12 @@ def main(argv):
   if test_results:
     if options.print_model:
       test_results.print_result_model()
-    # Drop the results into a folder where a mini-http-server can serve them.
-    dash_template = os.path.join(base_dir, 'dash_template', 'test_results.json')
-    file_name = write_json_file(dash_template, test_results.get_model())
+    file_name = write_json_file(test_results.get_model())
     print 'Wrote %s.' % file_name
-    print ('Run %s/result_viewer to serve the test resuls locally.'
-           % os.path.dirname(file_name))
+    viewer_path = os.path.join(base_dir, 'dash_template', 'result_viewer')
+    # Touch forces the bottle web server to refresh.
+    os.utime(viewer_path, None)
+    print 'Run %s to serve the test resuls locally.' % viewer_path
 
 
 if __name__ == '__main__':
