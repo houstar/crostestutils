@@ -66,6 +66,7 @@
         </td>
       </tr>
 
+      %# ----------------------------------------------------------------------
       %# Subsequent rows are: date | test results (pass, fail, not run)
       %for result_dict in test_results['results']:
         %if result_dict.setdefault('dut', {}).get('hwid') == hardware:
@@ -82,6 +83,17 @@
                 {{result_dict['localtime']}}
                 <span>
                   {{result_dict['path']}}
+                  %fail_set = set()
+                  %for test_result_dict in result_dict['tests']:
+                    %if test_result_dict.get('status') != 'PASS':
+                      %fail_set.add(test_result_dict.get('name'))
+                    %end
+                  %end
+                  %if fail_set:
+                    <div style="color:red;">
+                      Failed tests: {{', '.join(sorted(fail_set))}}.
+                    </div>
+                  %end
                 </span>
               </a>
             </td>

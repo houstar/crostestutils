@@ -29,6 +29,7 @@ except ImportError:
 
 
 base_cmd = os.path.realpath(sys.argv[0])
+sys.argv[0] = base_cmd
 base_dir = os.path.dirname(base_cmd)
 static_root = os.path.join(base_dir, 'static')
 
