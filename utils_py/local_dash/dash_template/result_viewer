@@ -31,6 +31,7 @@ except ImportError:
 base_cmd = os.path.realpath(sys.argv[0])
 sys.argv[0] = base_cmd
 base_dir = os.path.dirname(base_cmd)
+views_dir = os.path.join(base_dir, 'views')
 static_root = os.path.join(base_dir, 'static')
 
 default_logs_dir = '/tmp'
@@ -52,29 +53,8 @@ parser.add_option('', '--run-port',
 options, args = parser.parse_args()
 
 
-# Need to cd to base_dir so Bottle may find it's templates under ./views.
-saved_path = os.getcwd()
-os.chdir(base_dir)
-
-
+bottle.TEMPLATE_PATH.append(views_dir)
 app = bottle.Bottle()
-
-
-def _cleanup():
-  """Helper to ensure we return to the path where we started."""
-  os.chdir(saved_path)
-
-
-def _safe_exit():
-  """Helper to make sure cleanup occurs on success."""
-  _cleanup()
-  sys.exit(0)
-
-
-def _error_exit():
-  """Helper to make sure cleanup occurs on failure."""
-  _cleanup()
-  sys.exit(-1)
 
 
 def _check_logs_dir(args_):
@@ -85,7 +65,7 @@ def _check_logs_dir(args_):
     logs_dir = default_logs_dir
   if not os.path.isdir(logs_dir):
     print 'ERROR: cannot find result dir %s.\n%s' % (logs_dir, usage)
-    _error_exit()
+    sys.exit(1)
   return logs_dir
 
 
@@ -177,7 +157,14 @@ def server_result_file(filepath):
   """Render a view of a file or directory view for results debugging."""
   if filepath.endswith('*') or filepath.endswith('/'):
     return _server_result_dir(filepath=filepath)
-  return bottle.static_file(filepath, mimetype='text/plan', root=result_dir)
+
+  # Default is text/plain, since most files that bottle can't
+  # detect automatically need to be text/plain, otherwise
+  # they are rendered ugly by the browser.
+  mimetype='text/plain'
+  if filepath.endswith('.htm') or filepath.endswith('.html'):
+      mimetype = 'text/html'
+  return bottle.static_file(filepath, mimetype=mimetype, root=result_dir)
 
 
 @app.route('/logs')
@@ -199,4 +186,4 @@ if options.run_debug:
   print 'Serving with "debug" enabled.'
 bottle.run(app, host=options.run_host, port=options.run_port,
            debug=options.run_debug, reloader=True)
-_safe_exit()
+sys.exit(0)
