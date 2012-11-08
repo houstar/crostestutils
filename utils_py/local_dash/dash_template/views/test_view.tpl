@@ -84,15 +84,27 @@
                 <span>
                   {{result_dict['path']}}
                   %fail_set = set()
+                  %pass_set = set()
                   %for test_result_dict in result_dict['tests']:
+                    %test_name = test_result_dict.get('name')
                     %if test_result_dict.get('status') != 'PASS':
-                      %fail_set.add(test_result_dict.get('name'))
+                      %fail_set.add(test_name)
+                    %else:
+                      %pass_set.add(test_name)
                     %end
                   %end
                   %if fail_set:
                     <div style="color:red;">
                       Failed tests: {{', '.join(sorted(fail_set))}}.
                     </div>
+                  %end
+                  %fail_set.discard('firmware_FAFTClient')
+                  %pass_set.discard('firmware_FAFTClient')
+                  %if len(pass_set):
+                    {{ len(pass_set) }} tests passed.
+                  %end
+                  %if len(fail_set):
+                    {{ len(fail_set) }} tests failed.
                   %end
                 </span>
               </a>

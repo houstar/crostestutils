@@ -199,6 +199,38 @@ class ResultCollector(object):
       return testdir.replace(self._strip_text, '', 1)
     return testdir
 
+  def _CollectEndTimes(self, status_raw, status_re='', is_end=True):
+    """Helper to match and collect timestamp and localtime.
+
+    Preferred to locate timestamp and localtime with an 'END GOOD test_name...'
+    line.  Howerver, aborted tests occasionally fail to produce this line
+    and then need to scrape timestamps from the 'START test_name...' line.
+
+    Args:
+      status_raw: multi-line text to search.
+      status_re: status regex to seek (e.g. GOOD|FAIL)
+      is_end: if True, search for 'END' otherwise 'START'.
+
+    Returns:
+      Tuple of timestamp, localtime retrieved from the test status log.
+    """
+    timestamp = ''
+    localtime = ''
+
+    localtime_re = r'\w+\s+\w+\s+[:\w]+'
+    match_filter = r'^\s*%s\s+(?:%s).*timestamp=(\d*).*localtime=(%s).*$' % (
+        'END' if is_end else 'START', status_re, localtime_re)
+    matches = re.findall(match_filter, status_raw, re.MULTILINE)
+    if matches:
+      # There may be multiple lines with timestamp/localtime info.
+      # The last one found is selected because it will reflect the end time.
+      for i in xrange(len(matches)):
+        timestamp_, localtime_ = matches[-(i+1)]
+        if not timestamp or timestamp_ > timestamp:
+          timestamp = timestamp_
+          localtime = localtime_
+    return timestamp, localtime
+
   def _CollectResult(self, testdir, results):
     """Collects results stored under testdir into a dictionary.
 
@@ -257,29 +289,25 @@ class ResultCollector(object):
 
     # Grab the timestamp - it can be used for sorting the test runs.
     # Grab the localtime - it may be printed to enable line filtering by date.
-    test_timestamp = ''
-    test_localtime = ''
     # Designed to match a line like this:
     #   END GOOD  test_name ... timestamp=1347324321  localtime=Sep 10 17:45:21
     status_re = r'GOOD|%s' % failures
-    localtime_re = r'\w+\s+\w+\s+[:\w]+'
-    matches = re.findall(r'^\s*END\s+(?:%s).*timestamp=(\d*).*localtime=(%s).*$'
-                         % (status_re, localtime_re), status_raw, re.MULTILINE)
-    if matches:
-      # There may be multiple lines with timestamp/localtime info.
-      # The last one found is selected because it will reflect the end time.
-      test_timestamp, test_localtime = matches[-1]
+    timestamp, localtime = self._CollectEndTimes(status_raw, status_re)
+    # Hung tests will occasionally skip printing the END line so grab
+    # a default timestamp from the START line in those cases.
+    if not timestamp:
+      timestamp, localtime = self._CollectEndTimes(status_raw, is_end=False)
 
     results.append({
         'testdir': self._MakeResultKey(testdir),
         'crashes': self._CollectCrashes(status_raw),
         'status': status,
         'error_msg': error_msg,
-        'localtime': test_localtime,
-        'timestamp': test_timestamp,
+        'localtime': localtime,
+        'timestamp': timestamp,
         'perf': self._CollectPerf(testdir),
-        'info': self._CollectInfo(testdir, {'localtime': test_localtime,
-                                            'timestamp': test_timestamp})})
+        'info': self._CollectInfo(testdir, {'localtime': localtime,
+                                            'timestamp': timestamp})})
 
   def RecursivelyCollectResults(self, resdir):
     """Recursively collect results into a list of dictionaries.

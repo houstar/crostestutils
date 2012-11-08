@@ -146,7 +146,8 @@ class ResultModel(object):
   """A data structure that shows test results from run_remote_tests runs.
 
   Results are summarized into data useful for presenting a simple
-  result dashboard.
+  result dashboard. Each run_remote_tests.XXX folder will be an
+  individual dictionary entry in the list.
 
   The _results data structure is organized as follows.
 
@@ -182,12 +183,6 @@ class ResultModel(object):
     # run_remote_tests.sh.
     self._results = []
 
-    # An ongoing holder of the dictionary of test results while parsing a
-    # single folder of results. This structure is filled by parsing multiple
-    # lines of output.
-    self._current_suite = {}
-    self._previous_suite_folder = None
-
     # A list of unique hardware used. Could be a board but is hwid at this time.
     self._hardware_set = set()
 
@@ -200,6 +195,8 @@ class ResultModel(object):
     There may be some arbitrary path information in front of the
     run_remote_tests.XXX directory but the suite is always represented
     by the folder immediately below the run_remote_tests.XXX directory.
+    It is either a test_name (for a 1-test suite run) or a control file
+    of tests (e.g. tmp.combined-control.cHThH) for a multi-test suite.
 
     Returns:
       A tuple of the full path, actual suite_path and a boolean indicating if
@@ -245,46 +242,30 @@ class ResultModel(object):
     Args:
       fields: A list of fields extracted from a csv line to be inspected.
     """
+    result_dict = {}
+
     path_, suite_path, is_suite = self._parse_path(fields)
     if not path_:
-      return
+      logging.warning('Unexpected path format (%s).', ','.join(fields))
+      return result_dict
 
     if is_suite:
-      current_suite_path = self._current_suite.get('path')
-      if current_suite_path:
-        # Save the suite results just collected. If the suite resides in the
-        # same folder as the previous suite, aggregate them together.
-        # This corresponds to the existence of multiple, different
-        # combined-control files; run_remote_tests was supplied with
-        # multiple suite:xxx targets.
-        current_folder = os.path.dirname(current_suite_path)
-        if self._previous_suite_folder == current_folder:
-              previous_suite = self._results.pop()
-              previous_suite['path'] = current_folder
-              previous_suite['tests'].extend(self._current_suite['tests'])
-              self._current_suite = previous_suite
-        self._results.append(self._current_suite)
-        self._previous_suite_folder = current_folder
-        self._current_suite = {}
-      return
-
-    self._current_suite.setdefault('path', suite_path)
-
-    test_name = os.path.basename(path_)
-    self._test_set.add(test_name)
-    test_results = {'name': test_name, 'path': path_}
+      result_dict['path'] = suite_path
+    else:
+      result_dict['path'] = path_
+      test_name = os.path.basename(path_)
+      self._test_set.add(test_name)
+      result_dict['name'] = test_name
 
     i = self.STATUS_FIELD - 1
     for f in fields[self.STATUS_FIELD:]:
       i += 1
       if f in ['PASS', 'FAIL']:
-        if not is_suite:
-          test_results['status'] = f
+        result_dict['status'] = f
         continue
       # But, reason is the last field as well so stop when found.
       if f.startswith('reason'):
-        if not is_suite:
-          test_results['reason'] = ','.join(fields[i:])
+        result_dict['reason'] = ','.join(fields[i:])
         break
       info_kv = f.split('=')
       if len(info_kv) != 2:
@@ -292,25 +273,20 @@ class ResultModel(object):
         continue
       info_key, info_value = info_kv
       if info_key in ['localtime', 'timestamp']:
-        # Since generate_test_report is chronologically
-        # sorted, first row will have latest localtime.  Assign
-        # that to the suite for overall sorting.
-        self._current_suite.setdefault(info_key, info_value)
-        if not is_suite:
-          test_results[info_key] = info_value
+        result_dict[info_key] = info_value
       else:
         # Save the unique hwid's to track the hardware/boards.
         if info_key == 'hwid':
           self._hardware_set.add(info_value)
         # Save all non-time-based useful keys under dut.
-        dut_dict = self._current_suite.setdefault('dut', {})
+        dut_dict = result_dict.setdefault('dut', {})
         dut_dict[info_key] = info_value
-    self._current_suite.setdefault('tests', []).insert(0, test_results)
+    return result_dict
 
-  def add_run_lines(self, lines):
+  def add_run_lines(self, dir_name, lines):
     """ Parse lines from a single test run (folder) into a data model.
 
-    The output format from generate_test_results is:
+    The output format from ordinary generate_test_results is:
 
     line1: suite-result (if only 1 test run, the suite is the test)
     subsequent lines: test results
@@ -343,7 +319,14 @@ class ResultModel(object):
 
     The performance-keyval lines are recognized because they do not include
     the PASS|FAIL field in the second position.
+
+    Args:
+      dir_name: Directory traversed. Used to default the path.
+      lines: List of the lines produced by directory analysis.
     """
+    suite = {'path': [], 'localtime': None, 'timestamp': None,
+             'dut': {}, 'tests': []}
+    folder, last_test_path = os.path.split(dir_name)
     for l in lines:
       # Skip over generate_test_report warning lines.
       if l.startswith('WARNING'):
@@ -356,8 +339,43 @@ class ResultModel(object):
         LOG.warning('Unexpected line format: %s.', l)
         break
       # Skip performance-keyval lines; they have no status.
-      if f[self.STATUS_FIELD] in ['PASS', 'FAIL']:
-        self._parse_test_line(fields=f)
+      if not f[self.STATUS_FIELD] in ['PASS', 'FAIL']:
+        continue
+      result_dict = self._parse_test_line(fields=f)
+
+      # Save the path in case the logs are truncated and cannot find a suite.
+      if result_dict.get('path'):
+        last_test_path = result_dict['path']
+
+      timestamp = result_dict.get('timestamp')
+      suite_timestamp = suite.get('timestamp')
+      if timestamp and (not suite_timestamp or timestamp > suite_timestamp):
+        suite['timestamp'] = timestamp
+        suite['localtime'] = result_dict['localtime']
+
+      if 'dut' in result_dict:
+        suite['dut'].update(result_dict['dut'])
+        del result_dict['dut']
+
+      if result_dict.get('name'):
+        # Test line was parsed.
+        suite['tests'].append(result_dict)
+      elif result_dict.get('path'):
+        # Suite line was parsed. Save all suite paths in case multiple
+        # suites (combined-control files) were run.
+        suite['path'].append(result_dict['path'])
+
+    # Aborted tests sometimes emit poor status. Choose valid, related path.
+    if not suite.get('path'):
+      suite['path'] = [last_test_path]
+      logging.warning('Unexpected: suite has no path! Using %s.', suite['path'])
+
+    # Choose common parent of common-control suite dirs.
+    suite['path'] = os.path.commonprefix(suite['path'])
+    if not os.path.isdir(os.path.join(folder, suite['path'])):
+      suite['path'] = os.path.dirname(suite['path'])
+
+    self._results.append(suite)
 
 
 def retrieve_test_results(gtr_dir, folder):
@@ -373,8 +391,8 @@ def retrieve_test_results(gtr_dir, folder):
   Returns:
     A ResultModel object with valid results data else None.
   """
-  cmd = os.path.join(gtr_dir, 'generate_test_report.py')
-  if not os.path.isfile(cmd):
+  generate_test_report = os.path.join(gtr_dir, 'generate_test_report.py')
+  if not os.path.isfile(generate_test_report):
     LOG.error('Cannot find generate_test_report where expected: %s.', gtr_dir)
     return None
   if not folder:
@@ -396,11 +414,11 @@ def retrieve_test_results(gtr_dir, folder):
       # skip sym-links like run_remote_tests.latest
       continue
     args =  '%s %s' % (' '.join(['--csv', '--info', '--sort-chron']), d)
-    lines = simple_system_output('%s %s' % (cmd, args))
+    lines = simple_system_output('%s %s' % (generate_test_report, args))
     if not lines:
       LOG.warning('No results under %s.', d)
       continue
-    result_model.add_run_lines(lines)
+    result_model.add_run_lines(d, lines)
   return result_model
 
 
