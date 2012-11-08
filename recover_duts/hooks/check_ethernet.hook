@@ -14,6 +14,12 @@ fi
 
 NON_ETHERNET_DRIVERS="cdc_ether"
 
+# Returns the default gateway.
+get_default_gateway() {
+  local ip_route="$(ip route get 1.0.0.0)"
+  echo ${ip_route} | head -n 1 | cut -f 3 -d ' '
+}
+
 # Returns 0 if $1 is a non-Ethernet driver, or 1 otherwise.
 is_non_ethernet_driver() {
   local driver="$1"
@@ -44,34 +50,61 @@ find_ethernet_interfaces() {
   done
 }
 
-for eth in $(find_ethernet_interfaces); do
-  # Ping itself doesn't work on test images in a VM.
-  PING="curl --interface ${eth} -o /dev/null www.google.com"
+# Pings the given ipaddress through the given ethernet device.
+# $1 - The ethernet device to ping through.
+# $2 - IP address to ping.
+do_ping() {
+  local eth=$1
+  local ip_addr=$2
+  ping -I ${eth} -c 1 ${ip_addr}
+}
 
-  if ${PING}; then
-    exit 0
-  fi
-
-  ifconfig ${eth} down
-  ifconfig ${eth} up
-  sleep 5
-
-  if ${PING}; then
-    echo "Reconfigured using ifconfig down/up."
-    exit 1
-  fi
-
+# Restart all our ethernet devices and restart shill.
+recover_ethernet_devices() {
+  local eth
+  for eth in $(find_ethernet_interfaces); do
+    ifconfig ${eth} down
+    ifconfig ${eth} up
+  done
   initctl stop shill || echo "Shill was not running."
   initctl start shill
-
   sleep 5
+}
 
-  if ${PING}; then
-    exit 1
+# Loop through all ethernet devices and see if we can connect to our default
+# gateway.
+ping_default_gateway_over_ethernet() {
+  local eth default_gateway
+  default_gateway="$(get_default_gateway)" || default_gateway=
+  if [ -n "${default_gateway}" ]; then
+    for eth in $(find_ethernet_interfaces); do
+      if do_ping ${eth} ${default_gateway}; then
+        return 0
+      fi
+    done
   fi
-done
+  return 1
+}
 
-# Last chance - reboot if we can't get any connectivity.
-echo "All efforts to recover ethernet have been exhausted. Rebooting."
-(sleep 5 && reboot) &
-exit 1
+main() {
+  # Attempt to ping our default gateway over ethernet.
+  if ping_default_gateway_over_ethernet; then
+    return 0
+  fi
+
+  # We can't reach our default gateway through any ethernet devices.
+  recover_ethernet_devices
+
+  # Attempt to ping again. If successful, return 1 so that way log the fact
+  # that we need to take action to recover the dut.
+  if ping_default_gateway_over_ethernet; then
+    return 1
+  fi
+
+  # Last chance - reboot if we can't get any connectivity.
+  echo "All efforts to recover ethernet have been exhausted. Rebooting."
+  (sleep 5 && reboot) &
+  return 1
+}
+
+main
