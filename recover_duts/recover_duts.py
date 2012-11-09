@@ -19,6 +19,7 @@ LOGGING_SUBDIR = '/var/log/recover_duts'
 LOG_FILENAME_FORMAT = os.path.join(LOGGING_SUBDIR,
                                    'recover_duts_log_%Y%m%d_%H%M%S.txt')
 LOGGING_FORMAT = '%(asctime)s - %(levelname)s - %(message)s'
+LONG_REBOOT_DELAY = 300
 SLEEP_DELAY = 600
 
 
@@ -30,6 +31,9 @@ def main():
   logging.basicConfig(filename=log_filename, level=logging.DEBUG,
                       format=LOGGING_FORMAT)
   hooks_dir = os.path.join(os.path.dirname(__file__), 'hooks')
+
+  # Additional sleep as networking not be up in the case of a long reboot.
+  time.sleep(LONG_REBOOT_DELAY)
   try:
     while(True):
       for script in os.listdir(hooks_dir):
