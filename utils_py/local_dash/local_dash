@@ -17,6 +17,9 @@ logging.basicConfig()
 LOG = logging.getLogger('local_dash')
 
 
+UNKNOWN = 'unknown'
+
+
 class LocalDashException(StandardError):
   """Base exception class for this utility.
 
@@ -184,7 +187,7 @@ class ResultModel(object):
     self._results = []
 
     # A list of unique hardware used. Could be a board but is hwid at this time.
-    self._hardware_set = set()
+    self._hardware_set = set([UNKNOWN])
 
     # A list of unique tests discovered.
     self._test_set = set()
@@ -242,7 +245,7 @@ class ResultModel(object):
     Args:
       fields: A list of fields extracted from a csv line to be inspected.
     """
-    result_dict = {}
+    result_dict = {'dut': {'ec': UNKNOWN, 'bios': UNKNOWN, 'hwid': UNKNOWN}}
 
     path_, suite_path, is_suite = self._parse_path(fields)
     if not path_:
@@ -279,8 +282,7 @@ class ResultModel(object):
         if info_key == 'hwid':
           self._hardware_set.add(info_value)
         # Save all non-time-based useful keys under dut.
-        dut_dict = result_dict.setdefault('dut', {})
-        dut_dict[info_key] = info_value
+        result_dict['dut'][info_key] = info_value
     return result_dict
 
   def add_run_lines(self, dir_name, lines):
