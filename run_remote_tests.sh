@@ -350,6 +350,9 @@ main() {
     exit 1
   fi
 
+  # Allow use of commas for separating test names
+  FLAGS_ARGV=${FLAGS_ARGV//,/ }
+
   if [ ${FLAGS_servo} -eq ${FLAGS_TRUE} ]; then
     if [ -z "${FLAGS_board}" ]; then
       die "Must specify board when using --servo"
