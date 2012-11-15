@@ -245,7 +245,8 @@ class ResultModel(object):
     Args:
       fields: A list of fields extracted from a csv line to be inspected.
     """
-    result_dict = {'dut': {'ec': UNKNOWN, 'bios': UNKNOWN, 'hwid': UNKNOWN}}
+    result_dict = {}
+    dut_dict = {}
 
     path_, suite_path, is_suite = self._parse_path(fields)
     if not path_:
@@ -282,13 +283,13 @@ class ResultModel(object):
         if info_key == 'hwid':
           self._hardware_set.add(info_value)
         # Save all non-time-based useful keys under dut.
-        result_dict['dut'][info_key] = info_value
-    return result_dict
+        dut_dict[info_key] = info_value
+    return result_dict, dut_dict
 
   def add_run_lines(self, dir_name, lines):
     """ Parse lines from a single test run (folder) into a data model.
 
-    The output format from ordinary generate_test_results is:
+    The output format from ordinary generate_test_report is:
 
     line1: suite-result (if only 1 test run, the suite is the test)
     subsequent lines: test results
@@ -327,7 +328,8 @@ class ResultModel(object):
       lines: List of the lines produced by directory analysis.
     """
     suite = {'path': [], 'localtime': None, 'timestamp': None,
-             'dut': {}, 'tests': []}
+             'dut': {'ec': UNKNOWN, 'bios': UNKNOWN, 'hwid': UNKNOWN},
+             'tests': []}
     folder, last_test_path = os.path.split(dir_name)
     for l in lines:
       # Skip over generate_test_report warning lines.
@@ -343,7 +345,7 @@ class ResultModel(object):
       # Skip performance-keyval lines; they have no status.
       if not f[self.STATUS_FIELD] in ['PASS', 'FAIL']:
         continue
-      result_dict = self._parse_test_line(fields=f)
+      result_dict, dut_dict = self._parse_test_line(fields=f)
 
       # Save the path in case the logs are truncated and cannot find a suite.
       if result_dict.get('path'):
@@ -355,9 +357,7 @@ class ResultModel(object):
         suite['timestamp'] = timestamp
         suite['localtime'] = result_dict['localtime']
 
-      if 'dut' in result_dict:
-        suite['dut'].update(result_dict['dut'])
-        del result_dict['dut']
+      suite['dut'].update(dut_dict)
 
       if result_dict.get('name'):
         # Test line was parsed.
