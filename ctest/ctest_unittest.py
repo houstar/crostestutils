@@ -23,6 +23,9 @@ from crostestutils.lib import image_extractor
 class CTestTest(mox.MoxTestBase):
   """Testing the test-worthy methods in CTest."""
 
+  FAKE_ROOT = '/fake/root'
+  ARCHIVE_DIR = os.path.join(FAKE_ROOT, 'x86-generic-full')
+
   def testFindTargetAndBaseImagesNoBaseNoArchive(self):
     """Tests whether we can set the right vars if no Base image found.
 
@@ -42,7 +45,7 @@ class CTestTest(mox.MoxTestBase):
     ctester = ctest.CTest() # Calls mocked out __init__.
     ctester.target = 'some_image/target_version/file.bin'
     ctester.base = None
-    ctester.build_config = 'x86-generic-full'
+    ctester.archive_dir = self.ARCHIVE_DIR
     ctester.FindTargetAndBaseImages()
     self.mox.VerifyAll()
     self.assertEqual(ctester.base, ctester.target)
@@ -71,7 +74,7 @@ class CTestTest(mox.MoxTestBase):
     ctester = ctest.CTest() # Calls mocked out __init__.
     ctester.target = 'some_image/target_version/file.bin'
     ctester.base = None
-    ctester.build_config = 'x86-generic-full'
+    ctester.archive_dir = self.ARCHIVE_DIR
     ctester.FindTargetAndBaseImages()
     self.mox.VerifyAll()
     self.assertEqual(ctester.base, latest_base_path)
@@ -89,7 +92,7 @@ class CTestTest(mox.MoxTestBase):
     fake_result = self.mox.CreateMock(chromite_build_lib.CommandResult)
     fake_result.output = '/some/path_to/latest_version'
 
-    fake_crosutils = '/fake/root/src/scripts'
+    fake_crosutils = os.path.join(self.FAKE_ROOT, 'src', 'scripts')
 
     ctest.CTest.__init__()
     chromite_build_lib.RunCommand(
@@ -102,7 +105,7 @@ class CTestTest(mox.MoxTestBase):
     ctester = ctest.CTest() # Calls mocked out __init__.
     ctester.target = None
     ctester.base = None
-    ctester.build_config = 'x86-generic-full'
+    ctester.archive_dir = self.ARCHIVE_DIR
     ctester.board = 'board'
     ctester.crosutils_root = fake_crosutils
     ctester.FindTargetAndBaseImages()

@@ -388,9 +388,9 @@ def CheckOptions(parser, options):
   # Determine the base image. If latest_from_config specified, find the latest
   # image from the given config. If it doesn't exist, use the target image.
   target_version = os.path.realpath(options.target).rsplit('/', 2)[-2]
-  if options.base_latest_from_config:
+  if options.base_latest_from_dir:
     # Extract the latest build.
-    extractor = image_extractor.ImageExtractor(options.base_latest_from_config)
+    extractor = image_extractor.ImageExtractor(options.base_latest_from_dir)
     latest_image_dir = extractor.GetLatestImage(target_version)
     if latest_image_dir:
       options.base = extractor.UnzipImage(latest_image_dir)
@@ -451,10 +451,10 @@ def main():
   # Options related to the images to test.
   parser.add_option('--board', help='Board used for the images.')
   parser.add_option('--base', help='Image we want to test updates from.')
-  parser.add_option('--base_latest_from_config', help='Ignore the base '
-                    'option and use the latest image from the specified config '
-                    'as the base image. If none exists, default to target '
-                    'image.')
+  parser.add_option('--base_latest_from_dir', help='Ignore the base '
+                    'option and use the latest image from the specified '
+                    'directory as the base image. If none exists, default to '
+                    'target image.')
   parser.add_option('--target', help='Image we want to test updates to.')
 
   # Miscellaneous options.

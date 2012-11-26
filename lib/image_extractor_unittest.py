@@ -27,19 +27,15 @@ class ImageExtractorTest(mox.MoxTestBase):
     super(ImageExtractorTest, self).setUp()
 
     self.work_dir = tempfile.mkdtemp('ImageExtractorTest')
-    self.build_name = 'x86-generic-full'
     # Set constants to be easily testable.
-    image_extractor.ImageExtractor.LOCAL_ARCHIVE = os.path.join(self.work_dir,
-                                                                'archive')
+    self.archive_dir = os.path.join(self.work_dir, 'archive',
+                                    'x86-generic-full')
     image_extractor.ImageExtractor.SRC_ARCHIVE_DIR = os.path.join(self.work_dir,
                                                                   'src')
-
     # Our test object.
-    self.test_extractor = image_extractor.ImageExtractor(self.build_name)
+    self.test_extractor = image_extractor.ImageExtractor(self.archive_dir)
 
     # Convenience variables for testing.
-    self.archive_dir = os.path.join(
-        image_extractor.ImageExtractor.LOCAL_ARCHIVE, self.build_name)
     self.src_archive = image_extractor.ImageExtractor.SRC_ARCHIVE_DIR
     self.mox.StubOutWithMock(logging, 'error')
 

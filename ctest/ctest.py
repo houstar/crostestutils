@@ -32,7 +32,7 @@ class CTest(object):
   Variables:
     base: Base image to test from.
     board: the board for the latest image.
-    build_config: Build configuration we are testing.
+    archive_dir: Location where images for past versions are archived.
     crosutils_root: Location of crosutils.
     jobs: Numbers of threads to run in parallel.
     no_graphics: boolean: If True, disable graphics during vm test.
@@ -55,7 +55,7 @@ class CTest(object):
     """
     self.base = None
     self.board = options.board
-    self.build_config = options.build_config
+    self.archive_dir = options.archive_dir
     self.crosutils_root = os.path.join(constants.SOURCE_ROOT, 'src', 'scripts')
     self.no_graphics = options.no_graphics
     self.remote = options.remote
@@ -102,9 +102,9 @@ class CTest(object):
 
 
     # Grab the latest official build for this board to use as the base image.
-    if self.build_config:
+    if self.archive_dir:
       target_version = os.path.realpath(self.target).rsplit('/', 2)[-2]
-      extractor = image_extractor.ImageExtractor(self.build_config)
+      extractor = image_extractor.ImageExtractor(self.archive_dir)
       latest_image_dir = extractor.GetLatestImage(target_version)
       if latest_image_dir:
         self.base = extractor.UnzipImage(latest_image_dir)
@@ -204,8 +204,8 @@ def main():
   parser = optparse.OptionParser()
   parser.add_option('-b', '--board',
                     help='board for the image to compare against.')
-  parser.add_option('--build_config',
-                    help='Name for the build configuration we are archiving.')
+  parser.add_option('--archive_dir',
+                    help='Directory containing previously archived images.')
   parser.add_option('--cache', default=False, action='store_true',
                     help='Cache payloads')
   parser.add_option('--jobs', default=test_helper.CalculateDefaultJobs(),
