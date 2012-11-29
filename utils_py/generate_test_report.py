@@ -42,22 +42,39 @@ _CRASH_WHITELIST = {
 class ResultCollector(object):
   """Collects status and performance data from an autoserv results directory."""
 
-  def __init__(self, collect_perf=True, collect_info=False, escape_error=False,
-               strip_text='', whitelist_chrome_crashes=False):
+  def __init__(self, collect_perf=True, collect_attr=False, collect_info=False,
+               escape_error=False, strip_text='',
+               whitelist_chrome_crashes=False):
     """Initialize ResultsCollector class.
 
     Args:
       collect_perf: Should perf keyvals be collected?
+      collect_attr: Should attr keyvals be collected?
+      collect_info: Should info keyvals be collected?
+      escape_error: Escape error message text for tools.
       strip_text: Prefix to strip from test directory names.
       whitelist_chrome_crashes: Treat Chrome crashes as non-fatal.
     """
     self._collect_perf = collect_perf
+    self._collect_attr = collect_attr
     self._collect_info = collect_info
     self._escape_error = escape_error
     self._strip_text = strip_text
     self._whitelist_chrome_crashes = whitelist_chrome_crashes
 
   def _CollectPerf(self, testdir):
+    """Parses keyval file under testdir and return the perf keyval pairs."""
+    if not self._collect_perf:
+      return {}
+    return self._CollectKeyval(testdir, 'perf')
+
+  def _CollectAttr(self, testdir):
+    """Parses keyval file under testdir and return the attr keyval pairs."""
+    if not self._collect_attr:
+      return {}
+    return self._CollectKeyval(testdir, 'attr')
+
+  def _CollectKeyval(self, testdir, keyword):
     """Parses keyval file under testdir.
 
     If testdir contains a result folder, process the keyval file and return
@@ -65,24 +82,22 @@ class ResultCollector(object):
 
     Args:
       testdir: The autoserv test result directory.
+      keyword: The keyword of keyval, either 'perf' or 'attr'.
 
     Returns:
       If the perf option is disabled or the there's no keyval file under
       testdir, returns an empty dictionary. Otherwise, returns a dictionary of
       parsed keyvals. Duplicate keys are uniquified by their instance number.
     """
-    perf = {}
-    if not self._collect_perf:
-      return perf
-
+    keyval = {}
     keyval_file = os.path.join(testdir, 'results', 'keyval')
     if not os.path.isfile(keyval_file):
-      return perf
+      return keyval
 
     instances = {}
 
     for line in open(keyval_file):
-      match = re.search(r'^(.+){perf}=(.+)$', line)
+      match = re.search(r'^(.+){%s}=(.+)$' % keyword, line)
       if match:
         key = match.group(1)
         val = match.group(2)
@@ -96,9 +111,9 @@ class ResultCollector(object):
           key_inst = '%s{%d}' % (key, instance)
         instances[key] = instance + 1
 
-        perf[key_inst] = val
+        keyval[key_inst] = val
 
-    return perf
+    return keyval
 
   def _CollectCrashes(self, status_raw):
     """Parses status_raw file for crashes.
@@ -306,6 +321,7 @@ class ResultCollector(object):
         'localtime': localtime,
         'timestamp': timestamp,
         'perf': self._CollectPerf(testdir),
+        'attr': self._CollectAttr(testdir),
         'info': self._CollectInfo(testdir, {'localtime': localtime,
                                             'timestamp': timestamp})})
 
@@ -357,8 +373,9 @@ class ReportGenerator(object):
     contain values such as: test folder, status, localtime, crashes, error_msg,
     perf keyvals [optional], info [optional].
     """
-    collector = ResultCollector(self._options.perf, self._options.info,
-                                self._options.escape_error, self._options.strip,
+    collector = ResultCollector(self._options.perf, self._options.attr,
+                                self._options.info, self._options.escape_error,
+                                self._options.strip,
                                 self._options.whitelist_chrome_crashes)
     for resdir in self._args:
       if not os.path.isdir(resdir):
@@ -528,7 +545,8 @@ class ReportGenerator(object):
       test_entries = [test_entry, self._color.Color(color, status_entry)]
 
       info = result.get('info', {})
-      if self._options.csv and self._options.info:
+      info.update(result.get('attr', {}))
+      if self._options.csv and (self._options.info or self._options.attr):
         if info:
           test_entries.extend(['%s=%s' % (k, info[k])
                                for k in sorted(info.keys())])
@@ -616,6 +634,9 @@ def main():
   parser.add_option('--perf', dest='perf', action='store_true',
                     default=True,
                     help='Include perf keyvals in the report [default]')
+  parser.add_option('--attr', dest='attr', action='store_true',
+                    default=False,
+                    help='Include attr keyvals in the report')
   parser.add_option('--no-perf', dest='perf', action='store_false',
                     help='Don\'t include perf keyvals in the report')
   parser.add_option('--strip', dest='strip', type='string', action='store',

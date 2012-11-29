@@ -415,7 +415,8 @@ def retrieve_test_results(gtr_dir, folder):
     if os.path.islink(d):
       # skip sym-links like run_remote_tests.latest
       continue
-    args =  '%s %s' % (' '.join(['--csv', '--info', '--sort-chron']), d)
+    args = '%s %s' % (' '.join(['--csv', '--info', '--attr', '--sort-chron']),
+                      d)
     lines = simple_system_output('%s %s' % (generate_test_report, args))
     if not lines:
       LOG.warning('No results under %s.', d)
