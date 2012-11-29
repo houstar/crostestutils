@@ -10,12 +10,14 @@
       <tr>
         <th>&nbsp;</th>
         <th style="text-align:left">Name</th>
+        <th style="text-align:left">Size</th>
         <th style="text-align:right">Date Modified</th>
       </tr>
-      %for is_dir, link_part, time_part, _ in body_lines:
+      %for is_dir, link_part, time_part, _, size_part in body_lines:
         <tr>
         <td>{{is_dir}}</td>
         <td style="text-align:left">{{!link_part}}</td>
+        <td style="text-align:left">{{size_part}}</td>
         <td style="padding-left:20px">{{time_part}}</td>
         </tr>
       %end

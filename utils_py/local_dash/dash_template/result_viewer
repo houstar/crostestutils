@@ -109,11 +109,12 @@ def _server_result_dir(filepath, match=''):
     is_dir = os.path.isdir(dir_or_file)
     dir_or_file_link = _make_local_link(dir_or_file[len_prefix:],
                                         is_dir=is_dir)
+    file_size = os.stat(dir_or_file).st_size if not is_dir else '-'
     unformatted = time.localtime(os.stat(dir_or_file).st_mtime)
     dir_or_file_time = time.strftime("%a, %d %b %Y %H:%M:%S", unformatted)
     # Use 'd' to indicate directory vs '-' for a file.
     body_lines.append(['d' if is_dir else '-', dir_or_file_link,
-                       dir_or_file_time, unformatted])
+                       dir_or_file_time, unformatted, file_size])
     # Sort reverse-chronological top-down to see latest first.
     body_lines = sorted(body_lines, key=operator.itemgetter(3), reverse=True)
   return bottle.template('dir_view', filepath=filepath, body_lines=body_lines)
