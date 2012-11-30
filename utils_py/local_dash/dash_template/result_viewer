@@ -9,7 +9,8 @@ Allows easy review of multiple runs of run_remote_tests.sh via http pages.
 By default pages are shown
 """
 
-import glob, json, operator, optparse, os, socket, sys, time
+import glob, json, operator, optparse, os, socket, subprocess, sys
+import datetime, time
 
 # Bottle is a fast, simple and lightweight WSGI micro web-framework for Python.
 # It enables simple webpage rendering from a single file (bottle.py) with no
@@ -152,6 +153,23 @@ def urls_view():
   """Render a view that shows possible urls for help."""
   return bottle.template('urlhelp')
 
+@app.route('/regenerate')
+def regenerate_results():
+  """Regenerate all reports from test results folder"""
+  test_results = read_test_results()
+  cmd = test_results.get('cmd')
+  if cmd:
+    print '%s: Regenerating report from test results.' % datetime.datetime.now()
+    cmd = [cmd]
+    config = test_results.get('config')
+    args = test_results.get('args')
+    if config:
+      cmd.append('-c')
+      cmd.append(config)
+    if args:
+      cmd.append(args)
+    subprocess.check_call(cmd)
+  bottle.redirect('/')
 
 @app.route('/logs/<filepath:path>')
 def server_result_file(filepath):

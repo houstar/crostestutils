@@ -11,5 +11,6 @@
      target="_blank">External buildbot</a> |
   <a href="http://chromegw/i/chromeos/console"
      target="_blank">Internal buildbot</a> |
+  <a href="/regenerate">Regenerate</a> |
   <a href="/help">Help</a>
 </div>

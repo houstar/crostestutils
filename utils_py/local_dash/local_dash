@@ -76,6 +76,9 @@ def parse_args():
     0: Shows ERROR logged messages.
     1: Shows ERROR, INFO logged messages.
     2: Shows ERROR, INFO and DEBUG logged messages.
+
+  Returns:
+    Tuple of (options, args) parsed.
   """
   parser = optparse.OptionParser()
   parser.add_option('-c', '--config-file',
@@ -87,7 +90,7 @@ def parse_args():
   parser.add_option('-v', '--verbosity-level',
                     help='1=debug, 2=most verbose [default: %default]',
                     dest='verbosity', type='int', default=0)
-  options = parser.parse_args()[0]
+  options, args = parser.parse_args()
 
   logging_level = logging.ERROR
   if options.verbosity == 1:
@@ -96,7 +99,7 @@ def parse_args():
     logging_level = logging.DEBUG
   LOG.setLevel(logging_level)
 
-  return options
+  return options, args
 
 
 def get_json_config(current_dir, json_file):
@@ -151,6 +154,10 @@ class ResultModel(object):
   Results are summarized into data useful for presenting a simple
   result dashboard. Each run_remote_tests.XXX folder will be an
   individual dictionary entry in the list.
+
+  The result model is made up of actual _results, some hardware details,
+  a list of tests executed (for building report headers) and the
+  details of the command line execution for aiding re-runs of local_dash.
 
   The _results data structure is organized as follows.
 
@@ -215,20 +222,30 @@ class ResultModel(object):
     suite_path = '/'.join(suite_parts[:2])
     return path_, suite_path, is_suite
 
-  def get_model(self):
+  def get_model(self, cmd=None, config=None, args=None):
     """Some final post-processing before the data is returned.
 
     The model will commonly be viewed in date-descending order.
+
+    Args:
+      cmd: if present, added to the model to aid re-runs.
+      config: if present, added to the model to aid re-runs.
+      args: if present, added to the model to aid re-runs.
+
     Returns:
       A dictionary with 3 elements: the test-result-list-of-dictionaries, a
       list of unique hardware on which the tests were attempted and a list of
       unique tests that were attempted.  These 3 things allow the recipient to
       format some organized tables by hardware and test.
     """
-    return {'results': sorted(self._results, key=itemgetter('timestamp'),
-                              reverse=True),
-            'hardware': sorted(self._hardware_set),
-            'tests': sorted(self._test_set)}
+    model = {'results': sorted(self._results, key=itemgetter('timestamp'),
+                               reverse=True),
+             'hardware': sorted(self._hardware_set),
+             'tests': sorted(self._test_set)}
+    for k, var in [('cmd', cmd), ('config', config), ('args', args)]:
+      if var:
+        model[k] = var
+    return model
 
   def print_result_model(self):
     """For diagnostic purposes allow the model to be reviewed."""
@@ -435,7 +452,7 @@ def main(argv):
   base_dir = os.path.dirname(os.path.abspath(argv[0]))
 
   # Parse options
-  options = parse_args()
+  options, args = parse_args()
 
   try:
     config_dash = get_json_config(base_dir, options.config_file)
@@ -451,7 +468,11 @@ def main(argv):
   if test_results:
     if options.print_model:
       test_results.print_result_model()
-    file_name = write_json_file(test_results.get_model())
+    result_model = test_results.get_model(os.path.abspath(argv[0]),
+                                          options.config_file, args)
+    # To enable re-running this command from a web-ui, stash the
+    # details of this command invocation in the results.
+    file_name = write_json_file(result_model)
     print 'Wrote %s.' % file_name
     viewer_path = os.path.join(base_dir, 'dash_template', 'result_viewer')
     # Touch forces the bottle web server to refresh.
