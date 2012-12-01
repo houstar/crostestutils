@@ -50,13 +50,14 @@ find_ethernet_interfaces() {
   done
 }
 
-# Pings the given ipaddress through the given ethernet device.
-# $1 - The ethernet device to ping through.
-# $2 - IP address to ping.
+# Pings the given ipaddress through all wired ethernet devices
+# $1 - IP address to ping.
 do_ping() {
-  local eth=$1
-  local ip_addr=$2
-  ping -I ${eth} -c 1 ${ip_addr}
+  local ip_addr=$1
+  for eth in $(find_ethernet_interfaces); do
+    ping -I ${eth} -c 3 ${ip_addr} && return 0
+  done
+  return 1
 }
 
 # Restart all our ethernet devices and restart shill.
@@ -71,33 +72,38 @@ recover_ethernet_devices() {
   sleep 30
 }
 
-# Loop through all ethernet devices and see if we can connect to our default
-# gateway.
-ping_default_gateway_over_ethernet() {
-  local eth default_gateway
-  default_gateway="$(get_default_gateway)" || default_gateway=
-  if [ -n "${default_gateway}" ]; then
-    for eth in $(find_ethernet_interfaces); do
-      if do_ping ${eth} ${default_gateway}; then
-        return 0
-      fi
-    done
+# Return the remote IP address of the first established SSH connection
+find_ssh_client() {
+  netstat -lanp | awk '/tcp.*:22.*ESTABLISHED.*/ {split($5,a,":"); print a[1]}'
+}
+
+# Try to find a connected SSH client (our autotest server) and ping it
+ping_controlling_server() {
+  local ssh_client default_gateway
+  ssh_client="$(find_ssh_client)" || ssh_client=
+  if [ -n "${ssh_client}" ]; then
+    do_ping ${ssh_client} && return 0
+  else
+    default_gateway="$(get_default_gateway)" || default_gateway=
+    if [ -n "${default_gateway}" ]; then
+      do_ping ${default_gateway} && return 0
+    fi
   fi
   return 1
 }
 
 main() {
-  # Attempt to ping our default gateway over ethernet.
-  if ping_default_gateway_over_ethernet; then
+  # Attempt to ping our controlling autotest server over ethernet.
+  if ping_controlling_server; then
     return 0
   fi
 
-  # We can't reach our default gateway through any ethernet devices.
+  # We can't reach our controlling server through any ethernet devices.
   recover_ethernet_devices
 
   # Attempt to ping again. If successful, return 1 so that way log the fact
   # that we need to take action to recover the dut.
-  if ping_default_gateway_over_ethernet; then
+  if ping_controlling_server; then
     return 1
   fi
 
