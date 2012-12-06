@@ -2,6 +2,7 @@
 %# Use of this source code is governed by a BSD-style license that can be
 %# found in the LICENSE file.
 <div class="header">
+<form name="frmRefresh" style="margin: 0; padding: 0">
   <a href="/">Home</a> |
   <a href="/logs">Logs</a> |
   <a href="http://cautotest/results/dashboard"
@@ -12,5 +13,8 @@
   <a href="http://chromegw/i/chromeos/console"
      target="_blank">Internal buildbot</a> |
   <a href="/regenerate">Regenerate</a> |
-  <a href="/help">Help</a>
+  <a href="/help">Help</a> |
+  <input type="checkbox" name="CB1" onclick="StartTime()">
+  <label for="CB1">Auto-refresh (60s)</label>
+</form>
 </div>
