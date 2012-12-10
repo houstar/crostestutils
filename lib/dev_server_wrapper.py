@@ -11,8 +11,9 @@ import time
 
 import cros_build_lib as cros_lib
 
-# Wait up to 3 minutes for the dev server to start.
-DEV_SERVER_TIMEOUT = 180
+# Wait up to 15 minutes for the dev server to start. It can take a while to
+# start when generating payloads in parallel.
+DEV_SERVER_TIMEOUT = 900
 
 def GenerateUpdateId(target, src, key, for_vm):
   """Returns a simple representation id of target and src paths."""
