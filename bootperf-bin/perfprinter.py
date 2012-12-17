@@ -4,11 +4,6 @@
 
 """Routines for printing boot time performance test results."""
 
-import fnmatch
-import os
-import os.path
-import re
-
 import resultset
 
 
@@ -38,11 +33,11 @@ def PrintStatisticsSummary(reader, dirlist, keytype, keylist):
       keytype == resultset.TestResultSet.FIRMWARE_KEYSET):
     header = "%5s %3s  %5s %3s  %s" % (
         "time", "s%", "dt", "s%", "event")
-    format = "%5s %2d%%  %5s %2d%%  %s"
+    tformat = "%5s %2d%%  %5s %2d%%  %s"
   else:
     header = "%7s %3s  %7s %3s  %s" % (
         "diskrd", "s%", "delta", "s%", "event")
-    format = "%7s %2d%%  %7s %2d%%  %s"
+    tformat = "%7s %2d%%  %7s %2d%%  %s"
   havedata = False
   for dir_ in dirlist:
     results = reader(dir_)
@@ -70,7 +65,7 @@ def PrintStatisticsSummary(reader, dirlist, keytype, keylist):
       (valstring, val_printed) = keyset.PrintableStatistic(valueavg)
       delta = val_printed - prevvalue
       (deltastring, _) = keyset.PrintableStatistic(delta)
-      print format % (valstring, valuepct, "+" + deltastring, deltapct, stat)
+      print tformat % (valstring, valuepct, "+" + deltastring, deltapct, stat)
       prevvalue = val_printed
       prevstat = stat
     havedata = True

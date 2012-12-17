@@ -50,7 +50,7 @@ def CreateVMImage(image, board):
   """
   vm_image_path = '%s/chromiumos_qemu_image.bin' % os.path.dirname(image)
   if not os.path.exists(vm_image_path):
-    logging.info('Creating %s' % vm_image_path)
+    logging.info('Creating %s', vm_image_path)
     cros_build_lib.RunCommand(
         ['./image_to_vm.sh',
          '--full',

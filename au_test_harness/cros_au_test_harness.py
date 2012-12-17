@@ -17,8 +17,6 @@ import os
 import pickle
 import sys
 import tempfile
-import traceback
-import StringIO
 import unittest
 
 # TODO(sosa): Migrate to chromite cros_build_lib.
@@ -39,13 +37,14 @@ CACHE_FILE = 'update.cache'
 
 class _LessBacktracingTestResult(unittest._TextTestResult):
   """TestResult class that suppresses stacks for AssertionError."""
+  # pylint: disable=W0212
   def addFailure(self, test, err):
     """Overrides unittest.TestCase.addFailure to suppress stack traces."""
-    exc_type, exc_value = err[:2]
+    exc_type = err[0]
     if exc_type is AssertionError:  # There's already plenty of debug output.
       self.failures.append((test, ''))
     else:
-      super(AUTest, self).addFailure(test, err)
+      super(_LessBacktracingTestResult, self).addFailure(test, err)
 
 
 class _LessBacktracingTestRunner(unittest.TextTestRunner):

@@ -7,6 +7,7 @@
 
 import os
 import threading
+import sys
 import time
 
 import cros_build_lib as cros_lib

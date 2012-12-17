@@ -5,7 +5,6 @@
 """Module containing methods/classes related to running parallel test jobs."""
 
 import multiprocessing
-import sys
 import time
 
 import cros_build_lib as cros_lib

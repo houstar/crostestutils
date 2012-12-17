@@ -10,7 +10,6 @@ gsutil and boto libraries.
 """
 
 import logging
-import sys
 
 import cros_gestures_constants
 
