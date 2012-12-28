@@ -30,8 +30,6 @@ class AUWorker(object):
     self.board = options.board
     self._first_update = False
     self.test_results_root = test_results_root
-    self.all_results_root = os.path.join(test_results_root, 'all')
-    self.fail_results_root = os.path.join(test_results_root, 'failed')
     self.use_delta_updates = options.delta
     self.verbose = options.verbose
     self.vm_image_path = None
@@ -266,22 +264,17 @@ class AUWorker(object):
 
     # Initialize test results directory.
     self.test_name = inspect.stack()[1][3]
-    self.all_results_directory = os.path.join(self.all_results_root,
-                                              self.test_name)
-    self.fail_results_directory = os.path.join(self.fail_results_root,
-                                               self.test_name)
+    self.results_directory = os.path.join(self.test_results_root,
+                                          self.test_name)
     self.results_count = 0
 
   def GetNextResultsPath(self, label):
-    """Returns a tuple results directories to use for this label.
+    """Returns a path for the results directory for this label.
 
     Prefixes directory returned for worker with time called i.e. 1_label,
     2_label, etc.  The directory returned is outside the chroot so if passing
     to an script that is called with enther_chroot, make sure to use
-    ReinterpretPathForChroot. The first dir returned is the one where results
-    should be stored. The second is one where failed test results should be
-    stored. Only the former is created as the latter should only be created if
-    the test fails.
+    ReinterpretPathForChroot.
 
     Args:
       label: The label used to describe this test phase.
@@ -289,14 +282,12 @@ class AUWorker(object):
       Returns a path for the results directory to use for this label.
     """
     self.results_count += 1
-    results_dir = os.path.join(self.all_results_directory, '%s_%s' % (
+    return_dir = os.path.join(self.results_directory, '%s_%s' % (
         self.results_count, label))
-    fail_dir = os.path.join(self.fail_results_directory, '%s_%s' % (
-        self.results_count, label))
-    if not os.path.exists(results_dir):
-      os.makedirs(results_dir)
+    if not os.path.exists(return_dir):
+      os.makedirs(return_dir)
 
-    return results_dir, fail_dir
+    return return_dir
 
   # --- PRIVATE HELPER FUNCTIONS ---
 

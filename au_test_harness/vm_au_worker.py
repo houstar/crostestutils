@@ -5,12 +5,10 @@
 """Module containing implementation of an au_worker for virtual machines."""
 
 import os
-import shutil
 
 import cros_build_lib as cros_lib
 
 from crostestutils.au_test_harness import au_worker
-from crostestutils.au_test_harness import update_exception
 
 
 class VMAUWorker(au_worker.AUWorker):
@@ -39,18 +37,10 @@ class VMAUWorker(au_worker.AUWorker):
     """Creates an update-able VM based on base image."""
     self.PrepareVMBase(image_path, signed_base)
 
-  @staticmethod
-  def _HandleFail(log_directory, fail_directory):
-    parent_dir = os.path.dirname(fail_directory)
-    if not os.path.isdir(parent_dir):
-      os.makedirs(parent_dir)
-
-    shutil.copytree(log_directory, fail_directory)
-
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port='', private_key_path=None):
     """Updates VM image with image_path."""
-    log_directory, fail_directory = self.GetNextResultsPath('update')
+    log_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
     if src_image_path and self._first_update:
       src_image_path = self.vm_image_path
@@ -70,16 +60,12 @@ class VMAUWorker(au_worker.AUWorker):
                            private_key_path)
     self.TestInfo(self.GetUpdateMessage(image_path, src_image_path, True,
                                         proxy_port))
-    try:
-      self.RunUpdateCmd(cmd, log_directory)
-    except update_exception.UpdateException:
-      self._HandleFail(log_directory, fail_directory)
-      raise
+    self.RunUpdateCmd(cmd, log_directory)
 
   def UpdateUsingPayload(self, update_path, stateful_change='old',
                          proxy_port=None):
     """Updates a vm image using cros_run_vm_update."""
-    log_directory, fail_directory = self.GetNextResultsPath('update')
+    log_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
     cmd = ['%s/cros_run_vm_update' % self.crosutilsbin,
            '--payload=%s' % update_path,
@@ -94,11 +80,7 @@ class VMAUWorker(au_worker.AUWorker):
           ]
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
     self.TestInfo(self.GetUpdateMessage(update_path, None, True, proxy_port))
-    try:
-      self.RunUpdateCmd(cmd, log_directory)
-    except update_exception.UpdateException:
-      self._HandleFail(log_directory, fail_directory)
-      raise
+    self.RunUpdateCmd(cmd, log_directory)
 
   def AppendUpdateFlags(self, cmd, image_path, src_image_path, proxy_port,
                         private_key_path, for_vm=False):
@@ -118,7 +100,7 @@ class VMAUWorker(au_worker.AUWorker):
 
     Returns True upon success.  Prints test output and returns False otherwise.
     """
-    log_directory, fail_directory = self.GetNextResultsPath('autotest_tests')
+    log_directory = self.GetNextResultsPath('verify')
     (_, _, log_directory_in_chroot) = log_directory.rpartition('chroot')
     # image_to_live already verifies lsb-release matching.  This is just
     # for additional steps.
@@ -144,7 +126,6 @@ class VMAUWorker(au_worker.AUWorker):
           redirect_stdout=True, redirect_stderr=True,
           cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
     except cros_lib.RunCommandException:
-      self._HandleFail(log_directory, fail_directory)
       return False
 
     # If the output contains warnings, print the output.
