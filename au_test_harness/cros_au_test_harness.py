@@ -12,6 +12,7 @@
   being run during the update process.
 """
 
+import functools
 import optparse
 import os
 import pickle
@@ -19,16 +20,18 @@ import sys
 import tempfile
 import unittest
 
-# TODO(sosa): Migrate to chromite cros_build_lib.
+# TODO(sosa): Migrate all of crostestutils to chromite cros_build_lib.
 import constants
 sys.path.append(constants.CROSUTILS_LIB_DIR)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
-import cros_build_lib as cros_lib
+sys.path.append(constants.SOURCE_ROOT)
 
+from chromite.lib import cros_build_lib
+from chromite.lib import parallel
+from chromite.lib import sudo
 from crostestutils.au_test_harness import au_test
 from crostestutils.au_test_harness import au_worker
 from crostestutils.lib import dev_server_wrapper
-from crostestutils.lib import parallel_test_job
 from crostestutils.lib import test_helper
 
 # File location for update cache in given folder.
@@ -48,11 +51,27 @@ class _LessBacktracingTestResult(unittest._TextTestResult):
 
 
 class _LessBacktracingTestRunner(unittest.TextTestRunner):
-  """TestRunner class that suppresses stacks for AssertionError."""
+  """TestRunner class that suppresses stacks for AssertionError.
+
+  This class also prints an error message and exits whenever a test fails,
+  and further throws a TimeoutException if a test takes longer than
+  MAX_TIMEOUT_SECONDS.
+  """
   def _makeResult(self):
     return _LessBacktracingTestResult(self.stream,
                                       self.descriptions,
                                       self.verbosity)
+
+  def run(self, *args, **kwargs):
+    """Run the requested test suite.
+
+    If the test suite fails, raise a BackgroundFailure.
+    """
+    with cros_build_lib.SubCommandTimeout(constants.MAX_TIMEOUT_SECONDS):
+      test_result = super(_LessBacktracingTestRunner, self).run(*args, **kwargs)
+      if test_result is None or not test_result.wasSuccessful():
+        msg = 'Test harness failed. See logs for details.'
+        raise parallel.BackgroundFailure(msg)
 
 
 def _ReadUpdateCache(target_image):
@@ -61,7 +80,7 @@ def _ReadUpdateCache(target_image):
   cache_file = os.path.join(path_to_dump, CACHE_FILE)
 
   if os.path.exists(cache_file):
-    cros_lib.Info('Loading update cache from ' + cache_file)
+    cros_build_lib.Info('Loading update cache from ' + cache_file)
     with open(cache_file) as file_handle:
       return pickle.load(file_handle)
 
@@ -79,24 +98,17 @@ def _PrepareTestSuite(options):
 def _RunTestsInParallel(options):
   """Runs the tests given by the options in parallel."""
   test_suite = _PrepareTestSuite(options)
-  threads = []
-  args = []
+  steps = []
   for test in test_suite:
     test_name = test.id()
     test_case = unittest.TestLoader().loadTestsFromName(test_name)
-    threads.append(_LessBacktracingTestRunner().run)
-    args.append(test_case)
+    steps.append(functools.partial(_LessBacktracingTestRunner().run, test_case))
 
-  cros_lib.Info('Running tests in test suite in parallel.')
-  results = parallel_test_job.RunParallelJobs(options.jobs, threads, args)
-  for test_result in results:
-    if test_result is None or not test_result.wasSuccessful():
-      # TODO(sosa): Fix max recursion depth warnings. http://crosbug.com/14274
-      cros_lib.Die(
-          'Test harness was not successful. See logs for details. '
-          'Note: Max recursion depth warnings are normal and occur regardless '
-          'of success or failure. Scroll up past the warnings to see the '
-          'actual failures.')
+  cros_build_lib.Info('Running tests in test suite in parallel.')
+  try:
+    parallel.RunParallelSteps(steps, max_parallel=options.jobs)
+  except parallel.BackgroundFailure as ex:
+    cros_build_lib.Die(ex)
 
 
 def CheckOptions(parser, options, leftover_args):
@@ -115,7 +127,7 @@ def CheckOptions(parser, options, leftover_args):
     parser.error('Testing requires a valid target image.')
 
   if not options.base_image:
-    cros_lib.Info('Base image not specified.  Using target as base image.')
+    cros_build_lib.Info('No base image supplied.  Using target as base image.')
     options.base_image = options.target_image
 
   if not os.path.isfile(options.base_image):
@@ -132,11 +144,13 @@ def CheckOptions(parser, options, leftover_args):
       os.makedirs(options.test_results_root)
 
   else:
+    chroot_tmp = os.path.join(constants.SOURCE_ROOT, 'chroot', 'tmp')
     options.test_results_root = tempfile.mkdtemp(
-        prefix='au_test_harness', dir=cros_lib.PrependChrootPath('/tmp'))
+        prefix='au_test_harness', dir=chroot_tmp)
 
 
 def main():
+  test_helper.SetupCommonLoggingFormat()
   parser = optparse.OptionParser()
   parser.add_option('-b', '--base_image',
                     help='path to the base image.')
@@ -178,8 +192,9 @@ def main():
   # Generate cache of updates to use during test harness.
   update_cache = _ReadUpdateCache(options.target_image)
   if not update_cache:
-    cros_lib.Info('No update cache found. Update testing will not work.  Run'
-                  ' cros_generate_update_payloads if this was not intended.')
+    msg = ('No update cache found. Update testing will not work.  Run '
+           ' cros_generate_update_payloads if this was not intended.')
+    cros_build_lib.Info(msg)
 
   # Create download folder for payloads for testing.
   download_folder = os.path.join(os.path.realpath(os.path.curdir),
@@ -187,22 +202,24 @@ def main():
   if not os.path.exists(download_folder):
     os.makedirs(download_folder)
 
-  au_worker.AUWorker.SetUpdateCache(update_cache)
-  my_server = dev_server_wrapper.DevServerWrapper(options.test_results_root)
-  my_server.start()
-  try:
-    my_server.WaitUntilStarted()
-    if options.type == 'vm':
-      _RunTestsInParallel(options)
-    else:
-      # TODO(sosa) - Take in a machine pool for a real test.
-      # Can't run in parallel with only one remote device.
-      test_suite = _PrepareTestSuite(options)
-      test_result = unittest.TextTestRunner().run(test_suite)
-      if not test_result.wasSuccessful(): cros_lib.Die('Test harness failed.')
+  with sudo.SudoKeepAlive():
+    au_worker.AUWorker.SetUpdateCache(update_cache)
+    my_server = dev_server_wrapper.DevServerWrapper(options.test_results_root)
+    my_server.start()
+    try:
+      my_server.WaitUntilStarted()
+      if options.type == 'vm':
+        _RunTestsInParallel(options)
+      else:
+        # TODO(sosa) - Take in a machine pool for a real test.
+        # Can't run in parallel with only one remote device.
+        test_suite = _PrepareTestSuite(options)
+        test_result = unittest.TextTestRunner().run(test_suite)
+        if not test_result.wasSuccessful():
+          cros_build_lib.Die('Test harness failed.')
 
-  finally:
-    my_server.Stop()
+    finally:
+      my_server.Stop()
 
 
 if __name__ == '__main__':

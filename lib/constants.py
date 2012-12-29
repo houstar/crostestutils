@@ -12,3 +12,5 @@ SOURCE_ROOT = os.path.join(
     os.path.dirname(_TEST_LIB_PATH), '..', '..', '..', '..')
 
 CROSUTILS_LIB_DIR = os.path.join(SOURCE_ROOT, 'src/scripts/lib')
+
+MAX_TIMEOUT_SECONDS = 2400

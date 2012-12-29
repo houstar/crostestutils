@@ -17,6 +17,7 @@ payloads for testing in virtual machines.
 FOR USE OUTSIDE CHROOT ONLY.
 """
 
+import functools
 import logging
 import optparse
 import os
@@ -30,13 +31,17 @@ import constants
 sys.path.append(constants.CROSUTILS_LIB_DIR)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
-import cros_build_lib as cros_lib
+
+from chromite.lib import cros_build_lib
+from chromite.lib import git
 from chromite.lib import locking
+from chromite.lib import osutils
+from chromite.lib import parallel
+from chromite.lib import sudo
 from crostestutils.au_test_harness import cros_au_test_harness
 from crostestutils.generate_test_payloads import payload_generation_exception
 from crostestutils.lib import dev_server_wrapper
 from crostestutils.lib import image_extractor
-from crostestutils.lib import parallel_test_job
 from crostestutils.lib import public_key_manager
 from crostestutils.lib import test_helper
 
@@ -225,12 +230,12 @@ class UpdatePayloadGenerator(object):
 
       in_chroot_key = None
       in_chroot_base = None
-      in_chroot_target = cros_lib.ReinterpretPathForChroot(payload.target)
+      in_chroot_target = git.ReinterpretPathForChroot(payload.target)
       if payload.base:
-        in_chroot_base = cros_lib.ReinterpretPathForChroot(payload.base)
+        in_chroot_base = git.ReinterpretPathForChroot(payload.base)
 
       if payload.key:
-        in_chroot_key = cros_lib.ReinterpretPathForChroot(payload.key)
+        in_chroot_key = git.ReinterpretPathForChroot(payload.key)
 
       command.append('--image=%s' % in_chroot_target)
       if payload.base: command.append('--src_image=%s' % in_chroot_base)
@@ -252,39 +257,36 @@ class UpdatePayloadGenerator(object):
         debug_message = 'Generating an unsigned %s' % debug_message
 
       logging.info(debug_message)
-      return cros_lib.RunCommand(command, enter_chroot=True, print_cmd=False,
-                                 cwd=cros_lib.GetCrosUtilsPath(),
-                                 log_to_file=log_file, error_ok=True,
-                                 exit_code=True)
+      try:
+        with cros_build_lib.SubCommandTimeout(constants.MAX_TIMEOUT_SECONDS):
+          cros_build_lib.RunCommand(command, log_stdout_to_file=log_file,
+                                    combine_stdout_stderr=True,
+                                    enter_chroot=True, print_cmd=False,
+                                    cwd=constants.SOURCE_ROOT)
+      except (cros_build_lib.TimeoutError, cros_build_lib.RunCommandError):
+        # Print output first, then re-raise the exception.
+        if os.path.isfile(log_file):
+          logging.error(osutils.ReadFile(log_file))
+        raise
 
-    def ProcessOutput(log_files, return_codes):
+    def ProcessOutput(log_files):
       """Processes results from the log files of GeneratePayload invocations.
 
       Args:
         log_files:  A list of filename strings with stored logs.
-        return_codes: An equally sized list of return codes pertaining to
-          the processes that ran that generated those logs.
       Returns:
         An array of cache entries from the log files.
       Raises:
-        payload_generation_exception.PayloadGenerationException: Returns this
-          exception if the devserver returned an error code when producing
-          an update payload OR we failed to parse the devserver output to find
-          the location of the update path.
+        payload_generation_exception.PayloadGenerationException: Raises this
+          exception if we failed to parse the devserver output to find the
+          location of the update path.
       """
       # Looking for this line in the output.
       key_line_re = re.compile('^PREGENERATED_UPDATE=([\w/./+]+)')
       return_array = []
-      for log_file, return_code in zip(log_files, return_codes):
-        with open(log_file) as log_file_handle:
-          output = log_file_handle.read()
-
-        if return_code != 0:
-          logging.error(output)
-          raise payload_generation_exception.PayloadGenerationException(
-              'Failed to generate a required update.')
-        else:
-          for line in output.splitlines():
+      for log_file in log_files:
+        with open(log_file) as f:
+          for line in f:
             match = key_line_re.search(line)
             if match:
               # Convert cache/label/update.gz -> update/cache/label.
@@ -292,7 +294,7 @@ class UpdatePayloadGenerator(object):
               path_to_update_dir = path_to_update_gz.rpartition(
                   '/update.gz')[0]
 
-              # Check that we could actually parse the directory correctly.000
+              # Check that we could actually parse the directory correctly.
               if not path_to_update_dir:
                 raise payload_generation_exception.PayloadGenerationException(
                     'Payload generated but failed to parse cache directory.')
@@ -301,35 +303,38 @@ class UpdatePayloadGenerator(object):
               break
           else:
             logging.error('Could not find PREGENERATED_UPDATE in log:')
-            for line in output.splitlines():
+            f.seek(0)
+            for line in f:
               logging.error('  log: %s', line)
-            # this is not a recoverable error
+            # This is not a recoverable error.
             raise InvalidDevserverOutput('Could not parse devserver log')
 
       return return_array
 
-    payloads = []
     jobs = []
-    args = []
     log_files = []
     # Generate list of paylods and list of log files.
     for payload in self.payloads:
       fd, log_file = tempfile.mkstemp('GenerateVMUpdate')
       os.close(fd)  # Just want filename so close file immediately.
 
-      payloads.append(payload)
-      jobs.append(GeneratePayload)
-      args.append((payload, log_file))
+      jobs.append(functools.partial(GeneratePayload, payload, log_file))
       log_files.append(log_file)
 
     # Run update generation code and wait for output.
     logging.info('Generating updates required for this test suite in parallel.')
-    error_codes = parallel_test_job.RunParallelJobs(self.jobs, jobs, args)
-    results = ProcessOutput(log_files, error_codes)
+    try:
+      parallel.RunParallelSteps(jobs, max_parallel=self.jobs)
+    except parallel.BackgroundFailure as ex:
+      logging.error(ex)
+      raise payload_generation_exception.PayloadGenerationException(
+          'Failed to generate a required update.')
+
+    results = ProcessOutput(log_files)
 
     # Build the dictionary from our id's and returned cache paths.
     cache_dictionary = {}
-    for index, payload in enumerate(payloads):
+    for index, payload in enumerate(self.payloads):
       # Path return is of the form update/cache/directory.
       update_path = results[index]
       cache_dictionary[payload.UpdateId()] = update_path
@@ -472,11 +477,12 @@ def main():
   lock_path = os.path.join(os.path.dirname(__file__), '.lock_file')
   with locking.FileLock(lock_path, 'generate payloads lock') as lock:
     lock.write_lock()
-    generator = UpdatePayloadGenerator(options)
-    generator.GenerateImagesForTesting()
-    generator.GeneratePayloadRequirements()
-    cache = generator.GeneratePayloads()
-    generator.DumpCacheToDisk(cache)
+    with sudo.SudoKeepAlive():
+      generator = UpdatePayloadGenerator(options)
+      generator.GenerateImagesForTesting()
+      generator.GeneratePayloadRequirements()
+      cache = generator.GeneratePayloads()
+      generator.DumpCacheToDisk(cache)
 
 
 if __name__ == '__main__':
