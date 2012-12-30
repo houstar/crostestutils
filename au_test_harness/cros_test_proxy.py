@@ -20,7 +20,6 @@ class Filter(object):
 
   def setup(self):
     """This setup method is called once per connection."""
-    pass
 
   def InBound(self, data):
     """This method is called once per packet of incoming data.

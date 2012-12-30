@@ -45,7 +45,6 @@ class LocalDashException(StandardError):
 
 class ConfigException(LocalDashException):
   """Raised when issues with local config file."""
-  pass
 
 
 def simple_system_output(cmd):

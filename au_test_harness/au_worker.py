@@ -12,8 +12,7 @@ various types of target.  Types of targets include VM's, real devices, etc.
 import inspect
 import os
 
-import cros_build_lib as cros_lib
-
+from chromite.lib import cros_build_lib
 from crostestutils.au_test_harness import update_exception
 from crostestutils.lib import dev_server_wrapper
 
@@ -38,13 +37,8 @@ class AUWorker(object):
     else:
       self.verify_suite = 'suite:smoke'
 
-    # Set these up as they are used often.
-    self.crosutils = cros_lib.GetCrosUtilsPath()
-    self.crosutilsbin = cros_lib.GetCrosUtilsBinPath()
-
   def CleanUp(self):
     """Called at the end of every test."""
-    pass
 
   def GetUpdateMessage(self, update_target, update_base, from_vm, proxy):
     """Returns the update message that should be printed out for this update."""
@@ -68,7 +62,6 @@ class AUWorker(object):
       image_path: The image that should reside on the target before the test.
       signed_base: If True, use the signed image rather than the actual image.
     """
-    pass
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port=None, private_key_path=None):
@@ -80,7 +73,6 @@ class AUWorker(object):
     Args:
       See PerformUpdate for description of args.
     """
-    pass
 
   def UpdateUsingPayload(self, update_path, stateful_change='old',
                          proxy_port=None):
@@ -96,7 +88,6 @@ class AUWorker(object):
       proxy_port:  Port to have the client connect to. For use with
         CrosTestProxy.
     """
-    pass
 
   def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
     """Verifies the image with tests.
@@ -114,7 +105,6 @@ class AUWorker(object):
     Returns:
       Returns the percent that passed.
     """
-    pass
 
   # --- INTERFACE TO AU_TEST ---
 
@@ -209,22 +199,15 @@ class AUWorker(object):
       cmd:  The shell cmd to run.
       log_directory:  Where to store the logs for this cmd.
     """
-    if self.verbose:
-      try:
-        if log_directory:
-          cros_lib.RunCommand(
-              cmd, log_to_file=os.path.join(log_directory, 'update.log'),
-              print_cmd=False)
-        else:
-          cros_lib.RunCommand(cmd, print_cmd=False)
-      except cros_lib.RunCommandException as e:
-        raise update_exception.UpdateException(1, str(e))
-    else:
-      (code, stdout, unused_stderr) = cros_lib.RunCommandCaptureOutput(
-          cmd, print_cmd=False)
-      if code != 0:
-        cros_lib.Warning(stdout)
-        raise update_exception.UpdateException(code, 'Update cmd failed')
+    kwds = dict(print_cmd=False, combine_stdout_stderr=True, error_code_ok=True)
+    if not self.verbose:
+      kwds['redirect_stdout'] = kwds['redirect_stderr'] = True
+    if log_directory:
+      kwds['log_stdout_to_file'] = os.path.join(log_directory, 'update.log')
+    result = cros_build_lib.RunCommand(cmd, **kwds)
+    if result.returncode != 0:
+      cros_build_lib.Warning(result.output)
+      raise update_exception.UpdateException(result.returncode, 'Update failed')
 
   def AssertEnoughTestsPassed(self, unittest, output, percent_required_to_pass):
     """Helper function that asserts a sufficient number of tests passed.
@@ -248,7 +231,7 @@ class AUWorker(object):
     return percent_passed
 
   def TestInfo(self, message):
-    cros_lib.Info('%s: %s' % (self.test_name, message))
+    cros_build_lib.Info('%s: %s', self.test_name, message)
 
   def Initialize(self, port):
     """Initializes test specific variables for each test.

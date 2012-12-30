@@ -20,7 +20,6 @@ import sys
 import tempfile
 import unittest
 
-# TODO(sosa): Migrate all of crostestutils to chromite cros_build_lib.
 import constants
 sys.path.append(constants.CROSUTILS_LIB_DIR)
 sys.path.append(constants.CROS_PLATFORM_ROOT)

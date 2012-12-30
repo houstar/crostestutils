@@ -16,14 +16,13 @@ sys.path.append(constants.CROSUTILS_LIB_DIR)
 sys.path.append(constants.SOURCE_ROOT)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
 
-import chromite.lib.cros_build_lib as chromite_build_lib
+from chromite.lib import cros_build_lib
 from crostestutils.lib import image_extractor
 from crostestutils.lib import test_helper
 
 
 class TestException(Exception):
   """Thrown by RunAUTestHarness if there's a test failure."""
-  pass
 
 
 class CTest(object):
@@ -83,7 +82,7 @@ class CTest(object):
     # Just output to local directory.
     public_key_path = 'public_key.pem'
     logging.info('Generating public key from private key.')
-    chromite_build_lib.RunCommand(
+    cros_build_lib.RunCommand(
         ['openssl', 'rsa', '-in', self.private_key, '-pubout',
          '-out', public_key_path], print_cmd=False)
     self.public_key = public_key_path
@@ -92,7 +91,7 @@ class CTest(object):
     """Initializes the target and base images for CTest."""
     if not self.target:
       # Grab the latest image we've built.
-      return_object = chromite_build_lib.RunCommand(
+      return_object = cros_build_lib.RunCommand(
           ['./get_latest_image.sh', '--board=%s' % self.board],
           cwd=self.crosutils_root, redirect_stdout=True, print_cmd=False)
 
@@ -143,8 +142,8 @@ class CTest(object):
 
     if self.type != 'vm': cmd.append('--novm')
     try:
-      chromite_build_lib.RunCommand(cmd, cwd=self.crosutils_root)
-    except chromite_build_lib.RunCommandError:
+      cros_build_lib.RunCommand(cmd, cwd=self.crosutils_root)
+    except cros_build_lib.RunCommandError:
       logging.error('We failed to generate all the update payloads required '
                     'for testing. Please see the logs for more info. We print '
                     'out the log from a failing call to '
@@ -191,8 +190,8 @@ class CTest(object):
     if full and self.sign_payloads:
       cmd.append('--private_key=%s' % self.private_key)
 
-    res = chromite_build_lib.RunCommand(cmd, cwd=self.crosutils_root,
-                                        error_ok=True)
+    res = cros_build_lib.RunCommand(cmd, cwd=self.crosutils_root,
+                                    error_code_ok=True)
     if res.returncode != 0:
       raise TestException('%s exited with code %d: %s' % (' '.join(res.cmd),
                                                           res.returncode,
@@ -258,7 +257,7 @@ def main():
     ctest.RunAUTestHarness(options.full_suite, options.only_verify)
   except TestException as e:
     if options.verbose:
-      chromite_build_lib.Die(str(e))
+      cros_build_lib.Die(str(e))
 
     sys.exit(1)
 

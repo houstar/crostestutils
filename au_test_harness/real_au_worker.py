@@ -4,8 +4,8 @@
 
 """Module containing class that implements an au_worker for a test device."""
 
-import cros_build_lib as cros_lib
-
+import constants
+from chromite.lib import cros_build_lib
 from crostestutils.au_test_harness import au_worker
 
 
@@ -16,7 +16,8 @@ class RealAUWorker(au_worker.AUWorker):
     """Processes non-vm-specific options."""
     super(RealAUWorker, self).__init__(options, test_results_root)
     self.remote = options.remote
-    if not self.remote: cros_lib.Die('We require a remote address for tests.')
+    if not self.remote:
+      cros_build_lib.Die('We require a remote address for tests.')
 
   def PrepareBase(self, image_path, signed_base=False):
     """Auto-update to base image to prepare for test."""
@@ -26,7 +27,7 @@ class RealAUWorker(au_worker.AUWorker):
                   proxy_port=None, private_key_path=None):
     """Updates a remote image using image_to_live.sh."""
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
-    cmd = ['%s/image_to_live.sh' % self.crosutils,
+    cmd = ['%s/image_to_live.sh' % constants.CROSUTILS_DIR,
            '--remote=%s' % self.remote,
            stateful_change_flag,
            '--verify',
@@ -39,7 +40,7 @@ class RealAUWorker(au_worker.AUWorker):
                          proxy_port=None):
     """Updates a remote image using image_to_live.sh."""
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
-    cmd = ['%s/image_to_live.sh' % self.crosutils,
+    cmd = ['%s/image_to_live.sh' % constants.CROSUTILS_DIR,
            '--payload=%s' % update_path,
            '--remote=%s' % self.remote,
            stateful_change_flag,
@@ -53,13 +54,13 @@ class RealAUWorker(au_worker.AUWorker):
     test_directory = self.GetNextResultsPath('verify')
     if not test: test = self.verify_suite
 
-    output = cros_lib.RunCommand(
+    result = cros_build_lib.RunCommand(
         ['run_remote_tests.sh',
          '--remote=%s' % self.remote,
          '--results_dir_root=%s' % test_directory,
          test,
-        ], error_ok=True, enter_chroot=True, redirect_stdout=True,
-        cwd=self.crosutils)
-    return self.AssertEnoughTestsPassed(unittest, output,
+        ], error_code_ok=True, enter_chroot=True, redirect_stdout=True,
+        cwd=constants.CROSUTILS_DIR)
+    return self.AssertEnoughTestsPassed(unittest, result.output,
                                         percent_required_to_pass)
 

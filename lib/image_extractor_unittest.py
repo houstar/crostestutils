@@ -16,7 +16,7 @@ import unittest
 
 import constants
 sys.path.append(constants.SOURCE_ROOT)
-import chromite.lib.cros_build_lib as chromite_build_lib
+from chromite.lib import cros_build_lib
 
 import image_extractor
 
@@ -107,7 +107,7 @@ class ImageExtractorTest(mox.MoxTestBase):
     """
     self.CreateFakeArchiveDir(11)
     os.makedirs(os.path.join(self.archive_dir, 'R16-158.0.9-a1-b123'))
-    logging.error(mox.StrContains('R16-158.0.10-a1'))
+    logging.error(mox.IgnoreArg(), 'R16-158.0.10-a1')
     self.mox.ReplayAll()
     latest_image = self.test_extractor.GetLatestImage('R16-158.0.9-a1')
     self.assertEqual(os.path.basename(latest_image), 'R16-158.0.8-a1')
@@ -121,8 +121,8 @@ class ImageExtractorTest(mox.MoxTestBase):
     archived_image_dir = os.path.join(self.archive_dir, 'R16-158.0.1-a1')
     ImageExtractorTest._TouchImageZip(archived_image_dir)
 
-    self.mox.StubOutWithMock(chromite_build_lib, 'RunCommand')
-    chromite_build_lib.RunCommand(mox.In('unzip'), print_cmd=False)
+    self.mox.StubOutWithMock(cros_build_lib, 'RunCommand')
+    cros_build_lib.RunCommand(mox.In('unzip'), print_cmd=False)
 
     self.mox.ReplayAll()
     self.test_extractor.UnzipImage(archived_image_dir)
@@ -136,8 +136,8 @@ class ImageExtractorTest(mox.MoxTestBase):
     archived_image_dir = os.path.join(self.archive_dir, 'R16-158.0.1-a1')
     ImageExtractorTest._TouchImageZip(archived_image_dir)
 
-    self.mox.StubOutWithMock(chromite_build_lib, 'RunCommand')
-    chromite_build_lib.RunCommand(mox.In('unzip'), print_cmd=False)
+    self.mox.StubOutWithMock(cros_build_lib, 'RunCommand')
+    cros_build_lib.RunCommand(mox.In('unzip'), print_cmd=False)
 
     self.mox.ReplayAll()
     self.test_extractor.UnzipImage(archived_image_dir)

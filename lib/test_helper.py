@@ -9,15 +9,16 @@ import logging
 import multiprocessing
 import os
 
-import cros_build_lib
+import constants
+from chromite.lib import cros_build_lib
+from chromite.lib import git
 
 
 def _GetTotalMemoryGB():
   """Calculate total memory on this machine, in gigabytes."""
-  exitcode, output, _ = cros_build_lib.RunCommandCaptureOutput(
-      ['free', '-g'], print_cmd=False)
-  assert exitcode == 0
-  for line in output.splitlines():
+  res = cros_build_lib.RunCommandCaptureOutput(['free', '-g'], print_cmd=False)
+  assert res.returncode == 0
+  for line in res.output.splitlines():
     if line.startswith('Mem:'):
       return int(line.split()[1])
   raise Exception('Could not calculate total memory')
@@ -54,11 +55,10 @@ def CreateVMImage(image, board):
     cros_build_lib.RunCommand(
         ['./image_to_vm.sh',
          '--full',
-         '--from=%s' % cros_build_lib.ReinterpretPathForChroot(
-             os.path.dirname(image)),
+         '--from=%s' % git.ReinterpretPathForChroot(os.path.dirname(image)),
          '--board=%s' % board,
          '--test_image'
-         ], enter_chroot=True, cwd=cros_build_lib.GetCrosUtilsPath())
+        ], enter_chroot=True, cwd=constants.SOURCE_ROOT)
 
   assert os.path.exists(vm_image_path), 'Failed to create the VM image.'
   return vm_image_path

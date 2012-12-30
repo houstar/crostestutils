@@ -14,10 +14,10 @@ import unittest
 import constants
 sys.path.append(constants.SOURCE_ROOT)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
-import chromite.lib.cros_build_lib as chromite_build_lib
 
-import ctest
+from chromite.lib import cros_build_lib
 from crostestutils.lib import image_extractor
+import ctest
 
 
 class CTestTest(mox.MoxTestBase):
@@ -86,16 +86,16 @@ class CTestTest(mox.MoxTestBase):
     correctly.  This means target should be inferred and base should be set to
     target.
     """
-    self.mox.StubOutWithMock(chromite_build_lib, 'RunCommand')
+    self.mox.StubOutWithMock(cros_build_lib, 'RunCommand')
     self.mox.StubOutWithMock(ctest.CTest, '__init__')
     self.mox.StubOutWithMock(image_extractor.ImageExtractor, 'GetLatestImage')
-    fake_result = self.mox.CreateMock(chromite_build_lib.CommandResult)
+    fake_result = self.mox.CreateMock(cros_build_lib.CommandResult)
     fake_result.output = '/some/path_to/latest_version'
 
     fake_crosutils = os.path.join(self.FAKE_ROOT, 'src', 'scripts')
 
     ctest.CTest.__init__()
-    chromite_build_lib.RunCommand(
+    cros_build_lib.RunCommand(
         mox.In('./get_latest_image.sh'), cwd=fake_crosutils, print_cmd=False,
         redirect_stdout=True).AndReturn(fake_result)
     image_extractor.ImageExtractor.GetLatestImage('latest_version').AndReturn(

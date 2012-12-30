@@ -48,7 +48,6 @@ from crostestutils.lib import test_helper
 
 class InvalidDevserverOutput(Exception):
   """If we are unable to parse devserver output, this is raised."""
-  pass
 
 
 class UpdatePayload(object):
@@ -226,10 +225,9 @@ class UpdatePayloadGenerator(object):
     def GeneratePayload(payload, log_file):
       """Returns the error code from generating an update with the devserver."""
       # Base command.
-      command = ['sudo', 'start_devserver', '--pregenerate_update', '--exit']
+      command = ['start_devserver', '--pregenerate_update', '--exit']
 
-      in_chroot_key = None
-      in_chroot_base = None
+      in_chroot_key = in_chroot_base = None
       in_chroot_target = git.ReinterpretPathForChroot(payload.target)
       if payload.base:
         in_chroot_base = git.ReinterpretPathForChroot(payload.base)
@@ -259,10 +257,10 @@ class UpdatePayloadGenerator(object):
       logging.info(debug_message)
       try:
         with cros_build_lib.SubCommandTimeout(constants.MAX_TIMEOUT_SECONDS):
-          cros_build_lib.RunCommand(command, log_stdout_to_file=log_file,
-                                    combine_stdout_stderr=True,
-                                    enter_chroot=True, print_cmd=False,
-                                    cwd=constants.SOURCE_ROOT)
+          cros_build_lib.SudoRunCommand(command, log_stdout_to_file=log_file,
+                                        combine_stdout_stderr=True,
+                                        enter_chroot=True, print_cmd=False,
+                                        cwd=constants.SOURCE_ROOT)
       except (cros_build_lib.TimeoutError, cros_build_lib.RunCommandError):
         # Print output first, then re-raise the exception.
         if os.path.isfile(log_file):

@@ -7,14 +7,34 @@
 
 import os
 import threading
+import re
 import sys
 import time
 
-import cros_build_lib as cros_lib
+import constants
+from chromite.lib import cros_build_lib
 
 # Wait up to 15 minutes for the dev server to start. It can take a while to
 # start when generating payloads in parallel.
 DEV_SERVER_TIMEOUT = 900
+
+
+def GetIPAddress(device='eth0'):
+  """Returns the IP Address for a given device using ifconfig.
+
+  socket.gethostname() is insufficient for machines where the host files are
+  not set up "correctly."  Since some of our builders may have this issue,
+  this method gives you a generic way to get the address so you are reachable
+  either via a VM or remote machine on the same network.
+  """
+  result = cros_build_lib.RunCommandCaptureOutput(
+      ['/sbin/ifconfig', device], print_cmd=False)
+  match = re.search('.*inet addr:(\d+\.\d+\.\d+\.\d+).*', result.output)
+  if match:
+    return match.group(1)
+  cros_build_lib.Warning('Failed to find ip address in %r', result.output)
+  return None
+
 
 def GenerateUpdateId(target, src, key, for_vm):
   """Returns a simple representation id of target and src paths."""
@@ -27,7 +47,6 @@ def GenerateUpdateId(target, src, key, for_vm):
 
 class DevServerException(Exception):
   """Thrown when the devserver fails to start up correctly."""
-  pass
 
 
 class DevServerWrapper(threading.Thread):
@@ -41,61 +60,52 @@ class DevServerWrapper(threading.Thread):
 
   def run(self):
     # Kill previous running instance of devserver if it exists.
-    cros_lib.RunCommand(['sudo', 'pkill', '-f', 'devserver.py'], error_ok=True,
-                        print_cmd=False)
-    cros_lib.RunCommand(['sudo',
-                         'start_devserver',
-                         '--archive_dir=./static',
-                         '--production',
-                         ], enter_chroot=True, print_cmd=False,
-                         log_to_file=self._log_filename,
-                         cwd=cros_lib.GetCrosUtilsPath())
+    self.Stop()
+    cmd = ['start_devserver', '--archive_dir=./static', '--production']
+    cros_build_lib.SudoRunCommand(cmd, enter_chroot=True, print_cmd=False,
+                                  log_stdout_to_file=self._log_filename,
+                                  combine_stdout_stderr=True,
+                                  cwd=constants.SOURCE_ROOT)
 
   def Stop(self):
-    """Kills the devserver instance."""
-    cros_lib.RunCommand(['sudo', 'pkill', '-f', 'devserver.py'], error_ok=True,
-                        print_cmd=False)
+    """Kills the devserver instance if it exists."""
+    cros_build_lib.SudoRunCommand(['pkill', '-f', 'devserver.py'],
+                                  error_code_ok=True, print_cmd=False)
 
   def PrintLog(self):
     """Print devserver output."""
-    # Open in update mode in case the child process hasn't opened the file yet.
-    log = open(self._log_filename, 'w+')
     print '--- Start output from %s ---' % self._log_filename
-    for line in log:
-      sys.stdout.write(line)
+    # Open in update mode in case the child process hasn't opened the file yet.
+    with open(self._log_filename, 'w+') as log:
+      sys.stdout.writelines(log)
     print '--- End output from %s ---' % self._log_filename
-    log.close()
 
   def WaitUntilStarted(self):
     """Wait until the devserver has started."""
     # Open in update mode in case the child process hasn't opened the file yet.
-    log = open(self._log_filename, 'w+')
     pos = 0
-    for _ in range(DEV_SERVER_TIMEOUT * 2):
-      log.seek(pos)
-      for line in log:
-        # When the dev server has started, it will print a line stating
-        # 'Bus STARTED'. Wait for that line to appear.
-        if 'Bus STARTED' in line:
-          log.close()
-          return
-        # If we've read a complete line, and it doesn't contain the magic
-        # phrase, move on to the next line.
-        if line.endswith('\n'):
-          pos = log.tell()
-      # Looks like it hasn't started yet. Keep waiting...
-      time.sleep(0.5)
-    else:
-      log.close()
-      self.PrintLog()
-      raise DevServerException('Timeout waiting for the devserver to startup.')
+    with open(self._log_filename, 'w+') as log:
+      for _ in range(DEV_SERVER_TIMEOUT * 2):
+        log.seek(pos)
+        for line in log:
+          # When the dev server has started, it will print a line stating
+          # 'Bus STARTED'. Wait for that line to appear.
+          if 'Bus STARTED' in line:
+            return
+          # If we've read a complete line, and it doesn't contain the magic
+          # phrase, move on to the next line.
+          if line.endswith('\n'):
+            pos = log.tell()
+        # Looks like it hasn't started yet. Keep waiting...
+        time.sleep(0.5)
+    self.PrintLog()
+    raise DevServerException('Timeout waiting for the devserver to startup.')
 
   @classmethod
   def GetDevServerURL(cls, port, sub_dir):
     """Returns the dev server url for a given port and sub directory."""
-    ip_addr = cros_lib.GetIPAddress()
     if not port: port = 8080
-    url = 'http://%(ip)s:%(port)s/%(dir)s' % {'ip': ip_addr,
+    url = 'http://%(ip)s:%(port)s/%(dir)s' % {'ip': GetIPAddress(),
                                               'port': str(port),
                                               'dir': sub_dir}
     return url
@@ -103,9 +113,8 @@ class DevServerWrapper(threading.Thread):
   @classmethod
   def WipePayloadCache(cls):
     """Cleans up devserver cache of payloads."""
-    cros_lib.Info('Cleaning up previously generated payloads.')
-    cros_lib.RunCommandCaptureOutput(
-        ['sudo', 'start_devserver', '--clear_cache', '--exit'],
-        enter_chroot=True, print_cmd=False, combine_stdout_stderr=True,
-        cwd=cros_lib.GetCrosUtilsPath())
-
+    cros_build_lib.Info('Cleaning up previously generated payloads.')
+    cmd = ['start_devserver', '--clear_cache', '--exit']
+    cros_build_lib.SudoRunCommand(
+        cmd, enter_chroot=True, print_cmd=False, combine_stdout_stderr=True,
+        redirect_stdout=True, redirect_stderr=True, cwd=constants.SOURCE_ROOT)

@@ -10,8 +10,7 @@ import time
 import unittest
 import urllib
 
-import cros_build_lib as cros_lib
-
+from chromite.lib import cros_build_lib
 from crostestutils.au_test_harness import cros_test_proxy
 from crostestutils.au_test_harness import real_au_worker
 from crostestutils.au_test_harness import update_exception
@@ -53,9 +52,7 @@ class AUTest(unittest.TestCase):
       # Will raise ValueError if expected is not found.
       if re.search(re.escape(expected_msg), err.output, re.MULTILINE):
         return
-      else:
-        cros_lib.Warning("Didn't find '%s' in:" % expected_msg)
-        cros_lib.Warning(err.output)
+      cros_build_lib.Warning("Didn't find %r in:\n%s", expected_msg, err.output)
 
     self.fail('We managed to update when failure was expected')
 
@@ -174,7 +171,7 @@ class AUTest(unittest.TestCase):
                                 self.target_image_path + '.signed',
                                 private_key_path=self.private_key)
     else:
-      cros_lib.Info('No key found to use for signed testing.')
+      cros_build_lib.Info('No key found to use for signed testing.')
 
   def SimpleTestUpdateAndVerify(self):
     """Test that updates to itself.

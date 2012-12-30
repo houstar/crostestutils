@@ -10,7 +10,7 @@ import os
 import re
 import shutil
 
-import chromite.lib.cros_build_lib as chromite_build_lib
+from chromite.lib import cros_build_lib
 
 
 class ImageExtractor(object):
@@ -84,7 +84,7 @@ class ImageExtractor(object):
       os.makedirs(cached_dir)
       zip_path = os.path.join(image_dir, 'image.zip')
       logging.info('Unzipping image from %s to %s', zip_path, cached_dir)
-      chromite_build_lib.RunCommand(['unzip', '-d', cached_dir, zip_path],
-                                    print_cmd=False)
+      cros_build_lib.RunCommand(['unzip', '-d', cached_dir, zip_path],
+                                print_cmd=False)
 
     return cached_image

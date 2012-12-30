@@ -6,8 +6,8 @@
 
 import os
 
-import cros_build_lib as cros_lib
-
+import constants
+from chromite.lib import cros_build_lib
 from crostestutils.au_test_harness import au_worker
 
 
@@ -19,15 +19,16 @@ class VMAUWorker(au_worker.AUWorker):
     super(VMAUWorker, self).__init__(options, test_results_root)
     self.graphics_flag = ''
     if options.no_graphics: self.graphics_flag = '--no_graphics'
-    if not self.board: cros_lib.Die('Need board to convert base image to vm.')
+    if not self.board:
+      cros_build_lib.Die('Need board to convert base image to vm.')
     self.whitelist_chrome_crashes = options.whitelist_chrome_crashes
 
   def _KillExistingVM(self, pid_file):
     """Kills an existing VM specified by the pid_file."""
     if os.path.exists(pid_file):
-      cros_lib.RunCommand(['./cros_stop_vm', '--kvm_pid=%s' % pid_file],
-                          cwd=self.crosutilsbin, print_cmd=False,
-                          error_ok=True)
+      cmd = ['./bin/cros_stop_vm', '--kvm_pid=%s' % pid_file]
+      cros_build_lib.RunCommand(cmd, print_cmd=False, error_code_ok=True,
+                                cwd=constants.CROSUTILS_DIR)
 
   def CleanUp(self):
     """Stop the vm after a test."""
@@ -46,7 +47,7 @@ class VMAUWorker(au_worker.AUWorker):
       src_image_path = self.vm_image_path
       self._first_update = False
 
-    cmd = ['%s/cros_run_vm_update' % self.crosutilsbin,
+    cmd = ['%s/bin/cros_run_vm_update' % constants.CROSUTILS_DIR,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),
            '--snapshot',
@@ -67,7 +68,7 @@ class VMAUWorker(au_worker.AUWorker):
     """Updates a vm image using cros_run_vm_update."""
     log_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
-    cmd = ['%s/cros_run_vm_update' % self.crosutilsbin,
+    cmd = ['%s/bin/cros_run_vm_update' % constants.CROSUTILS_DIR,
            '--payload=%s' % update_path,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),
@@ -106,7 +107,7 @@ class VMAUWorker(au_worker.AUWorker):
     # for additional steps.
     if not test: test = self.verify_suite
 
-    command = ['./cros_run_vm_test',
+    command = ['./bin/cros_run_vm_test',
                '--image_path=%s' % self.vm_image_path,
                '--snapshot',
                '--persist',
@@ -120,16 +121,12 @@ class VMAUWorker(au_worker.AUWorker):
     if self.whitelist_chrome_crashes:
       command.append('--whitelist_chrome_crashes')
     self.TestInfo('Running smoke suite to verify image.')
-    try:
-      output = cros_lib.RunCommand(
-          command, enter_chroot=False,
-          redirect_stdout=True, redirect_stderr=True,
-          cwd=self.crosutilsbin, print_cmd=False, combine_stdout_stderr=True)
-    except cros_lib.RunCommandException:
-      return False
+    result = cros_build_lib.RunCommandCaptureOutput(
+        command, print_cmd=False, combine_stdout_stderr=True,
+        cwd=constants.CROSUTILS_DIR, error_code_ok=True)
 
-    # If the output contains warnings, print the output.
-    if '@@@STEP_WARNINGS@@@' in output:
-      print output
+    # If the command failed or printed warnings, print the output.
+    if result.returncode != 0 or '@@@STEP_WARNINGS@@@' in result.output:
+      print result.output
 
-    return True
+    return result.returncode == 0

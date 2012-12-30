@@ -8,9 +8,11 @@ _TEST_LIB_PATH = os.path.realpath(__file__)
 
 CROS_PLATFORM_ROOT = os.path.join(os.path.dirname(_TEST_LIB_PATH), '..', '..')
 
-SOURCE_ROOT = os.path.join(
-    os.path.dirname(_TEST_LIB_PATH), '..', '..', '..', '..')
+SOURCE_ROOT = os.path.realpath(os.path.join(
+    os.path.dirname(_TEST_LIB_PATH), '..', '..', '..', '..'))
 
-CROSUTILS_LIB_DIR = os.path.join(SOURCE_ROOT, 'src/scripts/lib')
+CROSUTILS_DIR = os.path.join(SOURCE_ROOT, 'src', 'scripts')
+
+CROSUTILS_LIB_DIR = os.path.join(CROSUTILS_DIR, 'lib')
 
 MAX_TIMEOUT_SECONDS = 2400

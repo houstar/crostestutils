@@ -7,4 +7,3 @@
 
 class PayloadGenerationException(Exception):
   """Exception thrown when we fail to create an update payload."""
-  pass
