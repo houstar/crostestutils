@@ -8,13 +8,9 @@
 import optparse
 import os
 import subprocess
-import sys
 import tempfile
 
-import constants
-sys.path.append(constants.CROSUTILS_LIB_DIR)
-from cros_build_lib import Die
-from cros_build_lib import Info
+from chromite.lib import cros_build_lib
 
 
 _DEFAULT_BASE_SSH_PORT = 9322
@@ -90,11 +86,11 @@ class ParallelTestRunner(object):
       if self._quiet:
         args.append('--verbose=0')  # generate less output
         output = open('/dev/null', mode='w')
-        Info('Log files are in %s' % results_dir)
+        cros_build_lib.Info('Log files are in %s', results_dir)
       elif self._order_output:
         output = tempfile.NamedTemporaryFile(prefix='parallel_vm_test_')
-        Info('Piping output to %s.' % output.name)
-      Info('Running %r...' % args)
+        cros_build_lib.Info('Piping output to %s.', output.name)
+      cros_build_lib.Info('Running %r...', args)
       proc = subprocess.Popen(args, stdout=output, stderr=output)
       test_info = { 'test': test,
                     'proc': proc,
@@ -122,18 +118,18 @@ class ParallelTestRunner(object):
       output = test_info['output']
       if output and not self._quiet:
         test = test_info['test']
-        Info('------ START %s:%s ------' % (test, output.name))
+        cros_build_lib.Info('------ START %s:%s ------', test, output.name)
         output.seek(0)
         for line in output:
           print line,
-        Info('------ END %s:%s ------' % (test, output.name))
+        cros_build_lib.Info('------ END %s:%s ------', test, output.name)
     return failed_tests
 
   def Run(self):
     """Runs the tests in |self._tests| on separate VMs in parallel."""
     spawned_tests = self._SpawnTests()
     failed_tests = self._WaitForCompletion(spawned_tests)
-    if failed_tests: Die('Tests failed: %r' % failed_tests)
+    if failed_tests: cros_build_lib.Die('Tests failed: %r', failed_tests)
 
 
 def main():
@@ -164,12 +160,12 @@ def main():
 
   if not args:
     parser.print_help()
-    Die('no tests provided')
+    cros_build_lib.Die('no tests provided')
 
   if options.quiet:
     options.order_output = False
     if not options.results_dir_root:
-      Die('--quiet requires --results_dir_root')
+      cros_build_lib.Die('--quiet requires --results_dir_root')
   runner = ParallelTestRunner(args, options.base_ssh_port, options.board,
                               options.image_path, options.order_output,
                               options.quiet, options.results_dir_root)

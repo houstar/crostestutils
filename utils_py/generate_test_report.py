@@ -18,9 +18,8 @@ import os
 import re
 import sys
 
-import constants
-sys.path.append(constants.CROSUTILS_LIB_DIR)
-from cros_build_lib import Color, Die, Warning
+from chromite.lib import cros_build_lib
+from chromite.lib import terminal
 
 _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 
@@ -362,7 +361,7 @@ class ReportGenerator(object):
   def __init__(self, options, args):
     self._options = options
     self._args = args
-    self._color = Color(options.color)
+    self._color = terminal.Color(options.color)
     self._results = []
 
   def _CollectAllResults(self):
@@ -379,11 +378,11 @@ class ReportGenerator(object):
                                 self._options.whitelist_chrome_crashes)
     for resdir in self._args:
       if not os.path.isdir(resdir):
-        Die('\'%s\' does not exist' % resdir)
+        cros_build_lib.Die('%r does not exist', resdir)
       self._results.extend(collector.RecursivelyCollectResults(resdir))
 
     if not self._results:
-      Die('no test directories found')
+      cros_build_lib.Die('no test directories found')
 
   def _GenStatusString(self, status):
     """Given a bool indicating success or failure, return the right string.
@@ -492,7 +491,7 @@ class ReportGenerator(object):
       else:
         key_entry = dict_key.ljust(width - self._KEYVAL_INDENT)
         key_entry = key_entry.rjust(width)
-      value_entry = self._color.Color(Color.BOLD, result_dict[dict_key])
+      value_entry = self._color.Color(self._color.BOLD, result_dict[dict_key])
       self._PrintEntries([test_entry, key_entry, value_entry])
 
   def _GetSortedTests(self):
@@ -537,10 +536,10 @@ class ReportGenerator(object):
 
       status_entry = self._GenStatusString(result['status'])
       if result['status']:
-        color = Color.GREEN
+        color = self._color.GREEN
         tests_pass += 1
       else:
-        color = Color.RED
+        color = self._color.RED
 
       test_entries = [test_entry, self._color.Color(color, status_entry)]
 
@@ -581,21 +580,22 @@ class ReportGenerator(object):
       total_tests = len(tests)
       percent_pass = 100 * tests_pass / total_tests
       pass_str = '%d/%d (%d%%)' % (tests_pass, total_tests, percent_pass)
-      print 'Total PASS: ' + self._color.Color(Color.BOLD, pass_str)
+      print 'Total PASS: ' + self._color.Color(self._color.BOLD, pass_str)
 
     if self._options.crash_detection:
       print ''
       if crashes:
-        print self._color.Color(Color.RED, 'Crashes detected during testing:')
+        print self._color.Color(self._color.RED,
+                                'Crashes detected during testing:')
         self._PrintDashLine(width)
 
         for crash_name, crashed_tests in sorted(crashes.iteritems()):
-          print self._color.Color(Color.RED, crash_name)
+          print self._color.Color(self._color.RED, crash_name)
           for crashed_test in crashed_tests:
             print self._Indent(crashed_test)
 
         self._PrintDashLine(width)
-        print 'Total unique crashes: ' + self._color.Color(Color.BOLD,
+        print 'Total unique crashes: ' + self._color.Color(self._color.BOLD,
                                                            str(len(crashes)))
 
       # Sometimes the builders exit before these buffers are flushed.
@@ -659,7 +659,7 @@ def main():
 
   if not args:
     parser.print_help()
-    Die('no result directories provided')
+    cros_build_lib.Die('no result directories provided')
 
   if options.csv and (options.print_debug or options.crash_detection):
     Warning('Forcing --no-debug --no-crash-detection')
