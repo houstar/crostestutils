@@ -51,7 +51,7 @@ class RealAUWorker(au_worker.AUWorker):
 
   def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
     """Verifies an image using run_remote_tests.sh with verification suite."""
-    test_directory = self.GetNextResultsPath('verify')
+    test_directory, _ = self.GetNextResultsPath('autotest_tests')
     if not test: test = self.verify_suite
 
     result = cros_build_lib.RunCommand(
