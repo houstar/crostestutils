@@ -8,8 +8,11 @@
 import optparse
 import os
 import subprocess
+import sys
 import tempfile
 
+import constants
+sys.path.append(constants.SOURCE_ROOT)
 from chromite.lib import cros_build_lib
 
 
@@ -173,4 +176,5 @@ def main():
 
 
 if __name__ == '__main__':
+  cros_build_lib.SetupBasicLogging()
   main()
