@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 #
 # Copyright (c) 2012 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
@@ -55,7 +55,7 @@ find_ethernet_interfaces() {
 do_ping() {
   local ip_addr=$1
   for eth in $(find_ethernet_interfaces); do
-    ping -I ${eth} -c 3 ${ip_addr} && return 0
+    ping -I ${eth} -c 9 ${ip_addr} && return 0
   done
   return 1
 }
@@ -94,9 +94,12 @@ ping_controlling_server() {
 
 main() {
   # Attempt to ping our controlling autotest server over ethernet.
-  if ping_controlling_server; then
-    return 0
-  fi
+  for i in {0..9}; do
+    if ping_controlling_server; then
+      return 0
+    fi
+    sleep 5
+  done
 
   # We can't reach our controlling server through any ethernet devices.
   recover_ethernet_devices
