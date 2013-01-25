@@ -1,3 +1,4 @@
 chromeos-base/chromeos-wm
 chromeos-base/pam_offline
 sys-boot/grub
+sys-devel/binutils
