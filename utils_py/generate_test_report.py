@@ -18,7 +18,13 @@ import os
 import re
 import sys
 
-from chromite.lib import cros_build_lib
+try:
+  from chromite.lib import cros_build_lib
+except ImportError:
+  script_path = os.path.dirname(os.path.abspath(__file__))
+  cros_path = os.path.join(script_path, "../../../..")
+  sys.path.append(cros_path)
+  from chromite.lib import cros_build_lib
 from chromite.lib import terminal
 
 _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
