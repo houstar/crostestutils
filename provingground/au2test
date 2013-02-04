@@ -1,0 +1,78 @@
+#!/bin/sh
+
+# Copyright (c) 2013 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+set -e
+
+# Check if user is root
+if [ $(/usr/bin/id -u) -ne 0 ]; then
+  echo -n "ERROR: Can not run script. "
+  echo "You are not root, or you did not use sudo.\n"
+  exit 1
+fi
+
+# Check if Chrome OS device is properly configured
+if [ ! -e "/etc/lsb-release" ]; then
+  echo -n "ERROR: Script must be run on a Chrome OS device with an "
+  echo "/etc/lsb-release file.\n"
+  exit 1
+fi
+
+# Get current version from /etc/lsb-release
+installed_version=$(grep -E "CHROMEOS_RELEASE_VERSION" /etc/lsb-release |
+                    grep -Eo "[0-9].+")
+echo "Release version installed: ${installed_version}"
+
+# Create /mnt/stateful_partition/etc/lsb-release if none.
+test_lsb_dir="/mnt/stateful_partition/etc"
+test_lsb_file="${test_lsb_dir}/lsb-release"
+if [ ! -e ${test_lsb_file} ]; then
+  echo "Created file: ${test_lsb_file}"
+  mkdir -p -m 0600 ${test_lsb_dir}
+  touch ${test_lsb_file}
+  chmod 0600 ${test_lsb_file}
+fi
+
+# Append CHROMEOS_AUSERVER if none. Exit if not equal to dev_test_server.
+dev_test_auserver="http://ttracy.mtv.corp.google.com:15001/service/update2"
+chromeos_auserver=$(grep -E "CHROMEOS_AUSERVER" ${test_lsb_file} |
+                    grep -Eo "http.+" || true)
+if [ -z ${chromeos_auserver} ]; then
+  echo "CHROMEOS_AUSERVER=${dev_test_auserver}" >> ${test_lsb_file}
+else
+  if [ ${chromeos_auserver} != ${dev_test_auserver} ]; then
+    echo -n "ERROR: CHROMEOS_AUSERVER is already defined as "
+    echo "${chromeos_auserver}."
+    echo "Delete or move ${test_lsb_file}, and run again."
+    exit 1
+  fi
+fi
+
+# Append CHROMEOS_RELEASE_VERSION if none. Exit if not equal to start_version
+start_version="0.0.0"
+release_version=$(grep -E "CHROMEOS_RELEASE_VERSION" ${test_lsb_file} |
+                  grep -Eo "[0-9].+" || true)
+if [ -z ${release_version} ]; then
+  echo "CHROMEOS_RELEASE_VERSION=${start_version}" >> ${test_lsb_file}
+else
+  if [ ${release_version} != ${start_version} ]; then
+    echo -n "ERROR: CHROMEOS_RELEASE_VERSION is already defined as "
+    echo "${release_version}."
+    echo "Delete or move ${test_lsb_file}, and run again."
+    exit 1
+  fi
+fi
+
+# Clear the /var/lib/update_engine/prefs directory. This will prevent
+# download delays caused by pre-existing backoff counts.
+stop -q update-engine
+rm -f /var/lib/update_engine/prefs/*
+start -q update-engine
+
+# Run update_engine_client
+echo "Running update_engine_client with following lsb-release config:"
+cat "${test_lsb_file}"
+echo ""
+update_engine_client -check_for_update && tail -f /var/log/update_engine.log
