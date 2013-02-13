@@ -36,7 +36,8 @@ if [ ! -e ${test_lsb_file} ]; then
 fi
 
 # Append CHROMEOS_AUSERVER if none. Exit if not equal to dev_test_server.
-dev_test_auserver="http://ttracy.mtv.corp.google.com:15001/service/update2"
+dev_test_auserver=("http://cros-hwqual-5.mtv.corp.google.com:15001/"
+                   "service/update2")
 chromeos_auserver=$(grep -E "CHROMEOS_AUSERVER" ${test_lsb_file} |
                     grep -Eo "http.+" || true)
 if [ -z ${chromeos_auserver} ]; then
