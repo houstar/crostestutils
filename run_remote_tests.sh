@@ -376,7 +376,7 @@ main() {
 
   trap cleanup EXIT
 
-  remote_access_init || [ ${FLAGS_allow_offline_remote} -eq ${FLAGS_TRUE} ]
+  [ ${FLAGS_allow_offline_remote} -eq ${FLAGS_TRUE} ] || remote_access_init
   # autotest requires that an ssh-agent already be running
   start_ssh_agent >/dev/null
 
