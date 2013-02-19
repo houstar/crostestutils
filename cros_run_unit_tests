@@ -66,9 +66,10 @@ fi
 
 # If we didn't specify packages, find all packages.
 if [ -z "${FLAGS_package_file}" -a -z "${FLAGS_packages}" ]; then
-  PACKAGE_LIST=$( /usr/lib/crosutils/get_package_list chromeos \
-                    --board="${FLAGS_board}" |
-                      egrep '^chromeos-base' )
+  PACKAGE_LIST=$( cd /usr/local/portage/chromiumos;
+                  git grep -lE '^[[:space:]]*inherit.*\<cros-workon\>' | \
+                  xargs git grep -lE '^src_test()' | \
+                  xargs -n 1 dirname | grep '/' | sort -u )
 fi
 
 BLACK_LIST_FILE="/usr/share/crostestutils/unit_test_black_list.txt"
@@ -87,9 +88,9 @@ for package in ${PACKAGE_LIST}; do
     warn "${package} not found"
   if [ -n "${EBUILD_PATH}" ]; then
     if check_src_test "${EBUILD_PATH}"; then
-      TEST_PACKAGE_LIST="${TEST_PACKAGE_LIST} ${package}"
+      TEST_PACKAGE_LIST+=" ${package}"
     else
-      NO_UNITTESTS="${NO_UNITTESTS} ${package}"
+      NO_UNITTESTS+=" ${package}"
     fi
   fi
 done
