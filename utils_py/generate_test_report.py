@@ -21,9 +21,14 @@ import sys
 try:
   from chromite.lib import cros_build_lib
 except ImportError:
+  # N.B., this script needs to work outside the chroot, from both
+  # 'src/scripts' and from 'crostestutils/utils_py'.
   script_path = os.path.dirname(os.path.abspath(__file__))
-  cros_path = os.path.join(script_path, "../../../..")
-  sys.path.append(cros_path)
+  cros_path = os.path.join(script_path, '../../../..')
+  for lib_path in (script_path, cros_path):
+    chromite_path = os.path.join(lib_path, 'chromite')
+    if os.path.isdir(chromite_path):
+      sys.path.append(lib_path)
   from chromite.lib import cros_build_lib
 from chromite.lib import terminal
 
