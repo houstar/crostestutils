@@ -31,9 +31,11 @@ _STDOUT_IS_TTY = hasattr(sys.stdout, 'isatty') and sys.stdout.isatty()
 
 class CrashWaiver:
   """Represents a crash that we want to ignore for now."""
-  def __init__(self, signals, deadline, ignored_url, ignored_person):
+  def __init__(self, signals, deadline, url, person):
     self.signals = signals
     self.deadline = datetime.datetime.strptime(deadline, '%Y-%b-%d')
+    self.issue_url = url
+    self.suppressor = person
 
 # List of crashes which are okay to ignore. This list should almost always be
 # empty. If you add an entry, include the bug URL and your name, something like
@@ -294,12 +296,20 @@ class ResultCollector(object):
     status = False
     error_msg = None
     status_raw = open(status_file, 'r').read()
-    failures = 'ABORT|ERROR|FAIL|TEST_NA|WARN'
-    if (re.search(r'GOOD.+completed successfully', status_raw) and
-        not re.search(r'%s' % failures, status_raw)):
+    failure_tags = 'ABORT|ERROR|FAIL|TEST_NA'
+    warning_tag = 'WARN'
+    failure = re.search(r'%s' % failure_tags, status_raw)
+    warning = re.search(r'%s' % warning_tag, status_raw) and not failure
+    good = (re.search(r'GOOD.+completed successfully', status_raw) and
+               not (failure or warning))
+
+    # We'd like warnings to allow the tests to pass, but still gather info.
+    if good or warning:
       status = True
-    else:
-      match = re.search(r'^\t+(%s)\t(.+)' % failures, status_raw, re.MULTILINE)
+
+    if not good:
+      match = re.search(r'^\t+(%s|%s)\t(.+)' % (failure_tags, warning_tag),
+                        status_raw, re.MULTILINE)
       if match:
         failure_type = match.group(1)
         reason = match.group(2).split('\t')[4]
@@ -311,7 +321,7 @@ class ResultCollector(object):
     # Grab the localtime - it may be printed to enable line filtering by date.
     # Designed to match a line like this:
     #   END GOOD  test_name ... timestamp=1347324321  localtime=Sep 10 17:45:21
-    status_re = r'GOOD|%s' % failures
+    status_re = r'GOOD|%s|%s' % (failure_tags, warning_tag)
     timestamp, localtime = self._CollectEndTimes(status_raw, status_re)
     # Hung tests will occasionally skip printing the END line so grab
     # a default timestamp from the START line in those cases.
