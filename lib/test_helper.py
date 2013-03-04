@@ -39,7 +39,7 @@ def CalculateDefaultJobs():
   return max(1, min(cpu_count, mem_count, loop_count))
 
 
-def CreateVMImage(image, board):
+def CreateVMImage(image, board=None, full=True):
   """Returns the path of the image built to run in a VM.
 
   VM returned is a test image that can run full update testing on it.  This
@@ -47,26 +47,30 @@ def CreateVMImage(image, board):
 
   Args:
     image: Path to the image.
-    board: Board that the image was built with.
+    board: Board that the image was built with. If None, attempts to use the
+           configured default board.
+    full: If the vm image doesn't exist, create a "full" one which supports AU.
   """
   vm_image_path = '%s/chromiumos_qemu_image.bin' % os.path.dirname(image)
   if not os.path.exists(vm_image_path):
     logging.info('Creating %s', vm_image_path)
-    cros_build_lib.RunCommand(
-        ['./image_to_vm.sh',
-         '--full',
-         '--from=%s' % git.ReinterpretPathForChroot(os.path.dirname(image)),
-         '--board=%s' % board,
-         '--test_image'
-        ], enter_chroot=True, cwd=constants.SOURCE_ROOT)
+    cmd = ['./image_to_vm.sh',
+           '--from=%s' % git.ReinterpretPathForChroot(os.path.dirname(image)),
+           '--test_image']
+    if full:
+      cmd.extend(['--full'])
+    if board:
+      cmd.extend(['--board', board])
+
+    cros_build_lib.RunCommand(cmd, enter_chroot=True, cwd=constants.SOURCE_ROOT)
 
   assert os.path.exists(vm_image_path), 'Failed to create the VM image.'
   return vm_image_path
 
 
-def SetupCommonLoggingFormat():
+def SetupCommonLoggingFormat(verbose=True):
   """Sets up common logging format for the logging module."""
   logging_format = '%(asctime)s - %(filename)s - %(levelname)-8s: %(message)s'
   date_format = '%Y/%m/%d %H:%M:%S'
-  logging.basicConfig(level=logging.DEBUG, format=logging_format,
-                      datefmt=date_format)
+  logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO,
+                      format=logging_format, datefmt=date_format)

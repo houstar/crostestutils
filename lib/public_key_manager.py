@@ -11,27 +11,7 @@ import constants
 from chromite.lib import cros_build_lib
 from chromite.lib import git
 from chromite.lib import osutils
-
-
-def MountImage(image_path, root_dir, stateful_dir, read_only):
-  """Mounts a Chromium OS image onto mount dir points."""
-  from_dir, image = os.path.split(image_path)
-  cmd = ['./mount_gpt_image.sh',
-         '--from=%s' % from_dir,
-         '--image=%s' % image,
-         '--rootfs_mountpt=%s' % root_dir,
-         '--stateful_mountpt=%s' % stateful_dir]
-  if read_only: cmd.append('--read_only')
-  cros_build_lib.RunCommandCaptureOutput(
-      cmd, print_cmd=False, cwd=constants.CROSUTILS_DIR)
-
-
-def UnmountImage(root_dir, stateful_dir):
-  """Unmounts a Chromium OS image specified by mount dir points."""
-  cmd = ['./mount_gpt_image.sh', '--unmount', '--rootfs_mountpt=%s' % root_dir,
-         '--stateful_mountpt=%s' % stateful_dir]
-  cros_build_lib.RunCommandCaptureOutput(
-      cmd, print_cmd=False, cwd=constants.CROSUTILS_DIR)
+from crostestutils.lib import mount_helper
 
 
 class PublicKeyManager(object):
@@ -47,7 +27,7 @@ class PublicKeyManager(object):
 
     # Gather some extra information about the image.
     try:
-      MountImage(image_path, self._rootfs_dir, self._stateful_dir,
+      mount_helper.MountImage(image_path, self._rootfs_dir, self._stateful_dir,
                  read_only=True)
       self._full_target_key_path = os.path.join(
           self._rootfs_dir, PublicKeyManager.TARGET_KEY_PATH)
@@ -59,7 +39,7 @@ class PublicKeyManager(object):
         if not res.output: self._is_key_new = False
 
     finally:
-      UnmountImage(self._rootfs_dir, self._stateful_dir)
+      mount_helper.UnmountImage(self._rootfs_dir, self._stateful_dir)
 
   def __del__(self):
     """Remove our temporary directories we created in init."""
@@ -75,14 +55,14 @@ class PublicKeyManager(object):
 
     cros_build_lib.Info('Copying %s into %s', self.key_path, self.image_path)
     try:
-      MountImage(self.image_path, self._rootfs_dir, self._stateful_dir,
-                 read_only=False)
+      mount_helper.MountImage(self.image_path, self._rootfs_dir,
+                              self._stateful_dir, read_only=False)
       dir_path = os.path.dirname(self._full_target_key_path)
       osutils.SafeMakedirs(dir_path, sudo=True)
       cmd = ['cp', '--force', '-p', self.key_path, self._full_target_key_path]
       cros_build_lib.SudoRunCommand(cmd)
     finally:
-      UnmountImage(self._rootfs_dir, self._stateful_dir)
+      mount_helper.UnmountImage(self._rootfs_dir, self._stateful_dir)
       self._MakeImageBootable()
 
   def _MakeImageBootable(self):

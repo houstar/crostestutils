@@ -76,7 +76,7 @@ class DevServerWrapper(threading.Thread):
     """Print devserver output."""
     print '--- Start output from %s ---' % self._log_filename
     # Open in update mode in case the child process hasn't opened the file yet.
-    with open(self._log_filename, 'w+') as log:
+    with open(self._log_filename) as log:
       sys.stdout.writelines(log)
     print '--- End output from %s ---' % self._log_filename
 
@@ -105,9 +105,10 @@ class DevServerWrapper(threading.Thread):
   def GetDevServerURL(cls, port, sub_dir):
     """Returns the dev server url for a given port and sub directory."""
     if not port: port = 8080
-    url = 'http://%(ip)s:%(port)s/%(dir)s' % {'ip': GetIPAddress(),
-                                              'port': str(port),
-                                              'dir': sub_dir}
+    url = 'http://%(ip)s:%(port)s' % {'ip': GetIPAddress(), 'port': str(port)}
+    if sub_dir:
+      url += '/' + sub_dir
+
     return url
 
   @classmethod
