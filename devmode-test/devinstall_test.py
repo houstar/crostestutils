@@ -25,6 +25,7 @@ sys.path.append(constants.SOURCE_ROOT)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
 
 from chromite.lib import cros_build_lib
+from chromite.lib import remote_access
 from crostestutils.lib import dev_server_wrapper
 from crostestutils.lib import mount_helper
 from crostestutils.lib import test_helper
@@ -55,11 +56,11 @@ class DevModeTest(object):
     self.binhost = binhost
 
     self.tmpdir = tempfile.mkdtemp('DevModeTest')
-    self.tmpsshkey = os.path.join(self.tmpdir, 'testing_rsa')
     self.tmpkvmpid = os.path.join(self.tmpdir, 'kvm_pid')
 
     self.working_image_path = None
     self.devserver = None
+    self.remote_access = None
     self.port = None
 
   def Cleanup(self):
@@ -87,17 +88,9 @@ class DevModeTest(object):
   def _SetupSSH(self):
     """Sets up the necessary items for running ssh."""
     self.port = self._FindUnusedPort()
-    shutil.copyfile(_PRIVATE_KEY, self.tmpsshkey)
-    os.chmod(self.tmpsshkey, 0400)
-
-  def _RunSSHCommand(self, command, **kwargs):
-    """Runs ssh command (a list) using RunCommand (kwargs for RunCommand)."""
-    assert isinstance(command, list)
-    assert self.port and self.tmpsshkey, 'Tried to run ssh before ssh was setup'
-    kwargs.update(dict(debug_level=logging.DEBUG))
-    return cros_build_lib.RunCommand(
-        ['ssh', '-n', '-p', str(self.port), '-i', self.tmpsshkey,
-         'root@%s' % _LOCALHOST, '--'] + command, **kwargs)
+    self.remote_access = remote_access.RemoteAccess(
+        _LOCALHOST, self.tmpdir, self.port,
+        debug_level=logging.DEBUG, interactive=False)
 
   def _WipeStatefulPartition(self):
     """Deletes everything from the working image path's stateful partition."""
@@ -157,12 +150,12 @@ class DevModeTest(object):
     """Tests that we can run dev-install and have python work afterwards."""
     try:
       logging.info('Running dev install in the vm.')
-      self._RunSSHCommand(
+      self.remote_access.RemoteSh(
           ['bash', '-l', '-c',
            '"/usr/bin/dev_install --yes --binhost %s"' % self.binhost])
 
       logging.info('Verifying that python works on the image.')
-      self._RunSSHCommand(
+      self.remote_access.RemoteSh(
           ['sudo', '-u', 'chronos', '--',
            'python', '-c', '"print \'hello world\'"'])
     except cros_build_lib.RunCommandError as e:
@@ -171,13 +164,14 @@ class DevModeTest(object):
                     'details.')
       raise TestError('dev-install test failed with: %s' % str(e))
 
-  # TODO(sosa): Currently not run as emerge is not respecting package.provided
-  # after dev_install in a VM. Cannot repro on a device.
   def TestGmerge(self):
     """Evaluates whether the test passed or failed."""
-    logging.info('Verifying that python works on the image after dev install.')
+    logging.info('Testing that gmerge works on the image after dev install.')
     try:
-      self._RunSSHCommand(['gmerge', 'gmerge', '--accept_stable', '--usepkg'])
+      # TODO(sosa): Remove this hack that is needed until this is cleaned up.
+      self.remote_access.RemoteSh(['rm', '-rf', '/usr/local/etc/make.profile'])
+      self.remote_access.RemoteSh(['gmerge', 'gmerge', '--accept_stable',
+                                   '--usepkg'])
     except cros_build_lib.RunCommandError as e:
       logging.error('gmerge test failed. See log for details')
       raise TestError('gmerge test failed with: %s' % str(e))
@@ -208,6 +202,7 @@ def main():
   try:
     test.PrepareTest()
     test.TestDevInstall()
+    test.TestGmerge()
     logging.info('All tests passed.')
   finally:
     test.Cleanup()
