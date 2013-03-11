@@ -113,6 +113,26 @@ read_test_type() {
   echo ${test_type}
 }
 
+# Determines the RETRIES value specified in a control file. Echos
+# 0 if no RETRIES value is specified, otherwise echos retires value.
+# Arguments:
+#   $1 - control file path
+read_retry_value() {
+  local control_file=$1
+  # Search for a line of the form
+  # [whitespace]RETRIES[whitepspace]=[whitespace][number]
+  # and pull out just the numeric part
+  local test_retry=$(egrep -m1 \
+     '^[[:space:]]*RETRIES[[:space:]]*=.*$' "$1" |
+     grep -o "[0-9]*")
+  if [[ -z "${test_retry}" ]]; then
+    echo "0"
+    return
+  fi
+
+  echo ${test_retry}
+}
+
 create_tmp() {
   # Set global TMP for remote_access.sh's sake
   # and if --results_dir_root is specified,
@@ -493,6 +513,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     control_file=$(remove_quotes "${control_file}")
     local control_file_path=$(normalize_control_path "${control_file}")
     local test_type=$(read_test_type "${control_file_path}")
+    local test_retry_value=$(read_retry_value "${control_file_path}")
 
     local option
     if [[ "${test_type}" == "client" ]]; then
@@ -557,7 +578,8 @@ ${profiled_control_file}."
 
     local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
         ${image} ${option} ${control_file} -r ${results_dir} ${verbose} \
-        ${FLAGS_label:+ -l $FLAGS_label}"
+        ${FLAGS_label:+ -l $FLAGS_label} \
+        --test-retry=${test_retry_value}"
 
     sudo chmod a+w ./server/{tests,site_tests}
 
