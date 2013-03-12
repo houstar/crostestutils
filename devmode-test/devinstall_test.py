@@ -168,8 +168,6 @@ class DevModeTest(object):
     """Evaluates whether the test passed or failed."""
     logging.info('Testing that gmerge works on the image after dev install.')
     try:
-      # TODO(sosa): Remove this hack that is needed until this is cleaned up.
-      self.remote_access.RemoteSh(['rm', '-rf', '/usr/local/etc/make.profile'])
       self.remote_access.RemoteSh(['gmerge', 'gmerge', '--accept_stable',
                                    '--usepkg'])
     except cros_build_lib.RunCommandError as e:
