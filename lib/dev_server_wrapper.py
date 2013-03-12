@@ -102,7 +102,7 @@ class DevServerWrapper(threading.Thread):
     raise DevServerException('Timeout waiting for the devserver to startup.')
 
   @classmethod
-  def GetDevServerURL(cls, port, sub_dir):
+  def GetDevServerURL(cls, port=None, sub_dir=None):
     """Returns the dev server url for a given port and sub directory."""
     if not port: port = 8080
     url = 'http://%(ip)s:%(port)s' % {'ip': GetIPAddress(), 'port': str(port)}

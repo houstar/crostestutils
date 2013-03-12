@@ -142,7 +142,7 @@ class DevModeTest(object):
       self.devserver.start()
       self.devserver.WaitUntilStarted()
       self.binhost = dev_server_wrapper.DevServerWrapper.GetDevServerURL(
-          None, 'static/pkgroot/%s/packages' % self.board)
+          sub_dir='static/pkgroot/%s/packages' % self.board)
 
     logging.info('Using binhost %s', self.binhost)
 
@@ -168,8 +168,10 @@ class DevModeTest(object):
     """Evaluates whether the test passed or failed."""
     logging.info('Testing that gmerge works on the image after dev install.')
     try:
-      self.remote_access.RemoteSh(['gmerge', 'gmerge', '--accept_stable',
-                                   '--usepkg'])
+      self.remote_access.RemoteSh(
+          ['gmerge', 'gmerge', '--accept_stable', '--usepkg',
+           '--devserver_url', self.devserver.GetDevServerURL(),
+           '--board', self.board])
     except cros_build_lib.RunCommandError as e:
       logging.error('gmerge test failed. See log for details')
       raise TestError('gmerge test failed with: %s' % str(e))
