@@ -235,7 +235,11 @@ def main():
                     help='Treat Chrome crashes as non-fatal.')
 
   # Set the usage to include flags.
-  parser.set_usage(parser.format_help())
+  def _ParserError(msg):
+    print >> sys.stderr, parser.format_help()
+    print >> sys.stderr, 'Error: %s' % msg
+    sys.exit(2)
+  parser.error = _ParserError
   (options, args) = parser.parse_args()
 
   if args: parser.error('Extra args found %s.' % args)
