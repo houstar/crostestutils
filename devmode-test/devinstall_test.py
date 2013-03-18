@@ -19,6 +19,7 @@ import shutil
 import socket
 import sys
 import tempfile
+import time
 
 import constants
 sys.path.append(constants.SOURCE_ROOT)
@@ -135,6 +136,10 @@ class DevModeTest(object):
            '--no_graphics',
            '--kvm_pid', self.tmpkvmpid]
     cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
+
+    # TODO(sosa): Super hack, fix with retry_ssh-like functionality.
+    # crbug.com/209719
+    time.sleep(30)
 
     if not self.binhost:
       logging.info('Starting the devserver.')
