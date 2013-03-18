@@ -546,14 +546,20 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
   if [[ -z ${FLAGS_profiler} ]]; then
     if [[ "$(echo ${control_files_to_run} | wc -w)" -gt 1 ]]; then
       # Check to make sure only client or only server control files have been
-      # requested, otherwise fall back to uncombined execution.
-      local control_type=$(check_control_file_types ${control_files_to_run})
+      # requested, and that none of the requested control files use retries.
+      # Otherwise fall back to uncombined execution.
+      local control_type retry_files
+      control_type=$(check_control_file_types ${control_files_to_run})
+      retry_files="$(get_nonzero_retry_control_files \
+                   ${control_files_to_run})"
       if [[ -n ${control_type} ]]; then
-        # Keep track of local control file for cleanup later.
-        new_control_file="$(generate_combined_control_file ${control_type} \
-            ${control_files_to_run})"
-        control_files_to_run="${new_control_file}"
-        echo ""
+        if [[ -z ${retry_files} ]]; then
+          # Keep track of local control file for cleanup later.
+          new_control_file="$(generate_combined_control_file ${control_type} \
+              ${control_files_to_run})"
+          control_files_to_run="${new_control_file}"
+          echo ""
+        fi
       fi
     fi
   fi
