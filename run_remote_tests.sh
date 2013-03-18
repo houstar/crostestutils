@@ -504,10 +504,12 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     fi
   fi
 
-  info "Running the following control files ${FLAGS_iterations} times:"
-  for control_file in ${control_files_to_run}; do
-    info " * ${control_file}"
-  done
+  if [[ -n "${control_files_to_run}" ]]; then
+    info "Running the following control files ${FLAGS_iterations} times:"
+    for control_file in ${control_files_to_run}; do
+      info " * ${control_file}"
+    done
+  fi
 
   test_control_file() {
     control_file=$(remove_quotes "${control_file}")
