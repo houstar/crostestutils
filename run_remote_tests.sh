@@ -249,6 +249,43 @@ EOF
   echo "${tmp}"
 }
 
+_equals_zero () {
+  [ "$1" == "0" ]
+}
+
+_notequals_zero () {
+  [ "$1" != "0" ]
+}
+
+get_matching_retry_control_files() {
+  local predicate_function="$1"
+  shift 1
+  local control_files="$@"
+  local test_retries
+
+  for control_file in ${control_files}; do
+    local normalized_file=$(normalize_control_path "${control_file}")
+    test_retries=$(read_retry_value ${normalized_file})
+    if $predicate_function ${test_retries}; then
+      echo "${control_file}"
+    fi
+  done
+}
+
+# Given a list of control files (with paths either relative or absolute),
+# returns the sublist of these control files (absolute paths)
+# for which the RETRIES field is either 0 or unspecified.
+get_zero_retry_control_files() {
+  get_matching_retry_control_files _equals_zero "$@"
+}
+
+# Given a list of control files (with paths either relative or absolute),
+# returns the sublist of these control files (absolute paths)
+# for which the RETRIES field is not 0
+get_nonzero_retry_control_files() {
+  get_matching_retry_control_files _notequals_zero "$@"
+}
+
 # Given a control_type (client or server) and a list of control files, assembles
 # them all into a single control file. Useful for reducing repeated packaging
 # between tests sharing the same resources.
@@ -470,13 +507,30 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
         die "Cannot enumerate ${suite}"
     # Combine into a single control file if possible.
     control_type="$(check_control_file_types ${suite_map[${suite}]})"
+
+    local nonretry_files retry_files
+    nonretry_files="$(get_zero_retry_control_files \
+                      ${suite_map[${suite}]})"
+    retry_files="$(get_nonzero_retry_control_files \
+                      ${suite_map[${suite}]})"
+
     info "Control type: ${control_type}"
     if [[ -n "${control_type}" ]]; then
       new_control_file="$(generate_combined_control_file ${control_type} \
-                          ${suite_map[${suite}]})"
+                          ${nonretry_files})"
       suite_map[${suite}]="${new_control_file}"
     fi
+
+    if [[ -n "${retry_files}" ]]; then
+      info "Running the following control files that use RETRIES separately:"
+      for control_file in $retry_files; do
+        info "$control_file"
+      done
+      suite_map[${suite}]+=" ${retry_files}"
+    fi
   done
+
+
 
   echo ""
 
