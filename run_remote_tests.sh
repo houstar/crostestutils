@@ -397,6 +397,25 @@ stop_servod() {
   fi
 }
 
+# Fail if the remote board does not match FLAGS_board.
+verify_remote_board() {
+  [ ${FLAGS_allow_offline_remote} -eq ${FLAGS_TRUE} ] && return
+  remote_sh -n grep CHROMEOS_RELEASE_BOARD /etc/lsb-release
+  local remote_board=$(echo "${REMOTE_OUT}" | cut -d '=' -f 2)
+  if [ -z "${remote_board}" ]; then
+    error "Remote device does not properly report Board"
+    exit 1
+  fi
+  if [ -z "${FLAGS_board}" ]; then
+    error "--board not supplied and default board not found"
+    exit 1
+  fi
+  if [ "${FLAGS_board}" != "${remote_board}" ]; then
+    error "Can not run ${FLAGS_board} tests on ${remote_board}"
+    exit 1
+  fi
+}
+
 main() {
   cd "${SCRIPTS_DIR}"
 
@@ -438,6 +457,7 @@ main() {
   start_ssh_agent >/dev/null
 
   learn_board
+  verify_remote_board
   if [[ -n "${FLAGS_autotest_dir}" ]]; then
     if [ ! -d "${FLAGS_autotest_dir}" ]; then
       die \
