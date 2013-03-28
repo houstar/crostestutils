@@ -525,6 +525,9 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     suite_map[${suite}]="$(${ENUMERATOR_PATH}/suite_enumerator.py \
                  --autotest_dir="${AUTOTEST_DIR}" ${suite})" ||
         die "Cannot enumerate ${suite}"
+
+    info "Found $(echo ${suite_map[${suite}]} | wc -w) control files in suite."
+
     # Combine into a single control file if possible.
     control_type="$(check_control_file_types ${suite_map[${suite}]})"
 
@@ -534,20 +537,23 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     retry_files="$(get_nonzero_retry_control_files \
                       ${suite_map[${suite}]})"
 
-    info "Control type: ${control_type}"
     if [[ -n "${control_type}" ]]; then
+      info "Control type: ${control_type}"
       new_control_file="$(generate_combined_control_file ${control_type} \
                           ${nonretry_files})"
       suite_map[${suite}]="${new_control_file}"
+
+      if [[ -n "${retry_files}" ]]; then
+        info "Running the following control files that use RETRIES separately:"
+        for control_file in $retry_files; do
+          info "$control_file"
+        done
+        suite_map[${suite}]+=" ${retry_files}"
+      fi
+    else
+      info "Control type: mix of client and server"
     fi
 
-    if [[ -n "${retry_files}" ]]; then
-      info "Running the following control files that use RETRIES separately:"
-      for control_file in $retry_files; do
-        info "$control_file"
-      done
-      suite_map[${suite}]+=" ${retry_files}"
-    fi
   done
 
 
