@@ -122,7 +122,8 @@ class DevModeTest(object):
                                         full=False)
 
     logging.info('Making copy of the vm image %s to manipulate.', vm_path)
-    self.working_image_path = vm_path + '.' + str(self.port)
+    self.working_image_path = os.path.join(self.tmpdir,
+                                           os.path.basename(vm_path))
     shutil.copyfile(vm_path, self.working_image_path)
     logging.debug('Copy of vm image stored at %s.', self.working_image_path)
 
