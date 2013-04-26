@@ -14,6 +14,7 @@ install:
 	install -m 0644 lib/constants.py "${DESTDIR}/usr/lib/crostestutils"
 	install -m 0755 cros_run_unit_tests "${DESTDIR}/usr/bin"
 	install -m 0755 run_remote_tests.sh ${DESTDIR}/usr/bin
+	install -m 0755 test_that ${DESTDIR}/usr/bin
 	install -m 0644 unit_test_black_list.txt \
 		"${DESTDIR}/usr/share/crostestutils"
 	install -m 0755 utils_py/generate_test_report.py \
