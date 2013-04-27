@@ -26,6 +26,8 @@ DEFINE_string package_file "" \
   "File with space-separated list of packages to run unit tests" f
 DEFINE_string packages "" \
   "Optional space-separated list of packages to run unit tests" p
+DEFINE_string blacklist_packages "" \
+  "List of packages to blacklist from unit tests"
 DEFINE_boolean withdebug "${FLAGS_TRUE}" \
   "Build debug versions of Chromium-OS-specific packages."
 
@@ -73,6 +75,7 @@ if [ -z "${FLAGS_package_file}" -a -z "${FLAGS_packages}" ]; then
 fi
 
 BLACK_LIST_FILE="/usr/share/crostestutils/unit_test_black_list.txt"
+BLACK_LIST_PACKAGES="${FLAGS_blacklist_packages}"
 
 if [ "${FLAGS_withdebug}" -eq "${FLAGS_FALSE}" ]; then
   export USE="${USE} -cros-debug"
@@ -80,7 +83,8 @@ fi
 
 TEST_PACKAGE_LIST=""
 for package in ${PACKAGE_LIST}; do
-  if grep -xq "${package}" "${BLACK_LIST_FILE}"; then
+  if grep -xq "${package}" "${BLACK_LIST_FILE}" || \
+     [[ " ${BLACK_LIST_PACKAGES} " =~ " ${package} " ]]; then
     warn "Skipping package ${package} since it is blacklisted."
     continue
   fi
