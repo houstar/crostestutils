@@ -366,7 +366,7 @@ start_servod() {
     return
   fi
 
-  sudo servod --board=${FLAGS_board} >${TMP}/servod.log 2>&1 &
+  sudo servod --debug --board=${FLAGS_board} >${TMP}/servod.log 2>&1 &
   SERVOD=$!
   echo
   info "Started servod; pid = ${SERVOD}."
