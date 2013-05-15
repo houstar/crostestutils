@@ -40,6 +40,7 @@ find_common_sh
 assert_inside_chroot
 
 DEFINE_string output_dir "" "output directory for results" o
+DEFINE_string board "" "name of board we are testing"
 DEFINE_boolean keep_logs "$FLAGS_FALSE" "keep autotest results" k
 
 RUN_TEST="run_remote_tests.sh"
@@ -86,6 +87,8 @@ usage: $(basename $0) [ <options> ] <ip-address> [ <count> ]
 Options:
   --output_dir <directory>
   --o <directory>       Specify output directory for results
+
+  --board <BOARDNAME>   name of board we are testing (e.g. daisy)
 
   --[no]keep_logs
   -k                    Keep [don't keep] autotest log files
@@ -167,7 +170,7 @@ run_boot_test() {
     # changes to the package.  (The option is here because IMO the
     # alternative is a bigger nuisance.)
     $RUN_TEST --use_emerged --results_dir_root="$TMP_RESULTS" \
-              --remote="$remote" $TEST >$logfile 2>&1
+              --remote="$remote" $BOARD $TEST >$logfile 2>&1
     if [ ! -e "$TMP_RESULTS/$RESULTS_KEYVAL" ]; then
       error "No results file; terminating test runs."
       error "Check $logfile for output from the test run,"
@@ -198,6 +201,10 @@ main() {
       usage "Missing target host address"
   elif [ $# -gt 2 ]; then
       usage "Too many arguments"
+  fi
+
+  if [ -n "${FLAGS_board}" ]; then
+    BOARD="--board=${FLAGS_board}"
   fi
 
   if [ -n "${FLAGS_output_dir}" ]; then
