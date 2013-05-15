@@ -19,6 +19,8 @@
             title='All tests passed'>Passed</td>
         <td class='legend failure'
             title='There is a new failure. Take a look!'>Failed</td>
+        <td class='legend testna'
+            title='The test is not applicable.'>Test N/A</td>
         <td class='legend notstarted'
             title='Test not run.'>No&nbsp;data</td>
       </tr>
@@ -133,7 +135,11 @@
                             {{!dut_info}}
                           </span>
                         %else:
-                          class="info DevSlaveBox failure">
+                          %if test_result_dict.get('reason', 'no reason')[8:15] == 'TEST_NA':
+                            class="info DevSlaveBox testna">
+                          %else:
+                            class="info DevSlaveBox failure">
+			  %end
                           <span>
                               <b>{{test_name}}</b><br>
                             {{!dut_info}}

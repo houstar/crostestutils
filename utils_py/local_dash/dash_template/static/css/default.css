@@ -371,6 +371,12 @@ div.BuildWaterfall {
   border-color: #A77272;
 }
 
+.testna {
+  color: #FFFFFF;
+  background-color: #F5E269;
+  border-color: #BFB052;
+}
+
 .warnings {
   color: #FFFFFF;
   background-color: #ffc343;
