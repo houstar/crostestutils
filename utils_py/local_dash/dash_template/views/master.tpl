@@ -18,12 +18,17 @@
       }
       function RefreshPage(){
         clearTimeout(asdf)
-        if(document.frmRefresh.CB1.checked)
-          document.location.href= "/?refreshing"
+        if(document.frmRefresh.CB1.checked) {
+          if (document.frmRefresh.CB2.checked)
+            document.location.href= "/regenerate?refreshing&regen";
+          else
+            document.location.href= "/?refreshing";
+        }
       }
       function LoadPage(){
-        var findCheck = document.location.href.split("?refr");
-        if(findCheck.length == 2){
+        if (document.location.href.indexOf("&regen") != -1)
+          document.frmRefresh.CB2.checked=true;
+        if (document.location.href.indexOf("?refr") != -1) {
           document.frmRefresh.CB1.checked=true;
           StartTime()
         }

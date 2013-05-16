@@ -169,7 +169,7 @@ def regenerate_results():
     if args:
       cmd.append(args)
     subprocess.check_call(cmd)
-  bottle.redirect('/')
+  bottle.redirect('/' + ''.join(bottle.request.url.partition('?')[1:]))
 
 @app.route('/logs/<filepath:path>')
 def server_result_file(filepath):

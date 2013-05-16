@@ -134,7 +134,7 @@
                             class="info DevSlaveBox testna">
                           %else:
                             class="info DevSlaveBox failure">
-			  %end
+                          %end
                           <span>
                               <b>{{test_name}}</b><br>
                             {{!dut_info}}
