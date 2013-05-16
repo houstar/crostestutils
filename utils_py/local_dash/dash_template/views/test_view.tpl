@@ -50,18 +50,13 @@
     <table width="96%">
       %# First row is a header row
       <tr>
-        <td with="1%">Test Date</td>
+        <td width="1%">Test Date</td>
         <td class="DevSlave Alt last">
           <table width="100%">
             <tr>
             %for test_name in test_results['tests']:
-              <td class="DevSlaveBox">
-                <a class="info DevSlaveBox"
-                   onmouseover="fixTooltip(event, this)"
-                   onmouseout="clearTooltip(this)">
-                   <span><b>{{test_name}}</b></span>
-                </a>
-              </td>
+              <td><div class="TestName"><div class="TestNameDiv">{{test_name}}
+              </div></div></td>
             %end
             </tr>
           </table>
