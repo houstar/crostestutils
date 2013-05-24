@@ -6,7 +6,7 @@
 """
 
 import os
-import threading
+import multiprocessing
 import re
 import sys
 import time
@@ -49,14 +49,14 @@ class DevServerException(Exception):
   """Thrown when the devserver fails to start up correctly."""
 
 
-class DevServerWrapper(threading.Thread):
+class DevServerWrapper(multiprocessing.Process):
   """A Simple wrapper around a dev server instance."""
 
   def __init__(self, test_root):
     self.proc = None
     self.test_root = test_root
     self._log_filename = os.path.join(test_root, 'dev_server.log')
-    threading.Thread.__init__(self)
+    multiprocessing.Process.__init__(self)
 
   def run(self):
     # Kill previous running instance of devserver if it exists.
