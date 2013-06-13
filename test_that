@@ -12,4 +12,14 @@ if [ ! -f $SCR ]; then
     exit 1
 fi
 
-sudo $SCR $@
+trap : SIGTERM SIGINT
+
+sudo $SCR $@ &
+child_pid=$!
+wait $child_pid
+
+if [[ $? -gt 128 ]]
+then
+    sudo kill $child_pid
+    wait $child_pid
+fi
