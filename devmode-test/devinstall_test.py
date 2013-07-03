@@ -12,6 +12,7 @@ all of the stateful partition. Once done, runs dev_install to restore the
 stateful partition and then runs gmerge.
 """
 
+import getpass
 import logging
 import optparse
 import os
@@ -90,17 +91,20 @@ class DevModeTest(object):
         _LOCALHOST, self.tmpdir, self.port,
         debug_level=logging.DEBUG, interactive=False)
 
-  def _WipeStatefulPartition(self):
-    """Deletes everything from the working image path's stateful partition."""
+  def _WipeDevInstall(self):
+    """Wipes the devinstall state."""
     r_mount_point = os.path.join(self.tmpdir, 'm')
     s_mount_point = os.path.join(self.tmpdir, 's')
+    dev_image_path = os.path.join(s_mount_point, 'dev_image')
     mount_helper.MountImage(self.working_image_path,
                             r_mount_point, s_mount_point, read_only=False,
                             safe=True)
-    # Run in shell mode to interpret '*' as a glob.
-    cros_build_lib.SudoRunCommand('rm -rf %s/*' % s_mount_point, shell=True,
-                                  debug_level=logging.DEBUG)
-    mount_helper.UnmountImage(r_mount_point, s_mount_point)
+    try:
+      cros_build_lib.SudoRunCommand(['chown', '--recursive', getpass.getuser(),
+                                     s_mount_point], debug_level=logging.DEBUG)
+      shutil.rmtree(dev_image_path)
+    finally:
+      mount_helper.UnmountImage(r_mount_point, s_mount_point)
 
   def _FindUnusedPort(self):
     """Returns a currently unused port."""
@@ -156,8 +160,8 @@ class DevModeTest(object):
     shutil.copyfile(vm_path, self.working_image_path)
     logging.debug('Copy of vm image stored at %s.', self.working_image_path)
 
-    logging.info('Wiping the stateful partition to prepare test.')
-    self._WipeStatefulPartition()
+    logging.info('Wiping /usr/local/bin from the image.')
+    self._WipeDevInstall()
 
     logging.info('Starting the vm on port %d.', self.port)
     self._RobustlyStartVMWithSSH()
