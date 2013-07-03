@@ -19,7 +19,6 @@ import shutil
 import socket
 import sys
 import tempfile
-import time
 
 import constants
 sys.path.append(constants.SOURCE_ROOT)
@@ -35,6 +34,7 @@ from crostestutils.lib import test_helper
 _LOCALHOST = 'localhost'
 _PRIVATE_KEY = os.path.join(constants.CROSUTILS_DIR, 'mod_for_test_scripts',
                             'ssh_keys', 'testing_rsa')
+_MAX_SSH_ATTEMPTS = 3
 
 class TestError(Exception):
   """Raised on any error during testing. It being raised is a test failure."""
@@ -74,10 +74,7 @@ class DevModeTest(object):
         self.devserver.Stop()
 
       self.devserver = None
-
-      cmd = ['%s/bin/cros_stop_vm' % constants.CROSUTILS_DIR,
-             '--kvm_pid', self.tmpkvmpid]
-      cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
+      self._StopVM()
 
       if self.tmpdir:
         shutil.rmtree(self.tmpdir, ignore_errors=True)
@@ -113,6 +110,38 @@ class DevModeTest(object):
     s.close()
     return port
 
+  def _RobustlyStartVMWithSSH(self):
+    """Start test copy of VM and ensure we can ssh into it.
+
+    This command is more robust than just naively starting the VM as it will
+    try to start the VM multiple times if the VM fails to start up. This is
+    inspired by retry_until_ssh in crosutils/lib/cros_vm_lib.sh.
+    """
+    for _ in range(_MAX_SSH_ATTEMPTS):
+      try:
+        cmd = ['%s/bin/cros_start_vm' % constants.CROSUTILS_DIR,
+               '--ssh_port', str(self.port),
+               '--image_path', self.working_image_path,
+               '--no_graphics',
+               '--kvm_pid', self.tmpkvmpid]
+        cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
+
+        # Ping the VM to ensure we can SSH into it.
+        self.remote_access.RemoteSh(['true'])
+        return
+      except cros_build_lib.RunCommandError as e:
+        logging.warning('Failed to connect to VM')
+        logging.debug(e)
+        self._StopVM()
+    else:
+      raise TestError('Max attempts to connect to VM exceeded')
+
+  def _StopVM(self):
+    """Stops a running VM set up using _RobustlyStartVMWithSSH."""
+    cmd = ['%s/bin/cros_stop_vm' % constants.CROSUTILS_DIR,
+           '--kvm_pid', self.tmpkvmpid]
+    cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
+
   def PrepareTest(self):
     """Pre-test modification to the image and env to setup test."""
     logging.info('Setting up the image %s for vm testing.',
@@ -131,16 +160,7 @@ class DevModeTest(object):
     self._WipeStatefulPartition()
 
     logging.info('Starting the vm on port %d.', self.port)
-    cmd = ['%s/bin/cros_start_vm' % constants.CROSUTILS_DIR,
-           '--ssh_port', str(self.port),
-           '--image_path', self.working_image_path,
-           '--no_graphics',
-           '--kvm_pid', self.tmpkvmpid]
-    cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
-
-    # TODO(sosa): Super hack, fix with retry_ssh-like functionality.
-    # crbug.com/209719
-    time.sleep(30)
+    self._RobustlyStartVMWithSSH()
 
     if not self.binhost:
       logging.info('Starting the devserver.')
