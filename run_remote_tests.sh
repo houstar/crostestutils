@@ -37,6 +37,8 @@ DEFINE_boolean whitelist_chrome_crashes ${FLAGS_FALSE} \
     "Treat Chrome crashes as non-fatal."
 DEFINE_boolean allow_offline_remote ${FLAGS_FALSE} \
     "Proceed with testing even if remote is offline; useful when using servo"
+DEFINE_boolean fast ${FLAGS_FALSE} \
+    "Drop expensive autoserv features not needed for desk use"
 
 # The prefix to look for in an argument that determines we're talking about a
 # new-style suite.
@@ -664,10 +666,16 @@ ${profiled_control_file}."
       control_file="${profiled_control_file}"
     fi
 
+    if [ "${FLAGS_fast}" -eq "${FLAGS_FALSE}" ]; then
+      fast_flags=""
+    else
+      fast_flags="--no_collect_crashinfo --disable_sysinfo"
+    fi
+
     local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
         ${image} ${option} ${control_file} -r ${results_dir} ${verbose} \
         ${FLAGS_label:+ -l $FLAGS_label} \
-        --test-retry=${test_retry_value}"
+        --test-retry=${test_retry_value} ${fast_flags}"
 
     sudo chmod a+w ./server/{tests,site_tests}
 
