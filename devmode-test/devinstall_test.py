@@ -20,6 +20,7 @@ import shutil
 import socket
 import sys
 import tempfile
+import time
 
 import constants
 sys.path.append(constants.SOURCE_ROOT)
@@ -35,7 +36,8 @@ from crostestutils.lib import test_helper
 _LOCALHOST = 'localhost'
 _PRIVATE_KEY = os.path.join(constants.CROSUTILS_DIR, 'mod_for_test_scripts',
                             'ssh_keys', 'testing_rsa')
-_MAX_SSH_ATTEMPTS = 3
+_MAX_SSH_ATTEMPTS = 5
+_TIME_BETWEEN_ATTEMPT = 30
 
 class TestError(Exception):
   """Raised on any error during testing. It being raised is a test failure."""
@@ -135,8 +137,9 @@ class DevModeTest(object):
         return
       except cros_build_lib.RunCommandError as e:
         logging.warning('Failed to connect to VM')
-        logging.debug(e)
+        logging.warning(e)
         self._StopVM()
+        time.sleep(_TIME_BETWEEN_ATTEMPT)
     else:
       raise TestError('Max attempts to connect to VM exceeded')
 
