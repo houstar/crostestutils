@@ -184,6 +184,8 @@ def main():
   parser.add_option('--whitelist_chrome_crashes', default=False,
                     dest='whitelist_chrome_crashes', action='store_true',
                     help='Treat Chrome crashes as non-fatal.')
+  parser.add_option('--verify_suite_name', default=None,
+                    help='Specify the verify suite to run.')
   (options, leftover_args) = parser.parse_args()
 
   CheckOptions(parser, options, leftover_args)

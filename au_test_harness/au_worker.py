@@ -37,7 +37,7 @@ class AUWorker(object):
     if options.quick_test:
       self.verify_suite = 'build_RootFilesystemSize'
     else:
-      self.verify_suite = 'suite:smoke'
+      self.verify_suite = 'suite:%s' % (options.verify_suite_name or 'smoke')
 
   def CleanUp(self):
     """Called at the end of every test."""

@@ -150,7 +150,7 @@ class CTest(object):
                     'cros_generate_update_payload for error handling.')
       sys.exit(1)
 
-  def RunAUTestHarness(self, full, only_verify):
+  def RunAUTestHarness(self, full, only_verify, suite):
     """Runs the auto update test harness.
 
     The auto update test harness encapsulates testing the auto-update mechanism
@@ -174,6 +174,9 @@ class CTest(object):
            '--verbose',
            '--jobs=%d' % self.jobs,
           ]
+
+    if suite:
+      cmd.append('--verify_suite_name=%s' % suite)
 
     if not full:
       if only_verify:
@@ -223,6 +226,7 @@ def main():
                     help='For real tests, ip address of the target machine.')
   parser.add_option('--target_image', default=None,
                     help='Target image to test.')
+  parser.add_option('--suite', default=None, help='Test suite to run.')
   parser.add_option('--test_results_root', default=None,
                     help='Root directory to store test results.  Should '
                     'be defined relative to chroot root.')
@@ -258,7 +262,8 @@ def main():
   if not options.only_verify:
     ctest.GenerateUpdatePayloads(options.full_suite)
   try:
-    ctest.RunAUTestHarness(options.full_suite, options.only_verify)
+    ctest.RunAUTestHarness(options.full_suite, options.only_verify,
+                           options.suite)
   except TestException as e:
     if options.verbose:
       cros_build_lib.Die(str(e))
