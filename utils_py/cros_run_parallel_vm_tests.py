@@ -73,7 +73,7 @@ class ParallelTestRunner(object):
       # Must run outside the chroot and use src path.
       args = [ os.path.join(os.path.dirname(os.path.realpath(__file__)),
                             '../cros_run_vm_test'),
-               '--snapshot', # The image is shared so don't modify it.
+               '--copy', # The image is shared so don't modify it.
                '--no_graphics',
                '--use_emerged',
                '--verbose=1',
