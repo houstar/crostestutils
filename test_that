@@ -14,7 +14,7 @@ fi
 
 trap : SIGTERM SIGINT
 
-sudo $SCR $@ &
+sudo $SCR "$@" &
 child_pid=$!
 wait $child_pid
 
