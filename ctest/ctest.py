@@ -178,11 +178,11 @@ class CTest(object):
     if suite:
       cmd.append('--verify_suite_name=%s' % suite)
 
-    if not full:
-      if only_verify:
-        cmd.append('--test_prefix=SimpleTestVerify')
-      else:
-        cmd.append('--test_prefix=SimpleTest')
+    # Only verify takes precedence over --quick.
+    if only_verify:
+      cmd.append('--test_prefix=SimpleTestVerify')
+    elif not full:
+      cmd.append('--test_prefix=SimpleTest')
 
     if self.test_results_root: cmd.append('--test_results_root=%s' %
                                           self.test_results_root)

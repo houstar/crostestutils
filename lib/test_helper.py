@@ -58,7 +58,7 @@ def CreateVMImage(image, board=None, full=True):
            '--from=%s' % git.ReinterpretPathForChroot(os.path.dirname(image)),
            '--test_image']
     if full:
-      cmd.extend(['--full'])
+      cmd.extend(['--disk_layout', '2gb-rootfs-updatable'])
     if board:
       cmd.extend(['--board', board])
 
