@@ -17,9 +17,12 @@ trap : SIGTERM SIGINT
 sudo $SCR "$@" &
 child_pid=$!
 wait $child_pid
+readonly cached_exit_status=$?
 
-if [[ $? -gt 128 ]]
+if [[ $cached_exit_status -gt 128 ]]
 then
     sudo kill $child_pid
     wait $child_pid
 fi
+
+exit $cached_exit_status
