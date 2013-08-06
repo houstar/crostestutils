@@ -50,15 +50,16 @@ class RealAUWorker(au_worker.AUWorker):
     self.RunUpdateCmd(cmd)
 
   def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
-    """Verifies an image using run_remote_tests.sh with verification suite."""
+    """Verifies an image using test_that with verification suite."""
     test_directory, _ = self.GetNextResultsPath('autotest_tests')
     if not test: test = self.verify_suite
 
     result = cros_build_lib.RunCommand(
-        ['run_remote_tests.sh',
-         '--remote=%s' % self.remote,
-         '--results_dir_root=%s' % test_directory,
-         test,
+        ['test_that',
+         '--no-quickmerge',
+         '--results_dir=%s' % test_directory,
+         self.remote,
+         test
         ], error_code_ok=True, enter_chroot=True, redirect_stdout=True,
         cwd=constants.CROSUTILS_DIR)
     return self.AssertEnoughTestsPassed(unittest, result.output,

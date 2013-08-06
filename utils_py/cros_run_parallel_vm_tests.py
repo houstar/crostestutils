@@ -33,7 +33,7 @@ class ParallelTestRunner(object):
     """Constructs and initializes the test runner class.
 
     Args:
-      tests: A list of test names (see run_remote_tests.sh).
+      tests: A list of test names (see test_that.py).
       base_ssh_port: The base SSH port. Spawned VMs listen to localhost SSH
         ports incrementally allocated starting from the base one.
       board: The target board. If none, cros_run_vm_tests will use the default

@@ -117,6 +117,7 @@ class VMAUWorker(au_worker.AUWorker):
         cmd, image_path, src_image_path, proxy_port, private_key_path,
         for_vm=True)
 
+  # pylint: disable-msg=W0221
   def VerifyImage(self, test=''):
     """Runs vm smoke suite or any single test to verify image.
 
@@ -129,6 +130,7 @@ class VMAUWorker(au_worker.AUWorker):
     if not test: test = self.verify_suite
 
     command = ['./bin/cros_run_vm_test',
+               '--board=%s' % self.board,
                '--image_path=%s' % self.vm_image_path,
                '--copy',
                '--persist',

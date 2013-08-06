@@ -57,27 +57,38 @@ if [ -z "${FLAGS_test_case}" ] && [ -z "${FLAGS_ARGV}" ]; then
 fi
 
 test_args=( )
+tests_lists=( )
 if [[ ${FLAGS_use_emerged} -eq ${FLAGS_TRUE} ]]; then
-  test_args+=(--use_emerged)
+  die "--use_emerged flag no longer supported by cros_run_vm test. The " \
+      "default behavior of test_that is equivalent."
 fi
 if [[ ${FLAGS_whitelist_chrome_crashes} -eq ${FLAGS_TRUE} ]]; then
-  test_args+=(--whitelist_chrome_crashes)
+  test_args+=(--whitelist-chrome-crashes)
 fi
 [ -n "${FLAGS_test_case}" ] && test_args+=( "${FLAGS_test_case}" )
 for test in ${FLAGS_ARGV}; do
-  test_args+=("$(remove_quotes "${test}")")
+  tests_list+=("$(remove_quotes "${test}")")
 done
+
+if [ -n "${FLAGS_board}" ]; then
+  test_args+=( "-b" )
+  test_args+=( "${FLAGS_board}" )
+fi
+
+if [ -n "${FLAGS_args}" ]; then
+  test_args+=( "--args" )
+  test_args+=( "${FLAGS_args}" )
+fi
 
 trap stop_kvm EXIT
 start_kvm "${FLAGS_image_path}"
 retry_until_ssh
 
-${GCLIENT_ROOT}/chromite/bin/cros_sdk -- run_remote_tests.sh \
-    --board=${FLAGS_board} \
-    --ssh_port=${FLAGS_ssh_port} \
-    --remote=127.0.0.1 \
-    --results_dir_root="${FLAGS_results_dir_root}" \
-    --verbose=${FLAGS_verbose} \
+${GCLIENT_ROOT}/chromite/bin/cros_sdk -- test_that \
+    --no-quickmerge \
+    --no-experimental \
     --ssh_verbosity=1 \
-    --args="${FLAGS_args}" \
-    "${test_args[@]}"
+    --results_dir "${FLAGS_results_dir_root}" \
+    "${test_args[@]}" \
+    127.0.0.1:${FLAGS_ssh_port} \
+    "${tests_list}"
