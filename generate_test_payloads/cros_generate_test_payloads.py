@@ -237,7 +237,7 @@ class UpdatePayloadGenerator(object):
 
       command.append('--image=%s' % in_chroot_target)
       if payload.base: command.append('--src_image=%s' % in_chroot_base)
-      if payload.for_vm: command.append('--for_vm')
+      if payload.for_vm: command.append('--no_patch_kernel')
       if payload.key: command.append('--private_key=%s' % in_chroot_key)
 
       if payload.base:
