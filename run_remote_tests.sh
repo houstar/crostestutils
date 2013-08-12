@@ -39,6 +39,8 @@ DEFINE_boolean allow_offline_remote ${FLAGS_FALSE} \
     "Proceed with testing even if remote is offline; useful when using servo"
 DEFINE_boolean fast ${FLAGS_FALSE} \
     "Drop expensive autoserv features not needed for desk use"
+DEFINE_string ssh_verbosity "0" \
+    "ssh_verbosity level passed through to autserv, between 0 and 3 inclusive"
 
 # The prefix to look for in an argument that determines we're talking about a
 # new-style suite.
@@ -675,7 +677,8 @@ ${profiled_control_file}."
     local autoserv_args="-m ${FLAGS_remote} --ssh-port ${FLAGS_ssh_port} \
         ${image} ${option} ${control_file} -r ${results_dir} ${verbose} \
         ${FLAGS_label:+ -l $FLAGS_label} \
-        --test-retry=${test_retry_value} ${fast_flags}"
+        --test-retry=${test_retry_value} ${fast_flags} \
+        --ssh_verbosity ${FLAGS_ssh_verbosity}"
 
     sudo chmod a+w ./server/{tests,site_tests}
 
