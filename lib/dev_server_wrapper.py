@@ -61,7 +61,7 @@ class DevServerWrapper(multiprocessing.Process):
   def run(self):
     # Kill previous running instance of devserver if it exists.
     self.Stop()
-    cmd = ['start_devserver', '--archive_dir=./static']
+    cmd = ['start_devserver']
     cros_build_lib.SudoRunCommand(cmd, enter_chroot=True, print_cmd=False,
                                   log_stdout_to_file=self._log_filename,
                                   combine_stdout_stderr=True,
