@@ -78,5 +78,6 @@ ${GCLIENT_ROOT}/chromite/bin/cros_sdk -- run_remote_tests.sh \
     --remote=127.0.0.1 \
     --results_dir_root="${FLAGS_results_dir_root}" \
     --verbose=${FLAGS_verbose} \
+    --ssh_verbosity=1 \
     --args="${FLAGS_args}" \
     "${test_args[@]}"
