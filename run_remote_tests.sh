@@ -495,7 +495,7 @@ exists inside the chroot. ${FLAGS_autotest_dir} $PWD"
     # Skip suites here.
     is_suite "${test_request}" && continue
 
-    ! finds=$(find ${search_path} -maxdepth 2 -xtype f \( -name control.\* -or \
+    ! finds=$(find ${search_path} -maxdepth 4 -xtype f \( -name control.\* -or \
       -name control \) | egrep -v "~$" | egrep "${test_request}")
     if [[ -z "${finds}" ]]; then
       die "Cannot find match for \"${test_request}\""
