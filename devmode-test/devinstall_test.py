@@ -38,6 +38,8 @@ _PRIVATE_KEY = os.path.join(constants.CROSUTILS_DIR, 'mod_for_test_scripts',
                             'ssh_keys', 'testing_rsa')
 _MAX_SSH_ATTEMPTS = 5
 _TIME_BETWEEN_ATTEMPT = 30
+_CONNECT_TIMEOUT = 120
+
 
 class TestError(Exception):
   """Raised on any error during testing. It being raised is a test failure."""
@@ -133,7 +135,9 @@ class DevModeTest(object):
         cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
 
         # Ping the VM to ensure we can SSH into it.
-        self.remote_access.RemoteSh(['true'])
+        ssh_settings = remote_access.CompileSSHConnectSettings(
+            ConnectTimeout=_CONNECT_TIMEOUT)
+        self.remote_access.RemoteSh(['true'], connect_settings=ssh_settings)
         return
       except cros_build_lib.RunCommandError as e:
         logging.warning('Failed to connect to VM')
