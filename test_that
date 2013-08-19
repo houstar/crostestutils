@@ -14,7 +14,7 @@ fi
 
 trap : SIGTERM SIGINT
 
-$SCR "$@" &
+ssh-agent $SCR "$@" &
 child_pid=$!
 wait $child_pid
 readonly cached_exit_status=$?
