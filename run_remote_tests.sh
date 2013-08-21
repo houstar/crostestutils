@@ -174,7 +174,12 @@ EOF
 
 autodetect_build() {
   if [ ${FLAGS_use_emerged} -eq ${FLAGS_TRUE} ]; then
-    AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/autotest"
+    if [ -d "/build/${FLAGS_board}/usr/local/autotest/site_utils" ]; then
+      AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/autotest"
+    else
+      AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/build/autotest"
+    fi
+
     FLAGS_build=${FLAGS_FALSE}
     if [ ! -d "${AUTOTEST_DIR}" ]; then
       die \
@@ -212,7 +217,7 @@ start autotest and repo sync to continue."
     fi
     info "Build and run autotests from ${AUTOTEST_DIR}."
   else
-    AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/autotest"
+    AUTOTEST_DIR="/build/${FLAGS_board}/usr/local/build/autotest"
     if [ ! -d "${AUTOTEST_DIR}" ]; then
       die \
 "Autotest was not emerged, ${AUTOTEST_DIR} does not exist. You should \
