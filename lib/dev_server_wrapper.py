@@ -5,11 +5,14 @@
 """Module containing methods and classes to interact with a devserver instance.
 """
 
-import os
+import logging
 import multiprocessing
+import os
 import re
 import sys
+import tempfile
 import time
+import urllib2
 
 import constants
 from chromite.lib import cros_build_lib
@@ -17,6 +20,8 @@ from chromite.lib import cros_build_lib
 # Wait up to 15 minutes for the dev server to start. It can take a while to
 # start when generating payloads in parallel.
 DEV_SERVER_TIMEOUT = 900
+CHECK_HEALTH_URL = 'http://127.0.0.1:8080/check_health'
+KILL_TIMEOUT = 10
 
 
 def GetIPAddress(device='eth0'):
@@ -52,54 +57,113 @@ class DevServerException(Exception):
 class DevServerWrapper(multiprocessing.Process):
   """A Simple wrapper around a dev server instance."""
 
-  def __init__(self, test_root):
-    self.proc = None
-    self.test_root = test_root
-    self._log_filename = os.path.join(test_root, 'dev_server.log')
-    multiprocessing.Process.__init__(self)
+  def __init__(self, test_root=None):
+    super(DevServerWrapper, self).__init__()
+    self.test_root = test_root or DevServerWrapper.MkChrootTemp(is_dir=True)
+    self._log_filename = os.path.join(self.test_root, 'dev_server.log')
+    self._pid_file = DevServerWrapper.MkChrootTemp(is_dir=False)
+    self._pid = None
+
+  # Chroot helper methods. Since we call a script into the chroot with paths
+  # created outside the chroot, translation back and forth is needed. These
+  # methods all assume the default chroot dir.
+
+  @staticmethod
+  def MkChrootTemp(is_dir):
+    """Returns a temp(dir if is_dir, file otherwise) in the chroot."""
+    chroot_tmp = os.path.join(constants.SOURCE_ROOT, 'chroot', 'tmp')
+    if is_dir:
+      return tempfile.mkdtemp(prefix='devserver_wrapper', dir=chroot_tmp)
+    else:
+      return tempfile.NamedTemporaryFile(prefix='devserver_wrapper',
+                                         dir=chroot_tmp, delete=False).name
+
+  @staticmethod
+  def ToChrootPath(path):
+    """Converts the path outside the chroot to one that can be used inside."""
+    path = os.path.abspath(path)
+    if '/chroot/' not in path:
+      raise ValueError('Path %s is not a path that points inside the chroot' %
+                       path)
+
+    return '/' + path.partition('/chroot/')[2]
+
+  def _WaitUntilStarted(self):
+    """Wait until the devserver has started."""
+    current_time = time.time()
+    deadline = current_time + DEV_SERVER_TIMEOUT
+    while current_time <= deadline:
+      try:
+        if not self.is_alive():
+          raise DevServerException('Devserver crashed while starting')
+
+        urllib2.urlopen(CHECK_HEALTH_URL, timeout=0.05)
+        return
+      except IOError:
+        # urlopen errors will throw a subclass of IOError if we can't connect.
+        pass
+      finally:
+        # Let's not churn needlessly in this loop as the devserver starts up.
+        time.sleep(1)
+
+      current_time = time.time()
+    else:
+      self.terminate()
+      raise DevServerException('Devserver did not start')
 
   def run(self):
-    # Kill previous running instance of devserver if it exists.
-    self.Stop()
-    cmd = ['start_devserver']
-    cros_build_lib.SudoRunCommand(cmd, enter_chroot=True, print_cmd=False,
-                                  log_stdout_to_file=self._log_filename,
-                                  combine_stdout_stderr=True,
-                                  cwd=constants.SOURCE_ROOT)
+    """Kicks off devserver in a separate process and waits for it to finish."""
+    cmd = ['start_devserver',
+           '--pidfile', DevServerWrapper.ToChrootPath(self._pid_file),
+           '--logfile', DevServerWrapper.ToChrootPath(self._log_filename)]
+    return_obj = cros_build_lib.SudoRunCommand(
+        cmd, enter_chroot=True, debug_level=logging.DEBUG,
+        cwd=constants.SOURCE_ROOT, error_code_ok=True,
+        redirect_stdout=True, combine_stdout_stderr=True)
+    if return_obj.returncode != 0:
+      logging.error('Devserver terminated unexpectedly!')
+      logging.error(return_obj.output)
+
+  def Start(self):
+    """Starts a background devserver and waits for it to start.
+
+    Starts a background devserver and waits for it to start. Will only return
+    once devserver has started and running pid has been read.
+    """
+    self.start()
+    self._WaitUntilStarted()
+    # Pid file was passed into the chroot.
+    with open(self._pid_file, 'r') as f:
+      self._pid = f.read()
 
   def Stop(self):
-    """Kills the devserver instance if it exists."""
-    cros_build_lib.SudoRunCommand(['pkill', '-f', 'devserver.py'],
-                                  error_code_ok=True, print_cmd=False)
+    """Kills the devserver instance with SIGTERM and SIGKILL if SIGTERM fails"""
+    if not self._pid:
+      logging.error('No devserver running.')
+      return
+
+    logging.debug('Stopping devserver instance with pid %s', self._pid)
+    if self.is_alive():
+      cros_build_lib.SudoRunCommand(['kill', self._pid],
+                                    debug_level=logging.DEBUG)
+    else:
+      logging.error('Devserver not running!')
+      return
+
+    self.join(KILL_TIMEOUT)
+    if self.is_alive():
+      logging.warning('Devserver is unstoppable. Killing with SIGKILL')
+      cros_build_lib.SudoRunCommand(['kill', '-9', self._pid],
+                                    debug_level=logging.DEBUG)
 
   def PrintLog(self):
-    """Print devserver output."""
+    """Print devserver output to stdout."""
     print '--- Start output from %s ---' % self._log_filename
     # Open in update mode in case the child process hasn't opened the file yet.
     with open(self._log_filename) as log:
       sys.stdout.writelines(log)
-    print '--- End output from %s ---' % self._log_filename
 
-  def WaitUntilStarted(self):
-    """Wait until the devserver has started."""
-    # Open in update mode in case the child process hasn't opened the file yet.
-    pos = 0
-    with open(self._log_filename, 'w+') as log:
-      for _ in range(DEV_SERVER_TIMEOUT * 2):
-        log.seek(pos)
-        for line in log:
-          # When the dev server has started, it will print a line stating
-          # 'Bus STARTED'. Wait for that line to appear.
-          if 'Bus STARTED' in line:
-            return
-          # If we've read a complete line, and it doesn't contain the magic
-          # phrase, move on to the next line.
-          if line.endswith('\n'):
-            pos = log.tell()
-        # Looks like it hasn't started yet. Keep waiting...
-        time.sleep(0.5)
-    self.PrintLog()
-    raise DevServerException('Timeout waiting for the devserver to startup.')
+    print '--- End output from %s ---' % self._log_filename
 
   @classmethod
   def GetDevServerURL(cls, port=None, sub_dir=None):

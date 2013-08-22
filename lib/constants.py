@@ -8,6 +8,8 @@ _TEST_LIB_PATH = os.path.realpath(__file__)
 
 CROS_PLATFORM_ROOT = os.path.join(os.path.dirname(_TEST_LIB_PATH), '..', '..')
 
+DEFAULT_CHROOT_DIR = 'chroot'
+
 SOURCE_ROOT = os.path.realpath(os.path.join(
     os.path.dirname(_TEST_LIB_PATH), '..', '..', '..', '..'))
 
