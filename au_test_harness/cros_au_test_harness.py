@@ -205,10 +205,14 @@ def main():
 
   with sudo.SudoKeepAlive():
     au_worker.AUWorker.SetUpdateCache(update_cache)
-    my_server = dev_server_wrapper.DevServerWrapper(options.test_results_root)
-    my_server.start()
+    my_server = None
     try:
-      my_server.WaitUntilStarted()
+      # Only start a devserver if we'll need it.
+      if update_cache:
+        my_server = dev_server_wrapper.DevServerWrapper(
+            options.test_results_root)
+        my_server.Start()
+
       if options.type == 'vm':
         _RunTestsInParallel(options)
       else:
@@ -220,7 +224,8 @@ def main():
           cros_build_lib.Die('Test harness failed.')
 
     finally:
-      my_server.Stop()
+      if my_server:
+        my_server.Stop()
 
 
 if __name__ == '__main__':
