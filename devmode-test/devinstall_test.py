@@ -175,8 +175,9 @@ class DevModeTest(object):
 
     if not self.binhost:
       logging.info('Starting the devserver.')
-      self.devserver = dev_server_wrapper.DevServerWrapper()
-      self.devserver.Start()
+      self.devserver = dev_server_wrapper.DevServerWrapper(self.tmpdir)
+      self.devserver.start()
+      self.devserver.WaitUntilStarted()
       self.binhost = dev_server_wrapper.DevServerWrapper.GetDevServerURL(
           sub_dir='static/pkgroot/%s/packages' % self.board)
 
