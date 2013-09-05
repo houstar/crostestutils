@@ -88,6 +88,7 @@ ${GCLIENT_ROOT}/chromite/bin/cros_sdk -- test_that \
     --no-quickmerge \
     --no-experimental \
     --ssh_verbosity 3 \
+    --ssh_options "-F /dev/null -i /dev/null" \
     --debug \
     --results_dir "${FLAGS_results_dir_root}" \
     "${test_args[@]}" \
