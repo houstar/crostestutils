@@ -258,7 +258,30 @@ class ResultCollector(object):
           localtime = localtime_
     return timestamp, localtime
 
-  def _CollectResult(self, testdir, results):
+  def _CheckExperimental(self, testdir):
+    """Parses keyval file and return the value of `experimental`.
+
+    Args:
+      testdir: The result directory that has the keyval file.
+
+    Returns:
+      The value of 'experimental', which is a boolean value indicating
+      whether it is an experimental test or not.
+    """
+    keyval_file = os.path.join(testdir, 'keyval')
+    if not os.path.isfile(keyval_file):
+      return False
+
+    with open(keyval_file) as f:
+      for line in f:
+        match = re.match(r'experimental=(.+)', line)
+        if match:
+          return match.group(1) == 'True'
+      else:
+        return False
+
+
+  def _CollectResult(self, testdir, results, is_experimental=False):
     """Collects results stored under testdir into a dictionary.
 
     The presence/location of status files (status.log, status and
@@ -286,10 +309,14 @@ class ResultCollector(object):
     in the result dictionary.  The test directory name and a test directory
     timestamp/localtime are saved to be used as sort keys for the results.
 
+    The value of 'is_experimental' is included in the result dictionary.
+
     Args:
       testdir: The autoserv test result directory.
       results: A list to which a populated test-result-dictionary will
                be appended if a status file is found.
+      is_experimental: A boolean value indicating whether the result directory
+                       is for an experimental test.
     """
     status_file = os.path.join(testdir, 'status.log')
     if not os.path.isfile(status_file):
@@ -343,28 +370,37 @@ class ResultCollector(object):
         'perf': self._CollectPerf(testdir),
         'attr': self._CollectAttr(testdir),
         'info': self._CollectInfo(testdir, {'localtime': localtime,
-                                            'timestamp': timestamp})})
+                                            'timestamp': timestamp}),
+        'experimental': is_experimental})
 
-  def RecursivelyCollectResults(self, resdir):
+  def RecursivelyCollectResults(self, resdir, parent_experimental_tag=False):
     """Recursively collect results into a list of dictionaries.
 
     Only recurses into directories that possess a 'debug' subdirectory
     because anything else is not considered a 'test' directory.
 
+    The value of 'experimental' in keyval file is used to determine whether
+    the result is for an experimental test. If it is, all its sub directories
+    are considered to be experimental tests too.
+
     Args:
       resdir: results/test directory to parse results from and recurse into.
+      parent_experimental_tag: A boolean value, used to keep track of whether
+                               its parent directory is for an experimental
+                               test.
 
     Returns:
       List of dictionaries of results.
     """
     results = []
-    self._CollectResult(resdir, results)
+    is_experimental = parent_experimental_tag or self._CheckExperimental(resdir)
+    self._CollectResult(resdir, results, is_experimental)
     for testdir in glob.glob(os.path.join(resdir, '*')):
       # Remove false positives that are missing a debug dir.
       if not os.path.exists(os.path.join(testdir, 'debug')):
         continue
 
-      results.extend(self.RecursivelyCollectResults(testdir))
+      results.extend(self.RecursivelyCollectResults(testdir, is_experimental))
     return results
 
 
@@ -628,6 +664,8 @@ class ReportGenerator(object):
     self._CollectAllResults()
     self._GenerateReportText()
     for d in self._results:
+      if d['experimental'] and self._options.ignore_experimental_tests:
+        continue
       if not d['status'] or (self._options.crash_detection and d['crashes']):
         sys.exit(1)
 
@@ -676,6 +714,12 @@ def main():
                     dest='whitelist_chrome_crashes',
                     action='store_true', default=False,
                     help='Treat Chrome crashes as non-fatal.')
+  parser.add_option('--ignore_experimental_tests',
+                    dest='ignore_experimental_tests',
+                    action='store_true', default=False,
+                    help='If set, experimental test results will not '
+                         'influence the exit code.')
+
   (options, args) = parser.parse_args()
 
   if not args:
