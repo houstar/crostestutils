@@ -186,6 +186,10 @@ def main():
                     help='Treat Chrome crashes as non-fatal.')
   parser.add_option('--verify_suite_name', default=None,
                     help='Specify the verify suite to run.')
+  parser.add_option('--parallel', default=False, dest='parallel',
+                    action='store_true',
+                    help='Run multiple test stages in parallel (applies only '
+                         'to vm tests). Default: False')
   (options, leftover_args) = parser.parse_args()
 
   CheckOptions(parser, options, leftover_args)
@@ -213,7 +217,7 @@ def main():
             options.test_results_root)
         my_server.Start()
 
-      if options.type == 'vm':
+      if options.type == 'vm' and options.parallel:
         _RunTestsInParallel(options)
       else:
         # TODO(sosa) - Take in a machine pool for a real test.
