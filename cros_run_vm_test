@@ -84,6 +84,10 @@ trap stop_kvm EXIT
 start_kvm "${FLAGS_image_path}"
 retry_until_ssh
 
+echo 'Builder uptime: ' $(uptime)
+echo 'Builder meminfo:'
+cat /proc/meminfo
+
 ${GCLIENT_ROOT}/chromite/bin/cros_sdk -- test_that \
     --no-quickmerge \
     --ssh_options "-F /dev/null -i /dev/null" \
