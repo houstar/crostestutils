@@ -38,7 +38,7 @@ class VMAUWorker(au_worker.AUWorker):
 
   def PrepareBase(self, image_path, signed_base=False):
     """Creates an update-able VM based on base image."""
-    self.PrepareVMBase(image_path, signed_base)
+    return self.PrepareVMBase(image_path, signed_base)
 
   @staticmethod
   def _HandleFail(log_directory, fail_directory):
@@ -56,10 +56,6 @@ class VMAUWorker(au_worker.AUWorker):
     """Updates VM image with image_path."""
     log_directory, fail_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
-    if src_image_path and self._first_update:
-      src_image_path = self.vm_image_path
-      self._first_update = False
-
     cmd = ['%s/bin/cros_run_vm_update' % constants.CROSUTILS_DIR,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),

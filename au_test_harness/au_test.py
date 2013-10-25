@@ -58,7 +58,7 @@ class AUTest(unittest.TestCase):
 
   def AttemptUpdateWithFilter(self, update_filter, proxy_port=8081):
     """Update through a proxy, with a specified filter, and expect success."""
-    self.worker.PrepareBase(self.target_image_path)
+    target_image_path = self.worker.PrepareBase(self.target_image_path)
 
     # The devserver runs at port 8080 by default. We assume that here, and
     # start our proxy at a different one. We then tell our update tools to
@@ -69,7 +69,7 @@ class AUTest(unittest.TestCase):
                                           filter=update_filter)
     proxy.serve_forever_in_thread()
     try:
-      self.worker.PerformUpdate(self.target_image_path, self.target_image_path,
+      self.worker.PerformUpdate(target_image_path, target_image_path,
                                 proxy_port=proxy_port)
     finally:
       proxy.shutdown()
@@ -99,10 +99,10 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9222)
     # Just make sure some tests pass on original image.  Some old images
     # don't pass many tests.
-    self.worker.PrepareBase(self.base_image_path)
+    base_image_path = self.worker.PrepareBase(self.base_image_path)
 
     # Update to
-    self.worker.PerformUpdate(self.target_image_path, self.base_image_path)
+    self.worker.PerformUpdate(self.target_image_path, base_image_path)
     self.assertTrue(self.worker.VerifyImage())
 
     # Update from
@@ -118,10 +118,10 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9223)
     # Just make sure some tests pass on original image.  Some old images
     # don't pass many tests.
-    self.worker.PrepareBase(self.base_image_path)
+    base_image_path = self.worker.PrepareBase(self.base_image_path)
 
     # Update to
-    self.worker.PerformUpdate(self.target_image_path, self.base_image_path,
+    self.worker.PerformUpdate(self.target_image_path, base_image_path,
                               'clean')
     self.assertTrue(self.worker.VerifyImage())
 
@@ -165,10 +165,11 @@ class AUTest(unittest.TestCase):
   def testSimpleSignedUpdate(self):
     """Test that updates to itself with a signed payload."""
     self.worker.Initialize(9226)
-    self.worker.PrepareBase(self.target_image_path, signed_base=True)
+    signed_target_image_path = self.worker.PrepareBase(self.target_image_path,
+                                                       signed_base=True)
     if self.private_key:
       self.worker.PerformUpdate(self.target_image_path,
-                                self.target_image_path + '.signed',
+                                signed_target_image_path,
                                 private_key_path=self.private_key)
     else:
       cros_build_lib.Info('No key found to use for signed testing.')
@@ -180,8 +181,8 @@ class AUTest(unittest.TestCase):
     run using test_prefix option.
     """
     self.worker.Initialize(9227)
-    self.worker.PrepareBase(self.target_image_path)
-    self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
+    target_image_path = self.worker.PrepareBase(self.target_image_path)
+    self.worker.PerformUpdate(target_image_path, target_image_path)
     self.assertTrue(self.worker.VerifyImage())
 
   def SimpleTestVerify(self):

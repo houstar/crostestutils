@@ -21,7 +21,7 @@ class RealAUWorker(au_worker.AUWorker):
 
   def PrepareBase(self, image_path, signed_base=False):
     """Auto-update to base image to prepare for test."""
-    self.PrepareRealBase(image_path, signed_base)
+    return self.PrepareRealBase(image_path, signed_base)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port=None, private_key_path=None):

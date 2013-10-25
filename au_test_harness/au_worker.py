@@ -27,7 +27,6 @@ class AUWorker(object):
   def __init__(self, options, test_results_root):
     """Processes options for the specific-type of worker."""
     self.board = options.board
-    self._first_update = False
     self.test_results_root = test_results_root
     self.all_results_root = os.path.join(test_results_root, 'all')
     self.fail_results_root = os.path.join(test_results_root, 'failed')
@@ -59,6 +58,8 @@ class AUWorker(object):
 
     Subclasses must override this method with the correct procedure for
     preparing the test target.
+
+    Returns the path to the base image (might have changed for vm's).
 
 `   Args:
       image_path: The image that should reside on the target before the test.
@@ -146,19 +147,24 @@ class AUWorker(object):
 
   def PrepareRealBase(self, image_path, signed_base):
     """Prepares a remote device for worker test by updating it to the image."""
+    real_image_path = image_path
     if not signed_base:
-      self.UpdateImage(image_path)
+      self.UpdateImage(real_image_path)
     else:
-      self.UpdateImage(image_path + '.signed')
+      real_image_path = real_image_path + '.signed'
+      self.UpdateImage(real_image_path)
+
+    return real_image_path
 
   def PrepareVMBase(self, image_path, signed_base):
     """Prepares a VM image for worker test."""
     # Tells the VM tests to use the Qemu image as the start point.
-    self._first_update = True
     self.vm_image_path = os.path.join(os.path.dirname(image_path),
                                       'chromiumos_qemu_image.bin')
     if signed_base:
       self.vm_image_path = self.vm_image_path + '.signed'
+
+    return self.vm_image_path
 
   def GetStatefulChangeFlag(self, stateful_change):
     """Returns the flag to pass to image_to_vm for the stateful change."""
