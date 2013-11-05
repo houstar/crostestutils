@@ -44,8 +44,7 @@ def _ReadKeyvalFile(results, file_):
     kvd[m.group(1)] = m.group(2)
 
 
-_RESULTS_PATH = (
-    "summary/platform_BootPerfServer/platform_BootPerfServer/results/keyval")
+_RESULTS_PATH = "summary/platform_BootPerfServer/results/keyval"
 
 
 def ReadResultsDirectory(dir_):

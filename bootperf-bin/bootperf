@@ -32,36 +32,36 @@ find_common_sh
 . "${SCRIPT_ROOT}/common.sh" || (echo "Unable to load common.sh" && exit 1)
 # --- END COMMON.SH BOILERPLATE ---
 
-# TODO(jrbarnette) Although run_remote_tests.sh works outside the
-# chroot, the log files it produces will be stored inside the
-# chroot.  So, from outside the chroot, this script doesn't work.
-# Yes, I think it's a bug, too.  You're welcome to fix it, if you
-# think it's so easy. :-)
+# TODO(jrbarnette) The log files produced in this script will be
+# stored inside the chroot.  So, from outside the chroot, this
+# script doesn't work.  I don't know if this is easy to fix, but
+# you're welcome to try.  Let me know how it goes.  :-)
 assert_inside_chroot
 
 DEFINE_string output_dir "" "output directory for results" o
 DEFINE_string board "" "name of board we are testing"
 DEFINE_boolean keep_logs "$FLAGS_FALSE" "keep autotest results" k
 
-RUN_TEST="run_remote_tests.sh"
-TEST='server/site_tests/platform_BootPerfServer/control$'
+RUN_TEST="test_that"
+TEST='f:.*/platform_BootPerfServer/control'
 TMP_RESULTS="$(mktemp -d /tmp/bootperf.XXXXXX)"
-RESULTS_DIR=platform_BootPerfServer/platform_BootPerfServer/results
+RESULTS_ROOT=results-1-experimental_BootPerfServer
+RESULTS_DIR=platform_BootPerfServer/results
 RESULTS_KEYVAL=$RESULTS_DIR/keyval
 RESULTS_SUMMARY_FILES=(
   $RESULTS_DIR
+  keyval
   platform_BootPerfServer/keyval
-  platform_BootPerfServer/platform_BootPerfServer/keyval
-  platform_BootPerfServer/platform_BootPerfServer/platform_BootPerf/keyval
-  platform_BootPerfServer/platform_BootPerfServer/platform_BootPerf/status
-  platform_BootPerfServer/platform_BootPerfServer/status
-  platform_BootPerfServer/platform_BootPerfServer/status.log
-  platform_BootPerfServer/platform_BootPerfServer/sysinfo/cmdline
-  platform_BootPerfServer/platform_BootPerfServer/sysinfo/cpuinfo
-  platform_BootPerfServer/platform_BootPerfServer/sysinfo/modules
-  platform_BootPerfServer/platform_BootPerfServer/sysinfo/uname
-  platform_BootPerfServer/platform_BootPerfServer/sysinfo/version
+  platform_BootPerfServer/platform_BootPerf/keyval
+  platform_BootPerfServer/platform_BootPerf/status
+  platform_BootPerfServer/status
   platform_BootPerfServer/status.log
+  platform_BootPerfServer/sysinfo/cmdline
+  platform_BootPerfServer/sysinfo/cpuinfo
+  platform_BootPerfServer/sysinfo/modules
+  platform_BootPerfServer/sysinfo/uname
+  platform_BootPerfServer/sysinfo/version
+  status.log
 )
 
 # Structure of a results directory:
@@ -140,9 +140,9 @@ extra_files() {
 # Arguments are <ip-address> and <count> arguments, as for the main
 # command.
 #
-# We terminate test runs if "run_remote_tests" ever fails to produce
-# the results file; generally this is the result of a serious error
-# (e.g. disk full) that won't go away if we just plow on.
+# We terminate test runs if "test_that" ever fails to produce the
+# results keyval file; generally this is the result of a serious
+# error (e.g. disk full) that won't go away if we just plow on.
 run_boot_test() {
   local remote="$1"
   local count="${2:-1}"
@@ -164,21 +164,16 @@ run_boot_test() {
     mkdir $iter_rundir
     echo "$(date '+%T') - $logfile"
 
-    # BEWARE:  The --use_emerged option means that you must manually
-    # emerge chromeos-base/autotest-tests if a) you are working on
-    # the package, and b) you also want use this script to test your
-    # changes to the package.  (The option is here because IMO the
-    # alternative is a bigger nuisance.)
-    $RUN_TEST --use_emerged --results_dir_root="$TMP_RESULTS" \
-              --remote="$remote" $BOARD $TEST >$logfile 2>&1
-    if [ ! -e "$TMP_RESULTS/$RESULTS_KEYVAL" ]; then
+    $RUN_TEST --results_dir="$TMP_RESULTS" \
+              "$remote" $BOARD $TEST >$logfile 2>&1
+    if [ ! -e "$TMP_RESULTS/$RESULTS_ROOT/$RESULTS_KEYVAL" ]; then
       error "No results file; terminating test runs."
       error "Check $logfile for output from the test run,"
       error "and see $TMP_RESULTS for full test logs and output."
       return
     fi
     mkdir $summary_dir
-    tar cf - -C $TMP_RESULTS "${RESULTS_SUMMARY_FILES[@]}" |
+    tar cf - -C $TMP_RESULTS/$RESULTS_ROOT "${RESULTS_SUMMARY_FILES[@]}" |
       tar xf - -C $summary_dir
     if [ $FLAGS_keep_logs -eq $FLAGS_TRUE ]; then
       mv $TMP_RESULTS $all_results_dir
