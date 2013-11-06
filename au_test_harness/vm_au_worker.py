@@ -6,8 +6,10 @@
 
 import os
 import shutil
+import tempfile
 
 import constants
+from chromite.buildbot import constants as buildbot_constants
 from chromite.lib import cros_build_lib
 from crostestutils.au_test_harness import au_worker
 from crostestutils.au_test_harness import update_exception
@@ -38,18 +40,36 @@ class VMAUWorker(au_worker.AUWorker):
 
   def PrepareBase(self, image_path, signed_base=False):
     """Creates an update-able VM based on base image."""
-    return self.PrepareVMBase(image_path, signed_base)
+    original_image_path = self.PrepareVMBase(image_path, signed_base)
+    # This worker may be running in parallel with other VMAUWorkers, as
+    # well as the archive stage of cbuildbot. Make a private copy of
+    # the VM image, to avoid any conflict.
+    _, private_image_path = tempfile.mkstemp(
+        prefix="%s." % buildbot_constants.VM_IMAGE_PREFIX)
+    shutil.copy(self.vm_image_path, private_image_path)
+    self.TestInfo('Copied shared disk image %s to %s.' %
+                  (self.vm_image_path, private_image_path))
+    self.vm_image_path = private_image_path
+    # Although we will run the VM with |private_image_path|, we return
+    # |original_image_path|, because our return value is used to find the
+    # update files. And the update files are shared across the tests
+    # that share the original image.
+    return original_image_path
 
-  @staticmethod
-  def _HandleFail(log_directory, fail_directory):
+  def _HandleFail(self, log_directory, fail_directory):
     parent_dir = os.path.dirname(fail_directory)
     if not os.path.isdir(parent_dir):
       os.makedirs(parent_dir)
 
     try:
+      # Copy logs. Must be done before moving image, as this creates
+      # |fail_directory|.
       shutil.copytree(log_directory, fail_directory)
+      self._KillExistingVM(self._kvm_pid_file)
+      shutil.move(self.vm_image_path, fail_directory)
     except shutil.Error as e:
-      cros_build_lib.Warning('Ignoring errors %s', e)
+      cros_build_lib.Warning(
+          'Ignoring errors while copying logs or VM disk image: %s', e)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port='', private_key_path=None):
@@ -59,7 +79,6 @@ class VMAUWorker(au_worker.AUWorker):
     cmd = ['%s/bin/cros_run_vm_update' % constants.CROSUTILS_DIR,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),
-           '--copy',
            self.graphics_flag,
            '--persist',
            '--kvm_pid=%s' % self._kvm_pid_file,
@@ -85,7 +104,6 @@ class VMAUWorker(au_worker.AUWorker):
            '--payload=%s' % update_path,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),
-           '--copy',
            self.graphics_flag,
            '--persist',
            '--kvm_pid=%s' % self._kvm_pid_file,
@@ -128,7 +146,6 @@ class VMAUWorker(au_worker.AUWorker):
     command = ['./bin/cros_run_vm_test',
                '--board=%s' % self.board,
                '--image_path=%s' % self.vm_image_path,
-               '--copy',
                '--persist',
                '--kvm_pid=%s' % self._kvm_pid_file,
                '--ssh_port=%s' % self._ssh_port,
