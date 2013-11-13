@@ -5,6 +5,9 @@
 
 # Transporter copies logs file to GS storage.
 
+# Must be a member of "chromiumos-test-logs-ninja" group or will get
+# "Access Denied" error from gsutil.
+
 import argparse
 import os
 
@@ -43,7 +46,7 @@ def main():
   else:
     print('%s is neither a file nor a directory.' % arguments.logs_path)
     return 1
-  link='https://storage.cloud.google.com/chromiumos-test-logs/'
+  link = 'https://storage.cloud.google.com/chromiumos-test-logs/'
   print('Logs link: %s%s/%s' %
         (link, logs_dir, os.path.basename(arguments.logs_path)))
 
