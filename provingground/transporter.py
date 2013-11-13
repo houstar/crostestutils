@@ -10,7 +10,9 @@ import os
 
 def main():
   gs_path = 'gs://chromiumos-test-logs/'
-  parser = argparse.ArgumentParser()
+  usage_desc = ('Please make sure you are part of chromiumos-test-logs-ninja '
+                'group. Ping rohitbm/krisr to get yourself added to the group.') 
+  parser = argparse.ArgumentParser(description=usage_desc)
   parser.add_argument('-t', '--tracker', dest='tracker',
                       help='[crosp|cr|misc] bug\'s tracker name.')
   parser.add_argument('-b', '--bug', dest='bug_id',
