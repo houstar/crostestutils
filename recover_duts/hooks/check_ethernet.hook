@@ -14,6 +14,15 @@ fi
 
 NON_ETHERNET_DRIVERS="cdc_ether"
 
+# Critical messages should be sent to /var/log/messages.  Other messages should
+# be sent via echo to be harvested by recover_duts.py.
+#
+# TODO(tbroch) Relocate this to common hook library if/when there's more than
+# one hook.
+critical_msg() {
+  logger -t "recover_duts:$(basename $0)" -- "$@"
+}
+
 # Returns the default gateway.
 get_default_gateway() {
   local ip_route="$(ip route get 1.0.0.0)"
@@ -55,7 +64,7 @@ find_ethernet_interfaces() {
 do_ping() {
   local ip_addr=$1
   for eth in $(find_ethernet_interfaces); do
-    ping -I ${eth} -c 9 ${ip_addr} && return 0
+    ping -q -I ${eth} -c 9 ${ip_addr} && return 0
   done
   return 1
 }
@@ -70,6 +79,7 @@ recover_ethernet_devices() {
   initctl stop shill || echo "Shill was not running."
   initctl start shill
   sleep 30
+  ifconfig -a
 }
 
 # Return the remote IP address of the first established SSH connection
@@ -111,7 +121,8 @@ main() {
   fi
 
   # Last chance - reboot if we can't get any connectivity.
-  echo "All efforts to recover ethernet have been exhausted. Rebooting."
+  critical_msg "All efforts to recover ethernet have been exhausted. Rebooting."
+  sync
   (sleep 5 && reboot) &
   return 1
 }
