@@ -28,6 +28,7 @@ sys.path.append(constants.SOURCE_ROOT)
 from chromite.lib import cros_build_lib
 from chromite.lib import parallel
 from chromite.lib import sudo
+from chromite.lib import timeout_util
 from crostestutils.au_test_harness import au_test
 from crostestutils.au_test_harness import au_worker
 from crostestutils.lib import dev_server_wrapper
@@ -66,7 +67,7 @@ class _LessBacktracingTestRunner(unittest.TextTestRunner):
 
     If the test suite fails, raise a BackgroundFailure.
     """
-    with cros_build_lib.SubCommandTimeout(constants.MAX_TIMEOUT_SECONDS):
+    with timeout_util.Timeout(constants.MAX_TIMEOUT_SECONDS):
       test_result = super(_LessBacktracingTestRunner, self).run(*args, **kwargs)
       if test_result is None or not test_result.wasSuccessful():
         msg = 'Test harness failed. See logs for details.'

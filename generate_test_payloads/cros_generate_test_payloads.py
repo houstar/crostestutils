@@ -38,6 +38,7 @@ from chromite.lib import locking
 from chromite.lib import osutils
 from chromite.lib import parallel
 from chromite.lib import sudo
+from chromite.lib import timeout_util
 from crostestutils.au_test_harness import cros_au_test_harness
 from crostestutils.generate_test_payloads import payload_generation_exception
 from crostestutils.lib import dev_server_wrapper
@@ -255,12 +256,12 @@ class UpdatePayloadGenerator(object):
 
       logging.info(debug_message)
       try:
-        with cros_build_lib.SubCommandTimeout(constants.MAX_TIMEOUT_SECONDS):
+        with timeout_util.Timeout(constants.MAX_TIMEOUT_SECONDS):
           cros_build_lib.SudoRunCommand(command, log_stdout_to_file=log_file,
                                         combine_stdout_stderr=True,
                                         enter_chroot=True, print_cmd=False,
                                         cwd=constants.SOURCE_ROOT)
-      except (cros_build_lib.TimeoutError, cros_build_lib.RunCommandError):
+      except (timeout_util.TimeoutError, cros_build_lib.RunCommandError):
         # Print output first, then re-raise the exception.
         if os.path.isfile(log_file):
           logging.error(osutils.ReadFile(log_file))
