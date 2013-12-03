@@ -27,12 +27,17 @@ class VMAUWorker(au_worker.AUWorker):
       cros_build_lib.Die('Need board to convert base image to vm.')
     self.whitelist_chrome_crashes = options.whitelist_chrome_crashes
 
-  def _KillExistingVM(self, pid_file):
+  def _KillExistingVM(self, pid_file, save_mem_path=None):
     """Kills an existing VM specified by the pid_file."""
-    if os.path.exists(pid_file):
-      cmd = ['./bin/cros_stop_vm', '--kvm_pid=%s' % pid_file]
-      cros_build_lib.RunCommand(cmd, print_cmd=False, error_code_ok=True,
-                                cwd=constants.CROSUTILS_DIR)
+    if not os.path.exists(pid_file):
+      return
+
+    cmd = ['./bin/cros_stop_vm', '--kvm_pid=%s' % pid_file]
+    if save_mem_path is not None:
+      cmd.append('--mem_path=%s' % save_mem_path)
+
+    cros_build_lib.RunCommand(cmd, print_cmd=False, error_code_ok=True,
+                              cwd=constants.CROSUTILS_DIR)
 
   def CleanUp(self):
     """Stop the vm after a test."""
@@ -45,7 +50,7 @@ class VMAUWorker(au_worker.AUWorker):
     # well as the archive stage of cbuildbot. Make a private copy of
     # the VM image, to avoid any conflict.
     _, private_image_path = tempfile.mkstemp(
-        prefix="%s." % buildbot_constants.VM_IMAGE_PREFIX)
+        prefix="%s." % buildbot_constants.VM_DISK_PREFIX)
     shutil.copy(self.vm_image_path, private_image_path)
     self.TestInfo('Copied shared disk image %s to %s.' %
                   (self.vm_image_path, private_image_path))
@@ -61,15 +66,24 @@ class VMAUWorker(au_worker.AUWorker):
     if not os.path.isdir(parent_dir):
       os.makedirs(parent_dir)
 
+    # Copy logs. Must be done before moving image, as this creates
+    # |fail_directory|.
     try:
-      # Copy logs. Must be done before moving image, as this creates
-      # |fail_directory|.
       shutil.copytree(log_directory, fail_directory)
-      self._KillExistingVM(self._kvm_pid_file)
+    except shutil.Error as e:
+      cros_build_lib.Warning(
+          'Ignoring errors while copying logs: %s', e)
+
+    # Copy VM state. This includes the disk image, and the memory
+    # image.
+    try:
+      _, mem_image_path = tempfile.mkstemp(
+        dir=fail_directory, prefix="%s." % buildbot_constants.VM_MEM_PREFIX)
+      self._KillExistingVM(self._kvm_pid_file, save_mem_path=mem_image_path)
       shutil.move(self.vm_image_path, fail_directory)
     except shutil.Error as e:
       cros_build_lib.Warning(
-          'Ignoring errors while copying logs or VM disk image: %s', e)
+          'Ignoring errors while copying VM files: %s', e)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port='', private_key_path=None):
