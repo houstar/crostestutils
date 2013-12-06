@@ -15,15 +15,18 @@ from chromite.lib import cros_build_lib
 
 class ImageExtractor(object):
   """Class used to get the latest image for the board."""
-  # The image we want to test.
+  # The default image to extract.
   IMAGE_TO_EXTRACT = 'chromiumos_test_image.bin'
   # Archive directory in the src tree to keep latest archived image after
   # we've unzipped them.
   SRC_ARCHIVE_DIR = 'latest_image'
 
-  def __init__(self, archive_dir):
+  def __init__(self, archive_dir, image_to_extract=None):
     """Initializes a extractor for the archive_dir."""
     self.archive = archive_dir
+    if not image_to_extract:
+      image_to_extract = self.IMAGE_TO_EXTRACT
+    self.image_to_extract = image_to_extract
 
   def GetLatestImage(self, target_version):
     """Gets the last image archived for the board.
@@ -69,7 +72,7 @@ class ImageExtractor(object):
     version_string = os.path.basename(image_dir)
     cached_dir = os.path.join(ImageExtractor.SRC_ARCHIVE_DIR, version_string)
     cached_image = os.path.abspath(os.path.join(
-        cached_dir, ImageExtractor.IMAGE_TO_EXTRACT))
+        cached_dir, self.image_to_extract))
     # If we previously unzipped the image, we're done.
     if os.path.exists(cached_image):
       logging.info('Re-using image with version %s that we previously '

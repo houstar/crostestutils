@@ -393,7 +393,8 @@ def CheckOptions(parser, options):
   target_version = os.path.realpath(options.target).rsplit('/', 2)[-2]
   if options.base_latest_from_dir:
     # Extract the latest build.
-    extractor = image_extractor.ImageExtractor(options.base_latest_from_dir)
+    extractor = image_extractor.ImageExtractor(options.base_latest_from_dir,
+                                               os.path.basename(options.target))
     latest_image_dir = extractor.GetLatestImage(target_version)
     if latest_image_dir:
       options.base = extractor.UnzipImage(latest_image_dir)
