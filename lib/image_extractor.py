@@ -63,13 +63,20 @@ class ImageExtractor(object):
     string. In order to save time, if it is attempting
     to re-unzip the same image with the same version string, it uses the
     cached image in SRC_ARCHIVE_DIR. It determines the version string based
-    on the basename of the image_dir.
+    on the last path parts of the image_dir.
 
-    Returns: the path to the image.bin file after it has been unzipped.
-    Raises: MissingImageZipException if there is nothing to unzip within
+    Args:
+      image_dir: Directory with image to unzip.
+
+    Returns:
+      The path to the image.bin file after it has been unzipped.
+
+    Raises:
+      MissingImageZipException if there is nothing to unzip within
       the image_dir.
     """
-    version_string = os.path.basename(image_dir)
+    # Use the last 2 paths as the version_string path (may include board id).
+    version_string = os.path.join(*image_dir.split(os.path.sep)[-2:])
     cached_dir = os.path.join(ImageExtractor.SRC_ARCHIVE_DIR, version_string)
     cached_image = os.path.abspath(os.path.join(
         cached_dir, self.image_to_extract))

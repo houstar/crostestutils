@@ -27,9 +27,9 @@ class ImageExtractorTest(mox.MoxTestBase):
     super(ImageExtractorTest, self).setUp()
 
     self.work_dir = tempfile.mkdtemp('ImageExtractorTest')
+    self.board = 'x86-generic-full'
     # Set constants to be easily testable.
-    self.archive_dir = os.path.join(self.work_dir, 'archive',
-                                    'x86-generic-full')
+    self.archive_dir = os.path.join(self.work_dir, 'archive', self.board)
     image_extractor.ImageExtractor.SRC_ARCHIVE_DIR = os.path.join(self.work_dir,
                                                                   'src')
     # Our test object.
@@ -115,9 +115,9 @@ class ImageExtractorTest(mox.MoxTestBase):
 
   def testUnzipImageArchiveAlready(self):
     """Ensure we create a new archive and delete the old one."""
-    old_entry = os.path.join(self.src_archive, 'R16-158.0.0-a1')
+    old_entry = os.path.join(self.src_archive, self.board, 'R16-158.0.0-a1')
     os.makedirs(old_entry)
-    new_entry = os.path.join(self.src_archive, 'R16-158.0.1-a1')
+    new_entry = os.path.join(self.src_archive, self.board, 'R16-158.0.1-a1')
     archived_image_dir = os.path.join(self.archive_dir, 'R16-158.0.1-a1')
     ImageExtractorTest._TouchImageZip(archived_image_dir)
 
@@ -132,7 +132,7 @@ class ImageExtractorTest(mox.MoxTestBase):
 
   def testUnzipImageNoArchive(self):
     """Ensure we create a new archive with none before."""
-    new_entry = os.path.join(self.src_archive, 'R16-158.0.1-a1')
+    new_entry = os.path.join(self.src_archive, self.board, 'R16-158.0.1-a1')
     archived_image_dir = os.path.join(self.archive_dir, 'R16-158.0.1-a1')
     ImageExtractorTest._TouchImageZip(archived_image_dir)
 
