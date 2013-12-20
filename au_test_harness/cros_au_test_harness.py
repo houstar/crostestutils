@@ -26,12 +26,12 @@ sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
 
 from chromite.lib import cros_build_lib
+from chromite.lib import dev_server_wrapper
 from chromite.lib import parallel
 from chromite.lib import sudo
 from chromite.lib import timeout_util
 from crostestutils.au_test_harness import au_test
 from crostestutils.au_test_harness import au_worker
-from crostestutils.lib import dev_server_wrapper
 from crostestutils.lib import test_helper
 
 # File location for update cache in given folder.

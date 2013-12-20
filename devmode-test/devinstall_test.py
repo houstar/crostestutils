@@ -27,8 +27,8 @@ sys.path.append(constants.SOURCE_ROOT)
 sys.path.append(constants.CROS_PLATFORM_ROOT)
 
 from chromite.lib import cros_build_lib
+from chromite.lib import dev_server_wrapper
 from chromite.lib import remote_access
-from crostestutils.lib import dev_server_wrapper
 from crostestutils.lib import mount_helper
 from crostestutils.lib import test_helper
 

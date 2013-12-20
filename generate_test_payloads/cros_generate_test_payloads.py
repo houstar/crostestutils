@@ -33,6 +33,7 @@ sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
 
 from chromite.lib import cros_build_lib
+from chromite.lib import dev_server_wrapper
 from chromite.lib import git
 from chromite.lib import locking
 from chromite.lib import osutils
@@ -41,7 +42,6 @@ from chromite.lib import sudo
 from chromite.lib import timeout_util
 from crostestutils.au_test_harness import cros_au_test_harness
 from crostestutils.generate_test_payloads import payload_generation_exception
-from crostestutils.lib import dev_server_wrapper
 from crostestutils.lib import image_extractor
 from crostestutils.lib import public_key_manager
 from crostestutils.lib import test_helper

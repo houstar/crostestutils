@@ -13,8 +13,8 @@ import inspect
 import os
 
 from chromite.lib import cros_build_lib
+from chromite.lib import dev_server_wrapper
 from crostestutils.au_test_harness import update_exception
-from crostestutils.lib import dev_server_wrapper
 
 
 class AUWorker(object):
