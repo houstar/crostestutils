@@ -103,12 +103,15 @@ ping_controlling_server() {
 }
 
 main() {
-  # Attempt to ping our controlling autotest server over ethernet.
-  for i in {0..9}; do
+  # Attempt to ping our controlling autotest server over ethernet. We guarantee
+  # a minimum of 12 minutes network timeout tolerance for tests that disrupt
+  # connectivity with the SSH connection from the autotest server. This timeout
+  # is 15 minutes to make sure it can never fail before that SSH session does.
+  for i in {0..29}; do
     if ping_controlling_server; then
       return 0
     fi
-    sleep 5
+    sleep 30
   done
 
   # We can't reach our controlling server through any ethernet devices.
