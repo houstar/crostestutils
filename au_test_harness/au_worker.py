@@ -192,7 +192,7 @@ class AUWorker(object):
     cache_path = self.update_cache.get(update_id)
     if cache_path:
       update_url = dev_server_wrapper.DevServerWrapper.GetDevServerURL(
-          proxy_port, cache_path)
+          port=proxy_port, sub_dir=cache_path)
       cmd.append('--update_url=%s' % update_url)
     else:
       raise update_exception.UpdateException(

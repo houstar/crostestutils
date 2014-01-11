@@ -215,7 +215,7 @@ def main():
       # Only start a devserver if we'll need it.
       if update_cache:
         my_server = dev_server_wrapper.DevServerWrapper(
-            options.test_results_root)
+            log_dir=options.test_results_root)
         my_server.Start()
 
       if options.type == 'vm' and options.parallel:
