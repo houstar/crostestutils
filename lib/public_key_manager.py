@@ -34,8 +34,8 @@ class PublicKeyManager(object):
       self._is_key_new = True
       if os.path.exists(self._full_target_key_path):
         cmd = ['diff', self.key_path, self._full_target_key_path]
-        res = cros_build_lib.RunCommandCaptureOutput(
-            cmd, print_cmd=False, error_code_ok=True)
+        res = cros_build_lib.RunCommand(
+            cmd, print_cmd=False, error_code_ok=True, capture_output=True)
         if not res.output: self._is_key_new = False
 
     finally:
@@ -72,5 +72,6 @@ class PublicKeyManager(object):
       from_dir = git.ReinterpretPathForChroot(from_dir)
       cmd = ['bin/cros_make_image_bootable', from_dir, image,
              '--force_developer_mode']
-      cros_build_lib.RunCommandCaptureOutput(
-          cmd, print_cmd=False, enter_chroot=True, cwd=constants.SOURCE_ROOT)
+      cros_build_lib.RunCommand(
+          cmd, print_cmd=False, enter_chroot=True, cwd=constants.SOURCE_ROOT,
+          capture_output=True)

@@ -16,7 +16,8 @@ from chromite.lib import git
 
 def _GetTotalMemoryGB():
   """Calculate total memory on this machine, in gigabytes."""
-  res = cros_build_lib.RunCommandCaptureOutput(['free', '-g'], print_cmd=False)
+  res = cros_build_lib.RunCommand(['free', '-g'], print_cmd=False,
+                                  capture_output=True)
   assert res.returncode == 0
   for line in res.output.splitlines():
     if line.startswith('Mem:'):

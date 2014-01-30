@@ -19,13 +19,13 @@ def MountImage(image_path, root_dir, stateful_dir, read_only, safe=False):
          '--stateful_mountpt=%s' % stateful_dir]
   if read_only: cmd.append('--read_only')
   if safe: cmd.append('--safe')
-  cros_build_lib.RunCommandCaptureOutput(
-      cmd, print_cmd=False, cwd=constants.CROSUTILS_DIR)
+  cros_build_lib.RunCommand(
+      cmd, print_cmd=False, cwd=constants.CROSUTILS_DIR, capture_output=True)
 
 
 def UnmountImage(root_dir, stateful_dir):
   """Unmounts a Chromium OS image specified by mount dir points."""
   cmd = ['./mount_gpt_image.sh', '--unmount', '--rootfs_mountpt=%s' % root_dir,
          '--stateful_mountpt=%s' % stateful_dir]
-  cros_build_lib.RunCommandCaptureOutput(
-      cmd, print_cmd=False, cwd=constants.CROSUTILS_DIR)
+  cros_build_lib.RunCommand(
+      cmd, print_cmd=False, cwd=constants.CROSUTILS_DIR, capture_output=True)

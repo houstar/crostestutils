@@ -171,9 +171,10 @@ class VMAUWorker(au_worker.AUWorker):
     if self.whitelist_chrome_crashes:
       command.append('--whitelist_chrome_crashes')
     self.TestInfo('Running smoke suite to verify image.')
-    result = cros_build_lib.RunCommandCaptureOutput(
+    result = cros_build_lib.RunCommand(
         command, print_cmd=False, combine_stdout_stderr=True,
-        cwd=constants.CROSUTILS_DIR, error_code_ok=True)
+        cwd=constants.CROSUTILS_DIR, error_code_ok=True,
+        capture_output=True)
 
     # If the command failed or printed warnings, print the output.
     if result.returncode != 0 or '@@@STEP_WARNINGS@@@' in result.output:
