@@ -139,7 +139,8 @@ class DevModeTest(object):
             ConnectTimeout=_CONNECT_TIMEOUT)
         self.remote_access.RemoteSh(['true'], connect_settings=ssh_settings)
         return
-      except cros_build_lib.RunCommandError as e:
+      except (cros_build_lib.RunCommandError,
+              remote_access.SSHConnectionError) as e:
         logging.warning('Failed to connect to VM')
         logging.warning(e)
         self._StopVM()
@@ -194,7 +195,8 @@ class DevModeTest(object):
       self.remote_access.RemoteSh(
           ['sudo', '-u', 'chronos', '--',
            'python', '-c', '"print \'hello world\'"'])
-    except cros_build_lib.RunCommandError as e:
+    except (cros_build_lib.RunCommandError,
+            remote_access.SSHConnectionError) as e:
       self.devserver.PrintLog()
       logging.error('dev-install test failed. See devserver log above for more '
                     'details.')
@@ -208,7 +210,8 @@ class DevModeTest(object):
           ['gmerge', 'gmerge', '--accept_stable', '--usepkg',
            '--devserver_url', self.devserver.GetDevServerURL(),
            '--board', self.board])
-    except cros_build_lib.RunCommandError as e:
+    except (cros_build_lib.RunCommandError,
+            remote_access.SSHConnectionError) as e:
       logging.error('gmerge test failed. See log for details')
       raise TestError('gmerge test failed with: %s' % str(e))
 
