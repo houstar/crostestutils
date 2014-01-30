@@ -3,9 +3,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Script to download ChromeOS images from google storage and output
-# command to put said image on a USB stick or directly copy to a given stick.
-# File needs to live in a place such that ./SRC_DIR reaches chromiumos/src
+# Script to download ChromeOS images or test folders from google storage and
+# output download location or directly copy (image) to a usb stick.
+# In order to make usb sticks, file needs to live in a place such that
+# ./SRC_DIR reaches chromiumos/src.  (Otherwise it can be anywhere.)
 # Downloads image via gsutil to chromiumos/src/REL_DL_DIR.
 
 """Download and output or run image_to_usb command."""
@@ -27,7 +28,14 @@ REL_DL_DIR = 'build/crosdl/'
 PLATFORM_CONVERT = {'spring': 'daisy-spring', 'alex': 'x86-alex',
                     'alex-he': 'x86-alex-he', 'mario': 'x86-mario',
                     'zgb': 'x86-zgb', 'zgb-he': 'x86-zgb-he',
-                    'pit': 'peach-pit', 'pheonix': 'phoenix'}
+                    'pit': 'peach-pit', 'pi': 'peach-pi',
+                    'snow': 'daisy', 'lucas': 'daisy'}
+
+# Download types
+RECOVERY = 0
+TEST = 1
+AUTOTEST = 2
+FACTORY = 3
 
 
 def _GstorageLinkGenerator(c, p, b):
@@ -35,23 +43,38 @@ def _GstorageLinkGenerator(c, p, b):
   return 'gs://chromeos-releases/%s-channel/%s/%s/' % (c, p, b)
 
 
-def _FolderNameGenerator(is_test, b, p, c, mp):
-  """Generate a folder name unique to the downloaded build."""
-  return '%s_%s_%s_%s%s' % ('Test' if is_test else 'Recovery', p, c, b, mp)
+def _FolderNameGenerator(download_type, b, p, c, mp):
+  """Generate a folder name unique to the download."""
+  if download_type == TEST:
+    type_string = 'Test'
+  elif download_type == AUTOTEST:
+    type_string = 'Autotest'
+  elif download_type == FACTORY:
+    type_string = 'Factory'
+  else:
+    type_string = 'Recovery'
+  return '%s_%s_%s_%s%s' % (p, b, c, type_string, mp)
 
 
 def main():
   """Download and output or run image_to_usb command."""
   parser = argparse.ArgumentParser(
-      description=('Download a recovery or test image of ChromeOS.\n\n'
+      description=('Download a testing resource: recovery image, test image, '
+                   'autotest folder, or factory\nbundle.  Optionally make usb '
+                   'sticks from these downloaded images.\n\n'
                    'e.g. ./crosdl.py -c dev -b 4996.0.0 -p '
                    'link daisy --tostick /dev/sdc /dev/sda.\n\nDefault '
                    'download location is src/%s.' % REL_DL_DIR),
-      formatter_class=argparse.RawTextHelpFormatter)
-  parser.add_argument('-r', '--recovery', dest='recovery',
-                      action='store_true', help='Recovery image (default).')
-  parser.add_argument('-t', '--test', dest='test', action='store_true',
-                      help='Test image.')
+      formatter_class=argparse.RawDescriptionHelpFormatter)
+  group_type = parser.add_mutually_exclusive_group()
+  group_type.add_argument('-r', '--recovery', dest='recovery',
+                          action='store_true', help='Recovery image (default).')
+  group_type.add_argument('-t', '--test', dest='test', action='store_true',
+                          help='Test image.')
+  group_type.add_argument('-a', '--autotest', dest='autotest',
+                          action='store_true', help='Autotest folder.')
+  group_type.add_argument('-f', '--factory', dest='factory',
+                          action='store_true', help='Factory bundle.')
   parser.add_argument('-c', '--channel', dest='channel', default='dev',
                       choices=['canary', 'dev', 'beta', 'stable'],
                       help='Channel (dev default).')
@@ -63,25 +86,32 @@ def main():
                       help='PreMP image instead of MP.')
   parser.add_argument('--force', dest='force', action='store_true',
                       help=('Force new download of builds, even if files '
-                            'already\nexist.'))
-  parser.add_argument('--tostick', dest='to_stick', nargs='*',
-                      help=('Copy to usb stick after download.  '
-                            'Can either specify\ndrive(s) (e.g. /dev/sdc) '
-                            'at which to install or leave\nblank for '
-                            'interactive dialog later.  For multiple\n'
-                            'boards, list out all drives (e.g. /dev/sdc '
-                            '/dev/sda\n/dev/sdd).  Script will match this '
-                            'list to the list of\ninput boards (in -p).'))
+                            'already exist.'))
+  group_usb = parser.add_mutually_exclusive_group()
+  group_usb.add_argument('--to_stick', dest='to_stick', nargs='*',
+                         help=('Copy to usb stick after download in a one-'
+                               'to-one way.  Can either specify drive(s) '
+                               '(e.g. /dev/sdc) at which to install or leave '
+                               'blank for interactive dialog later.  For '
+                               'multiple boards, list out all drives (e.g. '
+                               '/dev/sdc /dev/sda /dev/sdd).  Script will '
+                               'match this list directly to the list of input '
+                               'boards (in -p).'))
+  group_usb.add_argument('--one_to_multiple_sticks', dest='to_many', nargs='+',
+                         help=('Copy one image to the listed multiple usb '
+                               'sticks after download (e.g. /dev/sdc /dev/sdd)'
+                               '.  Must specify only one board at a time.'))
   parser.add_argument('--folder', dest='folder',
-                      help=('Specify a new download folder (default is\nsrc/'
+                      help=('Specify a new download folder (default is src/'
                             '%s).' % REL_DL_DIR))
-  parser.add_argument('--deletefiles', dest='delete', action='store_true',
+  parser.add_argument('--delete_files', dest='delete', action='store_true',
                       help=('Delete any files downloaded from this command'
-                            'when\nfinished with copying to usb stick.  '
-                            'Applicable only\nwhen using --tostick argument.'))
-  parser.add_argument('--clearfolder', dest='clear', action='store_true',
+                            'when finished with copying to usb stick.  '
+                            'Applicable only when using --to_stick or '
+                            '--one_to_multiple_sticks arguments.'))
+  parser.add_argument('--clear_folder', dest='clear', action='store_true',
                       help=('Delete all the sub-folders in the download '
-                            'location\n(useful if you have filled up your '
+                            'location (useful if you have filled up your '
                             'harddrive).'))
   arguments = parser.parse_args()
 
@@ -132,34 +162,60 @@ def main():
     dupe_boards.append(boards[i])
 
   # Set is_test based on input flags.
-  is_test = arguments.test
-  if is_test and arguments.recovery:
-    print 'Please use only one of -r and -t.'
-    return 1
-  elif is_test:
+  if arguments.test:
     print 'Downloading test image(s).'
-  else:
+    download_type = TEST
+    is_image = True
+  elif arguments.autotest:
+    print 'Downloading autotest folder(s).'
+    download_type = AUTOTEST
+    is_image = False
+  elif arguments.factory:
+    print 'Downloading factory folder(s).'
+    download_type = FACTORY
+    is_image = False
+  else: # RECOVERY
     print 'Downloading recovery image(s).'
+    download_type = RECOVERY
+    is_image = True
 
   # String to identify premp/mp images.
-  mp_str = '_premp' if arguments.premp else '_mp'
+  mp_str = ''
+  if download_type == RECOVERY:
+    mp_str = '_premp' if arguments.premp else '_mp'
 
-  # If installing multiple boards, must provide drive names.
-  installing = type(arguments.to_stick) == list
-  if len(boards) > 1 and installing:
+  # Disallow 'to many' option for more than one board
+  installing_many = arguments.to_many
+  if len(boards) > 1 and installing_many:
+    print ('Please only specify one board if using --one_to_multiple_'
+           'sticks option.  See help menu.')
+    return 1
+
+  # If installing multiple images, must provide drive names.
+  installing_one = type(arguments.to_stick) == list
+  if installing_one and (len(boards) > 1 or len(arguments.to_stick) > 1):
     if not arguments.to_stick:
-      print ('To install on multiple boards, please provide drive '
+      print ('Error: To make sticks for multiple boards, please provide drive '
              'names (e.g. /dev/sdc /dev/sdd).  See -h for help.')
       return 1
     if len(arguments.to_stick) != len(boards):
-      print ('Was given %d boards but %d usb drive locations.'
+      print ('Error: Was given %d boards but %d usb drive locations.'
              % (len(boards), len(arguments.to_stick)))
       return 1
     for drive in arguments.to_stick:
       if not os.path.exists(drive):
         print '%s does not exist!' % drive
 
-  # Subroutine to download an image for a single board.
+  # Disallow 'to usb' options if not an image
+  if not is_image and (installing_one or installing_many):
+    print ('Can only copy to usb if downloading an image.  See help menu.')
+    return 1
+
+  # Request sudo permissions if installing later.
+  if installing_one or installing_many:
+    subprocess.call(['sudo', '-v'])
+
+  # Subroutine to download a file for a single board.
   channel = arguments.channel
   build = arguments.build
   def _DownloadBoard(board, output_str, dl_error, dl_folder):
@@ -168,18 +224,22 @@ def main():
     dl_error[board] = True
 
     # See if file already exists locally.
-    folder_name = _FolderNameGenerator(is_test=is_test, p=board, b=build,
-                                       c=channel, mp=mp_str)
+    folder_name = _FolderNameGenerator(download_type=download_type, p=board,
+                                       b=build, c=channel, mp=mp_str)
     folder_path = os.path.join(download_folder, folder_name)
     dl_folder[board] = folder_path
-    if is_test:
-      image_name = 'chromiumos_test_image.bin'
-    else:
-      image_name = 'recovery_image.bin'
-    image_path = os.path.join(folder_path, image_name)
+    if download_type == TEST:
+      target_name = 'chromiumos_test_image.bin'
+    elif download_type == AUTOTEST:
+      target_name = ''
+    elif download_type == FACTORY:
+      target_name = ''
+    else: # RECOVERY
+      target_name = 'recovery_image.bin'
+    target_path = os.path.join(folder_path, target_name)
 
     # Skip for already present files, else download new file.
-    if os.path.exists(image_path) and not arguments.force:
+    if os.path.exists(target_path) and not arguments.force:
       print '%s: Found file locally.  Skipping download.' % board
     else:
       # Make folder if needed.
@@ -188,38 +248,53 @@ def main():
 
       # Generate search terms.
       folder = _GstorageLinkGenerator(c=channel, p=board, b=build)
-      if is_test:
+      if download_type == TEST:
         file_search = '%s*test*.tar.xz' % folder
-      else:
+      elif download_type == AUTOTEST:
+        file_search = '%s*hwqual*.tar.bz2' % folder
+      elif download_type == FACTORY:
+        file_search = '%s*factory*.zip' % folder
+      else: # RECOVERY
         file_search = '%s*recovery*%s*%s*.bin' % (folder, channel, mp_str)
+        file_search_2 = ('%schromeos-signing*/*recovery*%s*%s*.bin'
+                         % (folder, channel, mp_str))
+
+      # Output error if no files found
+      def _no_file_error(message):
+        """Actions to take if file is not found."""
+        print '%s: %s' % (board, message)
+        output_str[board] = '%s: Could not find file.' % board
 
       # Look for folder while file belongs.
       try:
         possible_files = subprocess.check_output(['gsutil', 'ls', folder])
       except subprocess.CalledProcessError:
-        print ('%s: Could not find folder %s where this file is '
-               'supposed to be.  Please check input values.' % (board, folder))
-        output_str[board] = '%s: Could not find file.' % board
+        _no_file_error('Could not find folder %s where this file is supposed '
+                       'to be.  Please check input values.' % folder)
         return 1
 
       # Look for file in folder.
       try:
         possible_files = subprocess.check_output(['gsutil', 'ls', file_search])
       except subprocess.CalledProcessError:
-        print ('%s: Could not find correct file (but found the '
-               'correct folder).' % board)
-        output_str[board] = '%s: Could not find file.' % board
-        return 1
+        if download_type == RECOVERY:
+          try:
+            possible_files = subprocess.check_output(['gsutil', 'ls',
+                                                      file_search_2])
+          except subprocess.CalledProcessError:
+            _no_file_error('Could not find file but found folder.')
+            return 1
+        else:
+          _no_file_error('Could not find file but found folder.')
+          return 1
 
-      # Locate exact filename.
+      # Locate exact file_name.
       possible_files = possible_files.splitlines()
       if len(possible_files) != 1:
-        print ('%s: Found %d possible files, not 1'
-               % (board, len(possible_files)))
-        output_str[board] = '%s: Could not find file.' % board
+        _no_file_error('Found %d possible files, not 1.' % len(possible_files))
         return 1
       gsfile_path = possible_files[0]
-      filename = os.path.basename(gsfile_path)
+      file_name = os.path.basename(gsfile_path)
 
       # Download file to local machine.
       try:
@@ -231,17 +306,26 @@ def main():
         return 1
 
       # Untar/rename files as needed.
-      file_path = os.path.join(folder_path, filename)
-      if is_test:
+      file_path = os.path.join(folder_path, file_name)
+      if download_type == TEST:
         subprocess.call(['tar', '-xf', file_path, '-C', folder_path])
         os.remove(file_path)
-      else:
-        os.rename(file_path, os.path.join(folder_path, image_name))
+      elif download_type == AUTOTEST:
+        print '%s: running tar -xf command' % board
+        subprocess.call(['tar', '-xf', file_path, '-C', folder_path])
+        target_name = 'autotest'
+        target_path = os.path.join(folder_path, file_name[:-len('.tar.bz2')],
+                                   target_name)
+        os.remove(file_path)
+      elif download_type == FACTORY:
+        print 'trying to unzip %s to %s' % (file_path, folder_path)
+        subprocess.call(['unzip', '-q', file_path, '-d', folder_path])
+        os.remove(file_path)
+      else: # RECOVERY
+        os.rename(file_path, os.path.join(folder_path, target_name))
 
-    # Return image_to_usb command and report successful download.
-    path_to_script = os.path.join(SRC_DIR, 'scripts', 'image_to_usb.sh')
-    output_str[board] = ('/usr/bin/sudo /bin/sh %s '
-                         '--from=%s' % (path_to_script, image_path))
+    # Report successful download and return path to downloaded thing
+    output_str[board] = target_path
     dl_error[board] = False
     print '%s: DONE' % board
 
@@ -262,23 +346,33 @@ def main():
   for job in jobs:
     job.join()
 
-  # Print or run image_to_usb command.
+  # Print output or run image_to_usb command.
   errors = ''
-  if installing:
+  if installing_one or installing_many:
     jobs = []
     for i in xrange(len(boards)):
       board = boards[i]
       # If board downloaded without errors, install.  Else, skip.
       if not dl_error[board]:
-        # If drive argument was provided, use it.  Else, leave it out.
-        if arguments.to_stick:
-          usb_drive = arguments.to_stick[i]
-          cmd = '%s --to=%s -y' % (output_str[board], usb_drive)
-          print 'Copying %s to %s.' % (board, usb_drive)
+        path_to_script = os.path.join(SRC_DIR, 'scripts', 'image_to_usb.sh')
+        cmd = ('/usr/bin/sudo /bin/sh %s --from=%s'
+               % (path_to_script, output_str[board]))
+        # Copy this (i-th) board to i-th drive
+        if installing_one:
+          # If drive argument was provided, use it.  Else, leave it out.
+          if arguments.to_stick:
+            usb_drive = arguments.to_stick[i]
+            cmd = '%s --to=%s -y' % (cmd, usb_drive)
+            print 'Copying %s to %s.' % (board, usb_drive)
+          proc = subprocess.Popen(cmd.split(' '))
+          jobs.append(proc)
+        # Copy this (only) board to all drives
         else:
-          cmd = output_str[board]
-        proc = subprocess.Popen(cmd.split(' '))
-        jobs.append(proc)
+          for usb_drive in arguments.to_many:
+            cmd_per_usb = '%s --to=%s -y' % (cmd, usb_drive)
+            print 'Copying %s to %s.' % (board, usb_drive)
+            proc = subprocess.Popen(cmd_per_usb.split(' '))
+            jobs.append(proc)
       else:
         errors += '%s\n' % output_str[board]
     # Wait for all copies to finish.
@@ -288,6 +382,7 @@ def main():
       print 'Deleting all files created for %s.' % board
       shutil.rmtree(dl_folder[board])
   else:
+    print '\nDownloaded File(s):'
     for board in boards:
       if not dl_error[board]:
         print output_str[board]
