@@ -17,10 +17,8 @@ import logging
 import optparse
 import os
 import shutil
-import socket
 import sys
 import tempfile
-import time
 
 import constants
 sys.path.append(constants.SOURCE_ROOT)
@@ -28,17 +26,12 @@ sys.path.append(constants.CROS_PLATFORM_ROOT)
 
 from chromite.lib import cros_build_lib
 from chromite.lib import dev_server_wrapper
+from chromite.lib import osutils
 from chromite.lib import remote_access
+from chromite.lib import vm
+
 from crostestutils.lib import mount_helper
 from crostestutils.lib import test_helper
-
-
-_LOCALHOST = 'localhost'
-_PRIVATE_KEY = os.path.join(constants.CROSUTILS_DIR, 'mod_for_test_scripts',
-                            'ssh_keys', 'testing_rsa')
-_MAX_SSH_ATTEMPTS = 5
-_TIME_BETWEEN_ATTEMPT = 30
-_CONNECT_TIMEOUT = 120
 
 
 class TestError(Exception):
@@ -48,7 +41,8 @@ class TestError(Exception):
 class DevModeTest(object):
   """Wrapper for dev mode tests."""
   def __init__(self, image_path, board, binhost):
-    """
+    """Initializes DevModeTest.
+
     Args:
       image_path: Filesystem path to the image to test.
       board: Board of the image under test.
@@ -60,40 +54,26 @@ class DevModeTest(object):
     self.image_path = image_path
     self.board = board
     self.binhost = binhost
-
     self.tmpdir = tempfile.mkdtemp('DevModeTest')
-    self.tmpkvmpid = os.path.join(self.tmpdir, 'kvm_pid')
-
     self.working_image_path = None
     self.devserver = None
-    self.remote_access = None
-    self.port = None
+    self.vm = None
+    self.device = None
 
   def Cleanup(self):
-    """Clean up any state at the end of the test."""
+    """Cleans up any state at the end of the test."""
     try:
-      if self.working_image_path:
-        os.remove(self.working_image_path)
-
       if self.devserver:
         self.devserver.Stop()
 
       self.devserver = None
-      self._StopVM()
-
-      if self.tmpdir:
-        shutil.rmtree(self.tmpdir, ignore_errors=True)
-
+      self.device.Cleanup()
+      self.vm.Stop()
+      self.vm = None
+      osutils.RmDir(self.tmpdir, ignore_missing=True)
       self.tmpdir = None
     except Exception:
       logging.warning('Received error during cleanup', exc_info=True)
-
-  def _SetupSSH(self):
-    """Sets up the necessary items for running ssh."""
-    self.port = self._FindUnusedPort()
-    self.remote_access = remote_access.RemoteAccess(
-        _LOCALHOST, self.tmpdir, self.port,
-        debug_level=logging.DEBUG, interactive=False)
 
   def _WipeDevInstall(self):
     """Wipes the devinstall state."""
@@ -104,63 +84,15 @@ class DevModeTest(object):
                             r_mount_point, s_mount_point, read_only=False,
                             safe=True)
     try:
-      cros_build_lib.SudoRunCommand(['chown', '--recursive', getpass.getuser(),
-                                     s_mount_point], debug_level=logging.DEBUG)
-      shutil.rmtree(dev_image_path)
+      osutils.RmDir(dev_image_path, sudo=True)
     finally:
       mount_helper.UnmountImage(r_mount_point, s_mount_point)
 
-  def _FindUnusedPort(self):
-    """Returns a currently unused port."""
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((_LOCALHOST, 0))
-    port = s.getsockname()[1]
-    s.close()
-    return port
-
-  def _RobustlyStartVMWithSSH(self):
-    """Start test copy of VM and ensure we can ssh into it.
-
-    This command is more robust than just naively starting the VM as it will
-    try to start the VM multiple times if the VM fails to start up. This is
-    inspired by retry_until_ssh in crosutils/lib/cros_vm_lib.sh.
-    """
-    for _ in range(_MAX_SSH_ATTEMPTS):
-      try:
-        cmd = ['%s/bin/cros_start_vm' % constants.CROSUTILS_DIR,
-               '--ssh_port', str(self.port),
-               '--image_path', self.working_image_path,
-               '--no_graphics',
-               '--kvm_pid', self.tmpkvmpid]
-        cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
-
-        # Ping the VM to ensure we can SSH into it.
-        ssh_settings = remote_access.CompileSSHConnectSettings(
-            ConnectTimeout=_CONNECT_TIMEOUT)
-        self.remote_access.RemoteSh(['true'], connect_settings=ssh_settings)
-        return
-      except (cros_build_lib.RunCommandError,
-              remote_access.SSHConnectionError) as e:
-        logging.warning('Failed to connect to VM')
-        logging.warning(e)
-        self._StopVM()
-        time.sleep(_TIME_BETWEEN_ATTEMPT)
-    else:
-      raise TestError('Max attempts to connect to VM exceeded')
-
-  def _StopVM(self):
-    """Stops a running VM set up using _RobustlyStartVMWithSSH."""
-    cmd = ['%s/bin/cros_stop_vm' % constants.CROSUTILS_DIR,
-           '--kvm_pid', self.tmpkvmpid]
-    cros_build_lib.RunCommand(cmd, debug_level=logging.DEBUG)
-
   def PrepareTest(self):
     """Pre-test modification to the image and env to setup test."""
-    logging.info('Setting up the image %s for vm testing.',
-                 self.image_path)
-    self._SetupSSH()
-    vm_path = test_helper.CreateVMImage(self.image_path, self.board,
-                                        full=False)
+    logging.info('Setting up the image %s for vm testing.', self.image_path)
+    vm_path = vm.CreateVMImage(image=self.image_path, board=self.board,
+                               full=False)
 
     logging.info('Making copy of the vm image %s to manipulate.', vm_path)
     self.working_image_path = os.path.join(self.tmpdir,
@@ -171,8 +103,12 @@ class DevModeTest(object):
     logging.info('Wiping /usr/local/bin from the image.')
     self._WipeDevInstall()
 
-    logging.info('Starting the vm on port %d.', self.port)
-    self._RobustlyStartVMWithSSH()
+    self.vm = vm.VMInstance(self.working_image_path, tempdir=self.tmpdir)
+    logging.info('Starting the vm on port %d.', self.vm.port)
+    self.vm.Start()
+
+    self.device = remote_access.ChromiumOSDevice(
+        remote_access.LOCALHOST, port=self.vm.port, work_dir=self.tmpdir)
 
     if not self.binhost:
       logging.info('Starting the devserver.')
@@ -187,14 +123,13 @@ class DevModeTest(object):
     """Tests that we can run dev-install and have python work afterwards."""
     try:
       logging.info('Running dev install in the vm.')
-      self.remote_access.RemoteSh(
+      self.device.RunCommand(
           ['bash', '-l', '-c',
            '"/usr/bin/dev_install --yes --binhost %s"' % self.binhost])
 
       logging.info('Verifying that python works on the image.')
-      self.remote_access.RemoteSh(
-          ['sudo', '-u', 'chronos', '--',
-           'python', '-c', '"print \'hello world\'"'])
+      self.device.RunCommand(['sudo', '-u', 'chronos', '--', 'python', '-c',
+                              '"print \'hello world\'"'])
     except (cros_build_lib.RunCommandError,
             remote_access.SSHConnectionError) as e:
       self.devserver.PrintLog()
@@ -206,7 +141,7 @@ class DevModeTest(object):
     """Evaluates whether the test passed or failed."""
     logging.info('Testing that gmerge works on the image after dev install.')
     try:
-      self.remote_access.RemoteSh(
+      self.device.RunCommand(
           ['gmerge', 'gmerge', '--accept_stable', '--usepkg',
            '--devserver_url', self.devserver.GetDevServerURL(),
            '--board', self.board])
