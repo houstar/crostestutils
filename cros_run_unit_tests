@@ -32,6 +32,8 @@ DEFINE_boolean withdebug "${FLAGS_TRUE}" \
   "Build debug versions of Chromium-OS-specific packages."
 DEFINE_boolean pretend "${FLAGS_FALSE}" \
   "Only show the packages we would test; don't actually test"
+DEFINE_boolean installed "${FLAGS_TRUE}" \
+  "Only test packages that are already installed"
 
 # List of packages with no unit tests.
 NO_UNITTESTS=""
@@ -71,6 +73,10 @@ fi
 # If we didn't specify packages, find all packages.
 if [ -z "${FLAGS_package_file}" -a -z "${FLAGS_packages}" ]; then
   PACKAGE_LIST=$(cros_workon --board "${FLAGS_board}" list --all)
+
+  if [[ ${FLAGS_installed} -eq ${FLAGS_TRUE} ]]; then
+    PACKAGE_LIST=$(qlist-${FLAGS_board} -ICe ${PACKAGE_LIST})
+  fi
 fi
 
 BLACK_LIST_FILE="/usr/share/crostestutils/unit_test_black_list.txt"
