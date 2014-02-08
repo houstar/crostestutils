@@ -30,6 +30,8 @@ DEFINE_string blacklist_packages "" \
   "List of packages to blacklist from unit tests"
 DEFINE_boolean withdebug "${FLAGS_TRUE}" \
   "Build debug versions of Chromium-OS-specific packages."
+DEFINE_boolean pretend "${FLAGS_FALSE}" \
+  "Only show the packages we would test; don't actually test"
 
 # List of packages with no unit tests.
 NO_UNITTESTS=""
@@ -105,8 +107,13 @@ if [ -n "${NO_UNITTESTS}" ]; then
 fi
 
 if [ -n "${TEST_PACKAGE_LIST}" ]; then
-  sudo -E PKGDIR="/build/${FLAGS_board}/test-packages" FEATURES="test" \
-    ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly ${TEST_PACKAGE_LIST}
+  if [[ ${FLAGS_pretend} -eq ${FLAGS_TRUE} ]]; then
+    printf '%s\n' ${TEST_PACKAGE_LIST} | sort
+    exit 0
+  else
+    sudo -E PKGDIR="/build/${FLAGS_board}/test-packages" FEATURES="test" \
+      ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly ${TEST_PACKAGE_LIST}
+  fi
 fi
 
 info "All unit tests passed."
