@@ -80,23 +80,36 @@ if [ "${FLAGS_withdebug}" -eq "${FLAGS_FALSE}" ]; then
   export USE="${USE} -cros-debug"
 fi
 
-TEST_PACKAGE_LIST=""
-for package in ${PACKAGE_LIST}; do
-  if grep -xq "${package}" "${BLACK_LIST_FILE}" || \
-     [[ " ${BLACK_LIST_PACKAGES} " =~ " ${package} " ]]; then
-    warn "Skipping package ${package} since it is blacklisted."
-    continue
-  fi
-  EBUILD_PATH=$( equery-${FLAGS_board} which ${package} 2> /dev/null ) || \
-    warn "${package} not found"
-  if [ -n "${EBUILD_PATH}" ]; then
-    if check_src_test "${EBUILD_PATH}"; then
-      TEST_PACKAGE_LIST+=" ${package}"
-    else
-      NO_UNITTESTS+=" ${package}"
+ALL_PACKAGE_LIST=$(
+  jobs=0
+  for package in ${PACKAGE_LIST}; do
+    (
+    if grep -xq "${package}" "${BLACK_LIST_FILE}" || \
+       [[ " ${BLACK_LIST_PACKAGES} " =~ " ${package} " ]]; then
+      warn "Skipping package ${package} since it is blacklisted."
+      continue
     fi
-  fi
-done
+    EBUILD_PATH=$(equery-${FLAGS_board} which ${package} 2>/dev/null) || \
+      warn "${package} not found"
+    if [[ -n ${EBUILD_PATH} ]]; then
+      if check_src_test "${EBUILD_PATH}"; then
+        echo "y:${package}"
+      else
+        echo "n:${package}"
+      fi
+    fi
+    ) &
+    if [[ ${jobs} -ge ${NUM_JOBS} ]]; then
+      jobs=0
+      wait
+    else
+      : $(( jobs += 1 ))
+    fi
+  done | sort
+  wait
+)
+TEST_PACKAGE_LIST=$(echo "${ALL_PACKAGE_LIST}" | sed -n '/^y:/s:^..::p')
+NO_UNITTESTS=$(echo "${ALL_PACKAGE_LIST}" | sed -n '/^n:/s:^..::p')
 
 if [ -n "${NO_UNITTESTS}" ]; then
   warn "The following packages have no unit tests:"
