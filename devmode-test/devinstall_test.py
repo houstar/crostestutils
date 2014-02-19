@@ -12,7 +12,6 @@ all of the stateful partition. Once done, runs dev_install to restore the
 stateful partition and then runs gmerge.
 """
 
-import getpass
 import logging
 import optparse
 import os
@@ -95,7 +94,7 @@ class DevModeTest(object):
     """Pre-test modification to the image and env to setup test."""
     logging.info('Setting up the image %s for vm testing.', self.image_path)
     vm_path = vm.CreateVMImage(image=self.image_path, board=self.board,
-                               full=False)
+                               updatable=False)
 
     logging.info('Making copy of the vm image %s to manipulate.', vm_path)
     self.working_image_path = os.path.join(self.tmpdir,
