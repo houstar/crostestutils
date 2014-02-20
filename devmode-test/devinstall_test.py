@@ -67,7 +67,10 @@ class DevModeTest(object):
         self.devserver.Stop()
 
       self.devserver = None
-      self.device.Cleanup()
+      if self.device:
+        self.device.Cleanup()
+
+      self.device = None
       self.vm.Stop()
       self.vm = None
       osutils.RmDir(self.tmpdir, ignore_missing=True)
@@ -108,7 +111,7 @@ class DevModeTest(object):
     self.vm.Start()
 
     self.device = remote_access.ChromiumOSDevice(
-        remote_access.LOCALHOST, port=self.vm.port, work_dir=self.tmpdir)
+        remote_access.LOCALHOST, port=self.vm.port, base_dir=self.tmpdir)
 
     if not self.binhost:
       logging.info('Starting the devserver.')
