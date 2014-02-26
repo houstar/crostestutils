@@ -13,6 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+import zipfile
 
 import constants
 sys.path.append(constants.SOURCE_ROOT)
@@ -47,8 +48,9 @@ class ImageExtractorTest(mox.MoxTestBase):
     if not os.path.exists(directory):
       os.makedirs(directory)
 
-    with open(os.path.join(directory, 'image.zip'), 'w') as f:
-      f.write('oogabooga')
+    zipname = os.path.join(directory, 'image.zip')
+    with zipfile.ZipFile(zipname, 'w'):
+      pass
 
   def CreateFakeArchiveDir(self, number_of_entries, add_build_number=False):
     """Creates a fake archive dir with specified number of entries."""
@@ -143,6 +145,25 @@ class ImageExtractorTest(mox.MoxTestBase):
     self.test_extractor.UnzipImage(archived_image_dir)
     self.mox.VerifyAll()
     self.assertTrue(os.path.exists(new_entry))
+
+  def testBadZipImageArchive(self):
+    """Ensure we ignore corrupt archives."""
+
+    # Create valid archive followed by corrupt one.
+    self.CreateFakeArchiveDir(2, add_build_number=True)
+    bad_zip_name = os.path.join(
+        self.archive_dir, 'R16-158.0.0-a1-b1', 'image.zip')
+    with open(bad_zip_name, 'w') as f:
+      f.write('oogabooga')
+
+    # This is normally mox'd out to ensure it's never called, but we expect it.
+    logging.error('Version in archive dir is corrupt: %s', 'R16-158.0.0-a1-b1')
+
+    self.mox.ReplayAll()
+
+    # Ensure we fine the first one (valid), not the second (corrupt)
+    latest_image = self.test_extractor.GetLatestImage('R16-158.0.1-a1')
+    self.assertEqual(os.path.basename(latest_image), 'R16-158.0.0-a1-b0')
 
 
 if __name__ == '__main__':

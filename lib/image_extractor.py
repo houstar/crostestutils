@@ -9,6 +9,7 @@ import logging
 import os
 import re
 import shutil
+import zipfile
 
 from chromite.lib import cros_build_lib
 
@@ -28,11 +29,30 @@ class ImageExtractor(object):
       image_to_extract = self.IMAGE_TO_EXTRACT
     self.image_to_extract = image_to_extract
 
+  def ValidateZip(self, zip_image):
+    """Validate that a zipped image is not corrupt.
+
+    Args:
+      zip_image:
+
+    Returns:
+      True if valid, else False.
+    """
+
+    try:
+      # These two lines will either return the name of the first bad file
+      # inside the zip, or raise an exception if it doesn't look like a valid
+      # zip at all.
+      zf = zipfile.ZipFile(zip_image)
+      return zf.testzip() == None
+    except zipfile.BadZipfile:
+      return False
+
   def GetLatestImage(self, target_version):
     """Gets the last image archived for the board.
 
     Args:
-      target_version:  The version that is being tested.  The archive
+      target_version: The version that is being tested.  The archive
         directory may be being populated with the results of this version
         while we're running so we shouldn't use it as the last image archived.
     """
@@ -47,7 +67,11 @@ class ImageExtractor(object):
         if my_re.match(filename):
           zip_image = os.path.join(self.archive, filename, 'image.zip')
           if lv < target_lv and os.path.exists(zip_image):
-            filelist.append(lv)
+            if self.ValidateZip(zip_image):
+              filelist.append(lv)
+            else:
+              logging.error('Version in archive dir is corrupt: %s', filename)
+
           elif not filename.startswith(target_version):
             logging.error('Version in archive dir is too new: %s', filename)
       if filelist:
