@@ -5,8 +5,9 @@
 
 # Script to download ChromeOS images or test folders from google storage and
 # output download location or directly copy (image) to a usb stick.
-# In order to make usb sticks, file needs to live in a place such that
-# ./SRC_DIR reaches chromiumos/src.  (Otherwise it can be anywhere.)
+# In order to make usb sticks, file needs to be run from a place such that
+# ./REL_SRC_DIR reaches chromiumos/src, or the src_dir input must be
+# specified.
 # Downloads image via gsutil to chromiumos/src/REL_DL_DIR.
 
 """Download and output or run image_to_usb command."""
@@ -19,9 +20,9 @@ import shutil
 import subprocess
 
 # Relative path from this file to the chromiumos/src folder
-SRC_DIR = '../../../'
+REL_SRC_DIR = '../../../'
 # Path to default download directory relative to chromiumos/src folder,
-# i.e. SRC_DIR+REL_DIR_DIR is a direct path from here to the directory
+# i.e. REL_SRC_DIR+REL_DIR_DIR is a direct path from here to the directory
 REL_DL_DIR = 'build/crosdl/'
 
 # Conversions from common simplified/misspelled names of boards
@@ -29,7 +30,7 @@ PLATFORM_CONVERT = {'spring': 'daisy-spring', 'alex': 'x86-alex',
                     'alex-he': 'x86-alex-he', 'mario': 'x86-mario',
                     'zgb': 'x86-zgb', 'zgb-he': 'x86-zgb-he',
                     'pit': 'peach-pit', 'pi': 'peach-pi',
-                    'snow': 'daisy', 'lucas': 'daisy'}
+                    'snow': 'daisy', 'lucas': 'daisy', 'big': 'nyan-big'}
 
 # Download types
 RECOVERY = 0
@@ -38,12 +39,12 @@ AUTOTEST = 2
 FACTORY = 3
 
 
-def _GstorageLinkGenerator(c, p, b):
+def _GenerateGstorageLink(c, p, b):
   """Generate Google storage link given channel, platform, and build."""
   return 'gs://chromeos-releases/%s-channel/%s/%s/' % (c, p, b)
 
 
-def _FolderNameGenerator(download_type, b, p, c, mp):
+def _GenerateFolderName(download_type, b, p, c, mp):
   """Generate a folder name unique to the download."""
   if download_type == TEST:
     type_string = 'Test'
@@ -104,6 +105,9 @@ def main():
   parser.add_argument('--folder', dest='folder',
                       help=('Specify a new download folder (default is src/'
                             '%s).' % REL_DL_DIR))
+  parser.add_argument('--src_dir', dest='src_dir',
+                      help=('Specify path to chromium src/ folder.  For running'
+                            'this script from other locations.'))
   parser.add_argument('--delete_files', dest='delete', action='store_true',
                       help=('Delete any files downloaded from this command'
                             'when finished with copying to usb stick.  '
@@ -115,12 +119,18 @@ def main():
                             'harddrive).'))
   arguments = parser.parse_args()
 
+  # Make sure the default or user defined src folder actually points to src/.
+  src_dir = arguments.src_dir if arguments.src_dir else REL_SRC_DIR
+  if os.path.basename(os.path.abspath(src_dir)) != 'src':
+    print 'Could not find src/ directory.  Try passing the --src_dir input.'
+    return
+
   # Set download folder as user defined or default.
   user_folder = arguments.folder
   if user_folder:
     download_folder = user_folder
   else:
-    download_folder = os.path.join(SRC_DIR, REL_DL_DIR)
+    download_folder = os.path.join(src_dir, REL_DL_DIR)
 
   # Delete download folder contents if clearfolder flag present.
   if arguments.clear:
@@ -141,7 +151,7 @@ def main():
     return
 
   # Require --deletefiles flag to be used only with --tostick flag.
-  if arguments.delete and arguments.to_stick:
+  if arguments.delete and (arguments.to_stick or arguments.to_many):
     print 'Will delete all newly downloaded files once finished.'
   elif arguments.delete:
     print ('This command will download and immediately delete all files.  '
@@ -152,7 +162,7 @@ def main():
   dupe_boards = []
   boards = arguments.board
   for i in xrange(len(boards)):
-    boards[i] = boards[i].lower()
+    boards[i] = boards[i].lower().replace('_', '-')
     if boards[i] in PLATFORM_CONVERT:
       boards[i] = PLATFORM_CONVERT[boards[i]]
     # Disallow duplicates.
@@ -224,8 +234,8 @@ def main():
     dl_error[board] = True
 
     # See if file already exists locally.
-    folder_name = _FolderNameGenerator(download_type=download_type, p=board,
-                                       b=build, c=channel, mp=mp_str)
+    folder_name = _GenerateFolderName(download_type=download_type, p=board,
+                                      b=build, c=channel, mp=mp_str)
     folder_path = os.path.join(download_folder, folder_name)
     dl_folder[board] = folder_path
     if download_type == TEST:
@@ -247,7 +257,7 @@ def main():
         subprocess.call(['mkdir', '-p', folder_path])
 
       # Generate search terms.
-      folder = _GstorageLinkGenerator(c=channel, p=board, b=build)
+      folder = _GenerateGstorageLink(c=channel, p=board, b=build)
       if download_type == TEST:
         file_search = '%s*test*.tar.xz' % folder
       elif download_type == AUTOTEST:
@@ -354,7 +364,7 @@ def main():
       board = boards[i]
       # If board downloaded without errors, install.  Else, skip.
       if not dl_error[board]:
-        path_to_script = os.path.join(SRC_DIR, 'scripts', 'image_to_usb.sh')
+        path_to_script = os.path.join(src_dir, 'scripts', 'image_to_usb.sh')
         cmd = ('/usr/bin/sudo /bin/sh %s --from=%s'
                % (path_to_script, output_str[board]))
         # Copy this (i-th) board to i-th drive
