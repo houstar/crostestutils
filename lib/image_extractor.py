@@ -93,11 +93,8 @@ class ImageExtractor(object):
       image_dir: Directory with image to unzip.
 
     Returns:
-      The path to the image.bin file after it has been unzipped.
-
-    Raises:
-      MissingImageZipException if there is nothing to unzip within
-      the image_dir.
+      The path to the image.bin file after it has been unzipped. Returns None
+      if the expected image is missing from the image.zip.
     """
     # Use the last 2 paths as the version_string path (may include board id).
     version_string = os.path.join(*image_dir.split(os.path.sep)[-2:])
@@ -120,5 +117,8 @@ class ImageExtractor(object):
       logging.info('Unzipping image from %s to %s', zip_path, cached_dir)
       cros_build_lib.RunCommand(['unzip', '-d', cached_dir, zip_path],
                                 print_cmd=False)
+      if not os.path.exists(cached_image):
+        logging.warn('image.zip did not contain expected image.')
+        return None
 
     return cached_image
