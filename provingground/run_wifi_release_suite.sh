@@ -31,7 +31,14 @@ list_3=(link stout peppy falco)
 # marvell_88w8797_2x2 on kernel 3.8
 list_4=(snow spring)
 
-DESIRED_BOARDS=(list_1 list_2 list_3 list_4)
+# marvell_88w8897_2x2 on kernel 3.8
+list_5=(peach_pi peach_pit)
+
+# intel wilkins peak 2 on kernel 3.10
+# TODO (krisr) add rambi when installed
+list_6=(squawks)
+
+DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6)
 
 return_available_hosts() {
   OIFS='$IFS'
