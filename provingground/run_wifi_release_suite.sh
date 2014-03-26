@@ -35,8 +35,7 @@ list_4=(snow spring)
 list_5=(peach_pi peach_pit)
 
 # intel wilkins peak 2 on kernel 3.10
-# TODO (krisr) add rambi when installed
-list_6=(squawks)
+list_6=(squawks rambi falco_li)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6)
 
@@ -52,7 +51,8 @@ return_available_hosts() {
     local host_info=($host)
     for board in ${boards[@]}; do
       if [[ $board == ${host_info[3]} && (${host_info[1]} != 'Repairing' &&
-          ${host_info[1]} != 'Repair Failed') ]] ; then
+        ${host_info[1]} != 'Repair Failed') &&
+        ${host_info[2]} == 'False' ]] ; then
         boards_to_run+=($board)
       fi
     done;
