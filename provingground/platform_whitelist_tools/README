@@ -1,0 +1,15 @@
+Scripts to update platform_ToolchainOptions whitelists.
+
+Download all the debug files for all the platforms into a directory and run
+"fetch_commons.py" against that directory to get a list of all the
+files that are passing currently on multilple platforms.
+This will generate files containing the files that need to be
+removed from the list.
+
+Run "fetch_commons.py" against multilple builds (atleast two).
+Then compare the files generated for various builds using
+"sort file1 file2 | uniq -d" to get a list of files which are common
+accross all platforms and multiple builds.
+
+Run remove_from_whitelist.py" to remove the now useless files from the
+whitelists in platform_ToolchainOptions.
