@@ -39,21 +39,38 @@ list_6=(squawks rambi falco_li)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6)
 
+# POOLS format: POOLS[<pool name>]=<suite name>
+declare -A POOLS
+POOLS[wificell]=wifi_release
+
+return_item_exists_in_array() {
+  for current_board in ${boards_to_run[@]}; do
+    if [[ ${1} == ${current_board} ]] ; then
+      echo 'True'
+    fi
+  done;
+  echo 'False'
+}
+
 return_available_hosts() {
   OIFS='$IFS'
   IFS=$'\n'
 
   boards=("${!1}")
+  local pool=${2}
 
   #TODO: Filter out stderr so the user doesn't see it.
-  for host in `$ATEST host list | grep wificell` ; do
+  for host in `$ATEST host list | grep 'pool:'${2}` ; do
     IFS=$' '
     local host_info=($host)
     for board in ${boards[@]}; do
       if [[ $board == ${host_info[3]} && (${host_info[1]} != 'Repairing' &&
         ${host_info[1]} != 'Repair Failed') &&
         ${host_info[2]} == 'False' ]] ; then
-        boards_to_run+=($board)
+        already_added=$(return_item_exists_in_array ${board})
+        if [[ ${already_added} == 'False' ]] ; then
+          boards_to_run+=($board)
+        fi
       fi
     done;
     IFS=$'\n'
@@ -61,51 +78,59 @@ return_available_hosts() {
   IFS=$OIFS
 }
 
-boards_to_run=()
+return_host_list() {
+  local pool=${1}
+  for sub_list in ${DESIRED_BOARDS[@]} ; do
+    previous_count=${#boards_to_run[@]}
 
-for sub_list in ${DESIRED_BOARDS[@]} ; do
-  previous_count=${#boards_to_run[@]}
+    subst="$sub_list[@]"
+    list_items=(`echo "${!subst}"`)
+    return_available_hosts list_items[@] ${pool}
 
-  subst="$sub_list[@]"
-  list_items=(`echo "${!subst}"`)
-  return_available_hosts list_items[@]
+    current_count=${#boards_to_run[@]}
+    if [ $current_count -eq $previous_count ] ; then
+      echo 'No devices from '$sub_list' ('${list_items}') were available!'
+    fi
 
-  current_count=${#boards_to_run[@]}
-  if [ $current_count -eq $previous_count ] ; then
-    echo 'No devices from '$sub_list' were available!'
-  fi
+  done;
+}
 
-done;
-
-#TODO: Remove duplicates from the list of boards_to_run
-
-results_folder='/tmp/wifi_release_R'$BRANCH'-'$BUILD'-'`date +%Y-%m-%d-%H-%M-%S`
-if [ -e $results_folder ] ; then
-  rm -rf $results_folder
+results_folder='/tmp/connectivity_release_'
+results_folder+=$BRANCH'-'$BUILD'-'`date +%Y-%m-%d-%H-%M-%S`
+if [ -e ${results_folder} ] ; then
+  rm -rf ${results_folder}
 fi
 
-#TODO: Create a wifi_release_Rx-x.latest symn link
 mkdir $results_folder
+latest_results_folder='/tmp/connectivity_results_latest'
+if [ -h ${latest_results_folder} ] ; then
+  rm -rf ${latest_results_folder}
+fi
+ln -s ${results_folder} ${latest_results_folder}
 
-for board in ${boards_to_run[@]}; do
-  # Perform the conversion from autotest platform names to board build names
-  if [ $board == 'spring' ] ; then
-    board='daisy_spring'
-  elif [ $board == 'snow' ] ; then
-    board='daisy'
-  elif [ $board == 'alex' ] ; then
-    board='x86-alex'
-  fi
+for pool in "${!POOLS[@]}"; do
+  boards_to_run=()
+  return_host_list ${pool}
 
-  run_command=$RUN_SUITE' --build='$board'-release/R'$BRANCH'-'$BUILD
-  run_command+=' --pool=wificell --board='$board' --suite_name=wifi_release'
+  for board in ${boards_to_run[@]}; do
+    # Perform the conversion from autotest platform names to board build names
+    if [ $board == 'spring' ] ; then
+      board='daisy_spring'
+    elif [ $board == 'snow' ] ; then
+      board='daisy'
+    elif [ $board == 'alex' ] ; then
+      board='x86-alex'
+    fi
 
-  results_file=$results_folder'/'$board'.txt'
+    run_command=$RUN_SUITE' --build='$board'-release/R'$BRANCH'-'$BUILD
+    run_command+=' --pool='$pool' --board='$board' --suite_name='${POOLS[$pool]}
 
-  echo 'Running: '$board
-  eval $run_command &> $results_file &
-  disown %1
+    results_file=$results_folder'/'$pool'_'$board'.txt'
 
+    eval $run_command &> $results_file &
+    disown %1
+
+  done;
 done;
 
-echo 'Results can be seen in: '$results_folder
+echo 'All results are available in: '${results_folder}
