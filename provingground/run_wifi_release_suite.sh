@@ -26,10 +26,10 @@ list_1=(alex lumpy stumpy)
 list_2=(parrot butterfly)
 
 # atheros_ar9462 on kernel 3.8
-list_3=(link stout peppy falco)
+list_3=(link stout peppy falco monroe panther leon wolf)
 
 # marvell_88w8797_2x2 on kernel 3.8
-list_4=(snow spring)
+list_4=(snow spring skate)
 
 # marvell_88w8897_2x2 on kernel 3.8
 list_5=(peach_pi peach_pit)
