@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import zipfile
+import zlib
 
 from chromite.lib import cros_build_lib
 
@@ -45,7 +46,7 @@ class ImageExtractor(object):
       # zip at all.
       zf = zipfile.ZipFile(zip_image)
       return zf.testzip() == None
-    except zipfile.BadZipfile:
+    except (zipfile.BadZipfile, zlib.error):
       return False
 
   def GetLatestImage(self, target_version):
