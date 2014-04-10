@@ -84,10 +84,10 @@ class ImageExtractor(object):
   def UnzipImage(self, image_dir):
     """Unzips the image.zip from the image_dir and returns the image.
 
-    This method unzips the image under SRC_ARCHIVE_DIR along with its version
-    string. In order to save time, if it is attempting
-    to re-unzip the same image with the same version string, it uses the
-    cached image in SRC_ARCHIVE_DIR. It determines the version string based
+    This method unzips the specified image from the archive dir. In order to
+    to save time, the image is cached under a subdirectory of the archive dir.
+    If it is attempting to re-unzip the same image with the same version
+    string, it uses the cached image. It determines the version string based
     on the last path parts of the image_dir.
 
     Args:
@@ -99,7 +99,7 @@ class ImageExtractor(object):
     """
     # Use the last 2 paths as the version_string path (may include board id).
     version_string = os.path.join(*image_dir.split(os.path.sep)[-2:])
-    cached_dir = os.path.join(ImageExtractor.SRC_ARCHIVE_DIR, version_string)
+    cached_dir = os.path.join(image_dir, ImageExtractor.SRC_ARCHIVE_DIR)
     cached_image = os.path.abspath(os.path.join(
         cached_dir, self.image_to_extract))
     # If we previously unzipped the image, we're done.
@@ -108,10 +108,10 @@ class ImageExtractor(object):
                    'unzipped to %s.', version_string, cached_image)
     else:
       # Cached image for version not found. Unzipping image from archive.
-      if os.path.exists(ImageExtractor.SRC_ARCHIVE_DIR):
+      if os.path.exists(cached_dir):
         logging.info('Removing previously archived images from %s',
-                     ImageExtractor.SRC_ARCHIVE_DIR)
-        shutil.rmtree(ImageExtractor.SRC_ARCHIVE_DIR)
+                     cached_dir)
+        shutil.rmtree(cached_dir)
 
       os.makedirs(cached_dir)
       zip_path = os.path.join(image_dir, 'image.zip')
