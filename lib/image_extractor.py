@@ -99,7 +99,8 @@ class ImageExtractor(object):
     """
     # Use the last 2 paths as the version_string path (may include board id).
     version_string = os.path.join(*image_dir.split(os.path.sep)[-2:])
-    cached_dir = os.path.join(image_dir, ImageExtractor.SRC_ARCHIVE_DIR)
+    cached_dir = os.path.join(image_dir, ImageExtractor.SRC_ARCHIVE_DIR,
+                              version_string)
     cached_image = os.path.abspath(os.path.join(
         cached_dir, self.image_to_extract))
     # If we previously unzipped the image, we're done.
