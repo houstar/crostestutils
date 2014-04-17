@@ -10,7 +10,7 @@
 # specified.
 # Downloads image via gsutil to chromiumos/src/REL_DL_DIR.
 
-"""Download and output or run image_to_usb command."""
+"""Download and output or run cros flash command to copy image to usb."""
 
 import argparse
 from multiprocessing import Manager
@@ -58,7 +58,7 @@ def _GenerateFolderName(download_type, b, p, c, mp):
 
 
 def main():
-  """Download and output or run image_to_usb command."""
+  """Download and output or run cros flash command."""
   parser = argparse.ArgumentParser(
       description=('Download a testing resource: recovery image, test image, '
                    'autotest folder, or factory\nbundle.  Optionally make usb '
@@ -105,9 +105,6 @@ def main():
   parser.add_argument('--folder', dest='folder',
                       help=('Specify a new download folder (default is src/'
                             '%s).' % REL_DL_DIR))
-  parser.add_argument('--src_dir', dest='src_dir',
-                      help=('Specify path to chromium src/ folder.  For running'
-                            'this script from other locations.'))
   parser.add_argument('--delete_files', dest='delete', action='store_true',
                       help=('Delete any files downloaded from this command'
                             'when finished with copying to usb stick.  '
@@ -119,10 +116,12 @@ def main():
                             'harddrive).'))
   arguments = parser.parse_args()
 
-  # Make sure the default or user defined src folder actually points to src/.
-  src_dir = arguments.src_dir if arguments.src_dir else REL_SRC_DIR
-  if os.path.basename(os.path.abspath(src_dir)) != 'src':
-    print 'Could not find src/ directory.  Try passing the --src_dir input.'
+  # Find src/ dir.
+  script_file_dir = os.path.dirname(os.path.realpath(__file__))
+  src_dir = os.path.join(script_file_dir, REL_SRC_DIR)
+  src_dir = os.path.abspath(src_dir)
+  if os.path.basename(src_dir) != 'src':
+    print 'Could not find src/ directory!  Has this script been moved?'
     return
 
   # Set download folder as user defined or default.
@@ -356,41 +355,54 @@ def main():
   for job in jobs:
     job.join()
 
-  # Print output or run image_to_usb command.
+  # Print output or run cros flash command.
   errors = ''
   if installing_one or installing_many:
+    # Move to src/ dir to access 'cros' command.
+    starting_dir = os.getcwd()
+    os.chdir(src_dir)
+
+    # Use 'cros flash' to copy images to boards.
     jobs = []
     for i in xrange(len(boards)):
       board = boards[i]
-      # If board downloaded without errors, install.  Else, skip.
+      # Skip unless board downloaded without errors.
       if not dl_error[board]:
-        path_to_script = os.path.join(src_dir, 'scripts', 'image_to_usb.sh')
-        cmd = ('/usr/bin/sudo /bin/sh %s --from=%s'
-               % (path_to_script, output_str[board]))
+        cmd = 'cros flash usb://%s ' + output_str[board]
+
         # Copy this (i-th) board to i-th drive
         if installing_one:
-          # If drive argument was provided, use it.  Else, leave it out.
+          # Use provided drive or leave blank.
           if arguments.to_stick:
             usb_drive = arguments.to_stick[i]
-            cmd = '%s --to=%s -y' % (cmd, usb_drive)
-            print 'Copying %s to %s.' % (board, usb_drive)
+          else:
+            usb_drive = ''
+          cmd = cmd % usb_drive
+          print 'Copying %s to %s.' % (board, usb_drive)
           proc = subprocess.Popen(cmd.split(' '))
           jobs.append(proc)
+
         # Copy this (only) board to all drives
         else:
           for usb_drive in arguments.to_many:
-            cmd_per_usb = '%s --to=%s -y' % (cmd, usb_drive)
+            cmd_per_usb = cmd % usb_drive
             print 'Copying %s to %s.' % (board, usb_drive)
             proc = subprocess.Popen(cmd_per_usb.split(' '))
             jobs.append(proc)
+
       else:
         errors += '%s\n' % output_str[board]
+
     # Wait for all copies to finish.
     for job in jobs:
       job.wait()
     if arguments.delete:
       print 'Deleting all files created for %s.' % board
       shutil.rmtree(dl_folder[board])
+
+    # Return to previous directory.
+    os.chdir(starting_dir)
+
   else:
     print '\nDownloaded File(s):'
     for board in boards:
