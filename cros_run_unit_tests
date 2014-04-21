@@ -127,8 +127,12 @@ if [ -n "${TEST_PACKAGE_LIST}" ]; then
     printf '%s\n' ${TEST_PACKAGE_LIST} | sort
     exit 0
   else
-    sudo -E PKGDIR="/build/${FLAGS_board}/test-packages" FEATURES="test" \
-      ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly ${TEST_PACKAGE_LIST}
+    cmd=( sudo -E PKGDIR="/build/${FLAGS_board}/test-packages"
+          FEATURES="test" ${EMERGE_BOARD_CMD} --nodeps --buildpkgonly )
+    info "Running unit tests with command ${cmd[*]}"
+    info "Unit tests will run for the following packages:"
+    info ${TEST_PACKAGE_LIST}
+    "${cmd[@]}" ${TEST_PACKAGE_LIST}
   fi
 fi
 
