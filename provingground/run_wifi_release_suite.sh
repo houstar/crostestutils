@@ -116,6 +116,8 @@ for pool in "${!POOLS[@]}"; do
     # Perform the conversion from autotest platform names to board build names
     if [ $board == 'spring' ] ; then
       board='daisy_spring'
+    elif [ $board == 'skate' ] ; then
+      board='daisy_skate'
     elif [ $board == 'snow' ] ; then
       board='daisy'
     elif [ $board == 'alex' ] ; then
