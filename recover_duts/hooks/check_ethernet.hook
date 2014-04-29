@@ -20,7 +20,7 @@ NON_ETHERNET_DRIVERS="cdc_ether"
 # TODO(tbroch) Relocate this to common hook library if/when there's more than
 # one hook.
 critical_msg() {
-  logger -t "recover_duts:$(basename $0)" -- "$@"
+  logger -t "$(basename $0)" -- "$@"
 }
 
 # Returns the default gateway.
@@ -72,7 +72,9 @@ do_ping() {
 # Restart all our ethernet devices and restart shill.
 recover_ethernet_devices() {
   local eth
+  critical_msg "Gateway still unreachable; restarting ethernet interfaces"
   for eth in $(find_ethernet_interfaces); do
+    echo "Bounce interface ${eth}"
     ifconfig ${eth} down
     ifconfig ${eth} up
   done
@@ -89,15 +91,14 @@ find_ssh_client() {
 
 # Try to find a connected SSH client (our autotest server) and ping it
 ping_controlling_server() {
-  local ssh_client default_gateway
-  ssh_client="$(find_ssh_client)" || ssh_client=
+  local default_gateway="$(get_default_gateway)" || default_gateway=
+  if [ -n "${default_gateway}" ]; then
+    do_ping ${default_gateway} && return 0
+  fi
+
+  local ssh_client="$(find_ssh_client)" || ssh_client=
   if [ -n "${ssh_client}" ]; then
     do_ping ${ssh_client} && return 0
-  else
-    default_gateway="$(get_default_gateway)" || default_gateway=
-    if [ -n "${default_gateway}" ]; then
-      do_ping ${default_gateway} && return 0
-    fi
   fi
   return 1
 }
@@ -107,11 +108,16 @@ main() {
   # a minimum of 12 minutes network timeout tolerance for tests that disrupt
   # connectivity with the SSH connection from the autotest server. This timeout
   # is 15 minutes to make sure it can never fail before that SSH session does.
-  for i in {0..29}; do
+  if ping_controlling_server; then
+    return 0
+  fi
+  critical_msg "Gateway unreachable; will retry for 15 minutes"
+  for i in {1..30}; do
+    sleep 30
     if ping_controlling_server; then
+      critical_msg "Gateway now answering; returning success"
       return 0
     fi
-    sleep 30
   done
 
   # We can't reach our controlling server through any ethernet devices.
