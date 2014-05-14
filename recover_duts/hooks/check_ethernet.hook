@@ -20,6 +20,7 @@ NON_ETHERNET_DRIVERS="cdc_ether"
 # TODO(tbroch) Relocate this to common hook library if/when there's more than
 # one hook.
 critical_msg() {
+  echo "$@"
   logger -t "$(basename $0)" -- "$@"
 }
 
@@ -70,20 +71,6 @@ do_ping() {
 }
 
 # Restart all our ethernet devices and restart shill.
-recover_ethernet_devices() {
-  local eth
-  critical_msg "Gateway still unreachable; restarting ethernet interfaces"
-  for eth in $(find_ethernet_interfaces); do
-    echo "Bounce interface ${eth}"
-    ifconfig ${eth} down
-    ifconfig ${eth} up
-  done
-  initctl stop shill || echo "Shill was not running."
-  initctl start shill
-  sleep 30
-  ifconfig -a
-}
-
 # Return the remote IP address of the first established SSH connection
 find_ssh_client() {
   netstat -lanp | awk '/tcp.*:22.*ESTABLISHED.*/ {split($5,a,":"); print a[1]}'
@@ -103,33 +90,55 @@ ping_controlling_server() {
   return 1
 }
 
+recover_ethernet_devices() {
+  local eth
+  critical_msg "Gateway unreachable; restarting ethernet interfaces"
+  for eth in $(find_ethernet_interfaces); do
+    echo "Bounce interface ${eth}"
+    ifconfig ${eth} down
+    ifconfig ${eth} up
+  done
+  initctl stop shill || echo "Shill was not running."
+  initctl start shill
+  sleep 30
+  ifconfig -a
+
+  if ping_controlling_server; then
+      critical_msg "Restart successful"
+      return 0
+  fi
+  return 1
+}
+
+TIMEOUT_MINUTES=15
+TIMEOUT=$(( TIMEOUT_MINUTES * 60 ))
+
 main() {
-  # Attempt to ping our controlling autotest server over ethernet. We guarantee
-  # a minimum of 12 minutes network timeout tolerance for tests that disrupt
-  # connectivity with the SSH connection from the autotest server. This timeout
-  # is 15 minutes to make sure it can never fail before that SSH session does.
+  # Attempt to ping our controlling autotest server over ethernet.
+  # We guarantee a minimum of 12 minutes network timeout tolerance
+  # for tests that disrupt connectivity with the SSH connection from
+  # the autotest server.  This timeout is 15 minutes to make sure it
+  # can never fail before that SSH session does.
+
+  local endtime=$(( $(date +%s) + TIMEOUT ))
   if ping_controlling_server; then
     return 0
   fi
-  critical_msg "Gateway unreachable; will retry for 15 minutes"
-  for i in {1..30}; do
+  if recover_ethernet_devices; then
+    return 0
+  fi
+  critical_msg "Restart failed; will retry recovery for ~$TIMEOUT_MINUTES minutes"
+  while [ $(date +%s) -lt $endtime ]; do
     sleep 30
     if ping_controlling_server; then
-      critical_msg "Gateway now answering; returning success"
+      critical_msg "Gateway now reachable; ending recovery loop"
+      return 0
+    fi
+    if recover_ethernet_devices; then
       return 0
     fi
   done
 
-  # We can't reach our controlling server through any ethernet devices.
-  recover_ethernet_devices
-
-  # Attempt to ping again. If successful, return 1 so that way log the fact
-  # that we need to take action to recover the dut.
-  if ping_controlling_server; then
-    return 1
-  fi
-
-  # Last chance - reboot if we can't get any connectivity.
   critical_msg "All efforts to recover ethernet have been exhausted. Rebooting."
   sync
   (sleep 5 && reboot) &
