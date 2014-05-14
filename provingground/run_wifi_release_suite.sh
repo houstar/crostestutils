@@ -35,7 +35,7 @@ list_4=(snow spring skate)
 list_5=(peach_pi peach_pit)
 
 # intel wilkins peak 2 on kernel 3.10
-list_6=(squawks rambi falco_li)
+list_6=(squawks rambi falco_li, clapper)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6)
 
