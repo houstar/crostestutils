@@ -9,7 +9,7 @@ import shutil
 import tempfile
 
 import constants
-from chromite.buildbot import constants as buildbot_constants
+from chromite.cbuildbot import constants as buildbot_constants
 from chromite.lib import cros_build_lib
 from crostestutils.au_test_harness import au_worker
 from crostestutils.au_test_harness import update_exception
