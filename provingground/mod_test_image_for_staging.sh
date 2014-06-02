@@ -8,8 +8,8 @@
 # Script modifies a chromiumos image so that it will work with test
 # instances of the DM Server and GAIA in the staging environment.
 #
-# When run, the script will mount the specified image, update the
-# session_manager_setup.sh file, and then re-sign the image with devkey.
+# When run, the script will mount the specified image, make modifications to
+# the flags passed to Chrome, and then re-sign the image with devkey.
 #
 
 . "/usr/lib/crosutils/common.sh" || { echo "Unable to load common.sh"; exit 1; }
@@ -34,19 +34,10 @@ FLAGS_image=$(eval readlink -f "${FLAGS_image}")
 IMAGE_DIR=$(dirname "${FLAGS_image}")
 IMAGE_NAME=$(basename "${FLAGS_image}")
 ROOT_FS_DIR="${IMAGE_DIR}/rootfs"
-SMS_FILE="${ROOT_FS_DIR}/sbin/session_manager_setup.sh"
+CONFIG_FILE="${ROOT_FS_DIR}/etc/chrome_dev.conf"
 DEVKEYS_DIR="/usr/share/vboot/devkeys"
 VBOOT_DIR="${CHROOT_TRUNK_DIR}/src/platform/vboot_reference/scripts/"\
 "image_signing"
-
-NL="\\\\\n"
-PAD="            "
-ARGS="${PAD}--gaia-url=${FLAGS_gaiaserver} ${NL}"\
-"${PAD}--lso-url=https://test-sandbox.auth.corp.google.com ${NL}"\
-"${PAD}--google-apis-host=www-googleapis-test.sandbox.google.com ${NL}"\
-"${PAD}--oauth2-client-id=236834563817.apps.googleusercontent.com ${NL}"\
-"${PAD}--oauth2-client-secret=RsKv5AwFKSzNgE0yjnurkPVI ${NL}"\
-"${PAD}--ignore-urlfetcher-cert-requests \\\\"
 
 cleanUp() {
   "${SCRIPTS_DIR}/mount_gpt_image.sh" -u -r "$ROOT_FS_DIR"
@@ -64,14 +55,26 @@ trap cleanUp EXIT
 "$SCRIPTS_DIR/mount_gpt_image.sh" --image="$IMAGE_NAME" --from="$IMAGE_DIR" \
   --rootfs_mountpt="$ROOT_FS_DIR"
 
-# Create backup of session manager setup file.
-sudo cp ${SMS_FILE} ${SMS_FILE}.bak
+# Instruct session_manager to make some changes to Chrome's command line.
+sudo_append "${CONFIG_FILE}" <<EOF
+################################################################################
+# mod_test_image_for_staging.sh modifications start here.
 
-# Update DMSERVER to user-specified URI.
-sudo sed -i 's@^DMSERVER=.*@DMSERVER="'${FLAGS_dmserver}'"@' ${SMS_FILE}
+# Delete the flag with the old URL and set a new one.
+!--device-management-url=
+--device-management-url=${FLAGS_dmserver}
 
-# Insert Staging Server arguments.
-sudo sed -i '/--device-management-url/i\'"${ARGS}"'' ${SMS_FILE}
+--gaia-url=${FLAGS_gaiaserver}
+--lso-url=https://test-sandbox.auth.corp.google.com
+--google-apis-host=www-googleapis-test.sandbox.google.com
+--oauth2-client-id=236834563817.apps.googleusercontent.com
+--oauth2-client-secret=RsKv5AwFKSzNgE0yjnurkPVI
+--cloud-print-service=https://cloudprint.sandbox.google.com/cloudprint
+--ignore-urlfetcher-cert-requests
+
+# mod_test_image_for_staging.sh modifications end here.
+################################################################################
+EOF
 
 trap - EXIT
 
