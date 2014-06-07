@@ -328,8 +328,8 @@ class ResultCollector(object):
     status = False
     error_msg = None
     status_raw = open(status_file, 'r').read()
-    failure_tags = 'ABORT|ERROR|FAIL|TEST_NA'
-    warning_tag = 'WARN'
+    failure_tags = 'ABORT|ERROR|FAIL'
+    warning_tag = 'WARN|TEST_NA'
     failure = re.search(r'%s' % failure_tags, status_raw)
     warning = re.search(r'%s' % warning_tag, status_raw) and not failure
     good = (re.search(r'GOOD.+completed successfully', status_raw) and
