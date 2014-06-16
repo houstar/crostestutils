@@ -15,7 +15,7 @@
 # Recent test results are fetched from the test-results.appspot.com server,
 # read from the results.json file located at:
 #   https://test-results.appspot.com/testfile?master=ChromiumChromiumOS&
-#   builder=Linux ChromiumOS Tests (dbg)(2)&testtype=browser_tests&
+#   builder=Linux ChromiumOS Tests (2)&testtype=browser_tests&
 #   name=results.json
 #
 
@@ -37,7 +37,7 @@ _BUILD_NUMBER = '-2'
 # TestResults server url parameter defaults.
 _TR_HOST = 'test-results.appspot.com'  # URI to TestResults server.
 _TR_MASTER = 'ChromiumChromiumOS'  # Test-results build master repository.
-_TR_BUILDER = 'Linux ChromiumOS Tests (dbg)(2)'  # TestResults builder name.
+_TR_BUILDER = 'Linux ChromiumOS Tests (2)'  # TestResults builder name.
 
 # Input file and report directory parameter defaults.
 _TESTS_FILE = './tests'  # Path to the file that contains the tests names.
@@ -211,7 +211,7 @@ def _GetResultsDict(master, builder):
 
   Args:
     master: Master repo (e.g., 'ChromiumChromiumOS')
-    builder: Builder name (e.g., 'Linux ChromiumOS Tests (dbg)(2)')
+    builder: Builder name (e.g., 'Linux ChromiumOS Tests (2)')
 
   Returns:
     Dictionary of builder results.
