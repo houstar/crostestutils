@@ -34,10 +34,16 @@ list_4=(snow spring skate)
 # marvell_88w8897_2x2 on kernel 3.8
 list_5=(peach_pi peach_pit)
 
-# intel wilkins peak 2 on kernel 3.10
-list_6=(squawks rambi falco_li, clapper)
+# marvell_88w8897_2x2 on kernel 3.10
+list_6=(nyan_big)
 
-DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6)
+# intel wilkins peak 2 on kernel 3.8
+list_7=(falco_li)
+
+# intel wilkins peak 2 on kernel 3.10
+list_8=(squawks rambi clapper quawks enguarde)
+
+DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8)
 
 # POOLS format: POOLS[<pool name>]=<suite name>
 declare -A POOLS
