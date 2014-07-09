@@ -39,7 +39,7 @@ DEFINE_boolean installed "${FLAGS_TRUE}" \
 NO_UNITTESTS=""
 
 check_src_test() {
-  egrep '^src_test()' "${1}" > /dev/null
+  egrep '^(src_test|platform_pkg_test)()' "${1}" > /dev/null
 }
 
 # Parse command line and die if unexpected parameters given.
