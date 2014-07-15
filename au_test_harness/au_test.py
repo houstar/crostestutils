@@ -11,6 +11,7 @@ import unittest
 import urllib
 
 from chromite.lib import cros_build_lib
+from chromite.lib import dev_server_wrapper
 from crostestutils.au_test_harness import cros_test_proxy
 from crostestutils.au_test_harness import real_au_worker
 from crostestutils.au_test_harness import update_exception
@@ -60,13 +61,15 @@ class AUTest(unittest.TestCase):
     """Update through a proxy, with a specified filter, and expect success."""
     target_image_path = self.worker.PrepareBase(self.target_image_path)
 
-    # The devserver runs at port 8080 by default. We assume that here, and
-    # start our proxy at a different one. We then tell our update tools to
-    # have the client connect to our proxy_port instead of 8080.
-    proxy = cros_test_proxy.CrosTestProxy(port_in=proxy_port,
-                                          address_out='127.0.0.1',
-                                          port_out=8080,
-                                          filter=update_filter)
+    # We assume that devserver starts at the default port (8080), and start
+    # our proxy at a different one. We then tell our update tools to
+    # have the client connect to our proxy_port instead of the 8080.
+    proxy = cros_test_proxy.CrosTestProxy(
+        port_in=proxy_port,
+        address_out='127.0.0.1',
+        port_out=dev_server_wrapper.DEFAULT_PORT,
+        filter=update_filter
+    )
     proxy.serve_forever_in_thread()
     try:
       self.worker.PerformUpdate(target_image_path, target_image_path,

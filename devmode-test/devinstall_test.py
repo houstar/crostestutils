@@ -116,7 +116,7 @@ class DevModeTest(object):
       logging.info('Starting the devserver.')
       self.devserver = dev_server_wrapper.DevServerWrapper()
       self.devserver.Start()
-      self.binhost = dev_server_wrapper.DevServerWrapper.GetDevServerURL(
+      self.binhost = self.devserver.GetURL(
           sub_dir='static/pkgroot/%s/packages' % self.board)
 
     logging.info('Using binhost %s', self.binhost)
@@ -145,7 +145,7 @@ class DevModeTest(object):
     try:
       self.device.RunCommand(
           ['gmerge', 'gmerge', '--accept_stable', '--usepkg',
-           '--devserver_url', self.devserver.GetDevServerURL(),
+           '--devserver_url', self.devserver.GetURL(),
            '--board', self.board])
     except (cros_build_lib.RunCommandError,
             remote_access.SSHConnectionError) as e:

@@ -116,8 +116,8 @@ def CheckOptions(parser, options, leftover_args):
 
   Args:
     parser: Parser used to parse options.
-    options:  Parsed options.
-    leftover_args:  Args left after parsing.
+    options: Parsed options.
+    leftover_args: Args left after parsing.
   """
   if leftover_args: parser.error('Found unsupported flags ' + leftover_args)
   if not options.type in ['real', 'vm']:
@@ -215,6 +215,7 @@ def main():
       # Only start a devserver if we'll need it.
       if update_cache:
         my_server = dev_server_wrapper.DevServerWrapper(
+            port=dev_server_wrapper.DEFAULT_PORT,
             log_dir=options.test_results_root)
         my_server.Start()
 
