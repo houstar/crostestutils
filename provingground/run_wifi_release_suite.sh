@@ -14,6 +14,8 @@ RUN_SUITE='../../../third_party/autotest/files/site_utils/run_suite.py'
 
 USAGE_STRING='Usage: ./run_wifi_release_suite.sh <branch number> <build number>'
 
+declare -i MINIMUM_WIFI_POOL_VERSION=37
+
 if [[ $# -eq 0  ||  -z $2 ]] ; then
   echo $USAGE_STRING
   exit
@@ -26,7 +28,7 @@ list_1=(alex lumpy stumpy)
 list_2=(parrot butterfly)
 
 # atheros_ar9462 on kernel 3.8
-list_3=(link stout peppy falco monroe panther leon wolf)
+list_3=(link stout peppy falco monroe panther leon wolf mccloud zako)
 
 # marvell_88w8797_2x2 on kernel 3.8
 list_4=(snow spring skate)
@@ -35,19 +37,27 @@ list_4=(snow spring skate)
 list_5=(peach_pi peach_pit)
 
 # marvell_88w8897_2x2 on kernel 3.10
-list_6=(nyan_big)
+list_6=(nyan_big nyan_blaze)
 
 # intel wilkins peak 2 on kernel 3.8
 list_7=(falco_li)
 
 # intel wilkins peak 2 on kernel 3.10
-list_8=(squawks rambi clapper quawks enguarde)
+list_8=(squawks rambi clapper glimmer quawks enguarde kip squawks)
+
+# wificell_preflight boards
+list_9=(swanky gnawty tricky)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8)
+
+if [ $BRANCH -ge ${MINIMUM_WIFI_POOL_VERSION} ] ; then
+  DESIRED_BOARDS+=(list_9)
+fi
 
 # POOLS format: POOLS[<pool name>]=<suite name>
 declare -A POOLS
 POOLS[wificell]=wifi_release
+POOLS[wificell_preflight]=wifi_release
 
 return_item_exists_in_array() {
   for current_board in ${boards_to_run[@]}; do
@@ -66,7 +76,7 @@ return_available_hosts() {
   local pool=${2}
 
   #TODO: Filter out stderr so the user doesn't see it.
-  for host in `$ATEST host list | grep 'pool:'${2}` ; do
+  for host in `$ATEST host list | grep -w 'pool:'${2}` ; do
     IFS=$' '
     local host_info=($host)
     for board in ${boards[@]}; do
