@@ -52,16 +52,16 @@ fi
 
 DUT="$1"
 OPTIONS=( --board="${FLAGS_board}" )
-TESTS=( suite:bvt suite:qav )
+TESTS=( suite:bvt-{inline,cq,qav} )
 
 SUITE_CHECK=0
 if [ ${FLAGS_smoke} -eq ${FLAGS_TRUE} ]; then
   SUITE_CHECK=$(( SUITE_CHECK + 1 ))
-  TESTS=( suite:smoke )
+  TESTS=( suite:bvt-inline )
 fi
 if [ ${FLAGS_commit} -eq ${FLAGS_TRUE} ]; then
   SUITE_CHECK=$(( SUITE_CHECK + 1 ))
-  TESTS=( suite:bvt_cq )
+  TESTS=( suite:bvt-{inline,cq} )
 fi
 if [ ${FLAGS_canary} -eq ${FLAGS_TRUE} ]; then
   SUITE_CHECK=$(( SUITE_CHECK + 1 ))
@@ -69,7 +69,7 @@ if [ ${FLAGS_canary} -eq ${FLAGS_TRUE} ]; then
 fi
 if [ ${FLAGS_labqual} -eq ${FLAGS_TRUE} ]; then
   SUITE_CHECK=$(( SUITE_CHECK + 1 ))
-  TESTS=( suite:bvt )
+  TESTS=( suite:bvt-{inline,cq} )
   if [ ${FLAGS_usbkey} -eq ${FLAGS_TRUE} ]; then
     TESTS+=( platform_ServoPowerStateController_USBPluggedin )
   else
