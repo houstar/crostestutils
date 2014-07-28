@@ -1,0 +1,99 @@
+#!/bin/bash
+# Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This script requires that you run build_packages first.
+
+# Special because this can only run inside the chroot.
+if [ ! -r /usr/lib/crosutils/common.sh ]; then
+  echo "Must run within chroot" >&2
+  exit 1
+fi
+. /usr/lib/crosutils/common.sh
+
+
+# Flags
+DEFINE_string board "${DEFAULT_BOARD}" \
+  "Target board of DUT running the tests"
+DEFINE_boolean smoke "${FLAGS_FALSE}" \
+  "Run a minimal set of tests for sanity"
+DEFINE_boolean commit "${FLAGS_FALSE}" \
+  "Run the tests required to pass the Commit Queue"
+DEFINE_boolean canary "${FLAGS_FALSE}" \
+  "Run all tests required for canary builds to pass"
+DEFINE_boolean labqual "${FLAGS_FALSE}" \
+  "Run the BVT tests required for lab qualification"
+DEFINE_boolean debug "${FLAGS_FALSE}" \
+  "Debug and test support for this script"
+
+# These options only matter if we're using Servo, which only
+# happens when --labqual is specified.
+DEFINE_boolean usbkey "${FLAGS_TRUE}" \
+  "When running servo tests, assume a USB storage key is plugged in"
+DEFINE_string servo_host "" \
+  "When running servo tests, specifies the host running servod"
+DEFINE_string servo_port "" \
+  "When running servo tests, specifies the port for contacting servod"
+
+# Parse command line; die on errors
+FLAGS_HELP="usage: $(basename $0) [flags] <hostname-or-ipaddr>"
+FLAGS "${@}" || exit 1
+eval set -- "${FLAGS_ARGV}"
+set -e
+
+if [ -z "${FLAGS_board}" ]; then
+  die "--board required"
+fi
+
+if [ $# -ne 1 ]; then
+  die "Must specify exactly one DUT"
+fi
+
+DUT="$1"
+OPTIONS=( --board="${FLAGS_board}" )
+TESTS=( suite:bvt suite:qav )
+
+SUITE_CHECK=0
+if [ ${FLAGS_smoke} -eq ${FLAGS_TRUE} ]; then
+  SUITE_CHECK=$(( SUITE_CHECK + 1 ))
+  TESTS=( suite:smoke )
+fi
+if [ ${FLAGS_commit} -eq ${FLAGS_TRUE} ]; then
+  SUITE_CHECK=$(( SUITE_CHECK + 1 ))
+  TESTS=( suite:bvt_cq )
+fi
+if [ ${FLAGS_canary} -eq ${FLAGS_TRUE} ]; then
+  SUITE_CHECK=$(( SUITE_CHECK + 1 ))
+  # Use the default tests.
+fi
+if [ ${FLAGS_labqual} -eq ${FLAGS_TRUE} ]; then
+  SUITE_CHECK=$(( SUITE_CHECK + 1 ))
+  TESTS=( suite:bvt )
+  if [ ${FLAGS_usbkey} -eq ${FLAGS_TRUE} ]; then
+    TESTS+=( platform_ServoPowerStateController_USBPluggedin )
+  else
+    TESTS+=( platform_ServoPowerStateController_USBUnplugged )
+  fi
+
+  # Handle Servo options for the lab qualification tests.
+  if [ -n "${FLAGS_servo_host}" ]; then
+    SERVO_ARGS="--args=servo_host=${FLAGS_servo_host}"
+    if [ -n "${FLAGS_servo_port}" ]; then
+      SERVO_ARGS="${SERVO_ARGS} servo_port=${FLAGS_servo_port}"
+    fi
+    OPTIONS+=( "${SERVO_ARGS}" )
+  elif [ -n "${FLAGS_servo_port}" ]; then
+    OPTIONS+=( "--args=servo_port=${FLAGS_servo_port}" )
+  fi
+fi
+
+if [ ${SUITE_CHECK} -gt 1 ]; then
+  die "can specify at most one of --smoke --commit --canary or --labqual"
+fi
+
+DEBUG=
+if [ ${FLAGS_debug} -eq ${FLAGS_TRUE} ]; then
+  DEBUG=echo
+fi
+$DEBUG test_that "${OPTIONS[@]}" "$DUT" "${TESTS[@]}"
