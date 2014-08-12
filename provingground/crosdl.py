@@ -4,11 +4,11 @@
 # found in the LICENSE file.
 
 # Script to download ChromeOS images or test folders from google storage and
-# output download location or directly copy (image) to a usb stick.
-# In order to make usb sticks, file needs to be run from a place such that
+# output download location or directly copy (image) to a usb stick or ip.
+# In order to install anything, file needs to be run from a place such that
 # ./REL_SRC_DIR reaches chromiumos/src, or the src_dir input must be
 # specified.
-# Downloads image via gsutil to chromiumos/src/REL_DL_DIR.
+# Downloads image via gsutil to chromiumos/src/REL_DL_DIR or to given folder.
 
 """Download and output or run cros flash command to copy image to usb."""
 
@@ -30,7 +30,8 @@ PLATFORM_CONVERT = {'spring': 'daisy-spring', 'alex': 'x86-alex',
                     'alex-he': 'x86-alex-he', 'mario': 'x86-mario',
                     'zgb': 'x86-zgb', 'zgb-he': 'x86-zgb-he',
                     'pit': 'peach-pit', 'pi': 'peach-pi',
-                    'snow': 'daisy', 'lucas': 'daisy', 'big': 'nyan-big'}
+                    'snow': 'daisy', 'lucas': 'daisy', 'big': 'nyan-big',
+                    'skate': 'daisy-skate', 'blaze': 'nyan-blaze'}
 
 # Download types
 RECOVERY = 0
@@ -102,6 +103,10 @@ def main():
                          help=('Copy one image to the listed multiple usb '
                                'sticks after download (e.g. /dev/sdc /dev/sdd)'
                                '.  Must specify only one board at a time.'))
+  group_usb.add_argument('--to_ip', dest='to_ip', nargs=1,
+                         help=('Flash to given ip address (using cros flash).'
+                               '  Only works when specifying one board.  '
+                               'Can list multiple ip addresses.'))
   parser.add_argument('--folder', dest='folder',
                       help=('Specify a new download folder (default is src/'
                             '%s).' % REL_DL_DIR))
@@ -170,8 +175,8 @@ def main():
       return 1
     dupe_boards.append(boards[i])
 
-  # Set is_test based on input flags.
-  if arguments.test:
+  # Set download_type based on input flags.  to_ip flag is TEST by default.
+  if arguments.test or arguments.to_ip:
     print 'Downloading test image(s).'
     download_type = TEST
     is_image = True
@@ -193,14 +198,15 @@ def main():
   if download_type == RECOVERY:
     mp_str = '_premp' if arguments.premp else '_mp'
 
-  # Disallow 'to many' option for more than one board
-  installing_many = arguments.to_many
-  if len(boards) > 1 and installing_many:
+  # Disallow listing multiple boards for 'to_many' or 'to_ip' flags.
+  installing_ip = type(arguments.to_ip) == list
+  installing_many = type(arguments.to_many) == list
+  if len(boards) > 1 and (installing_many or installing_ip):
     print ('Please only specify one board if using --one_to_multiple_'
-           'sticks option.  See help menu.')
+           'sticks or --to_ip option.  See help menu.')
     return 1
 
-  # If installing multiple images, must provide drive names.
+  # If multiple boards to usb, must provide same number of drive names.
   installing_one = type(arguments.to_stick) == list
   if installing_one and (len(boards) > 1 or len(arguments.to_stick) > 1):
     if not arguments.to_stick:
@@ -215,13 +221,14 @@ def main():
       if not os.path.exists(drive):
         print '%s does not exist!' % drive
 
-  # Disallow 'to usb' options if not an image
-  if not is_image and (installing_one or installing_many):
-    print ('Can only copy to usb if downloading an image.  See help menu.')
+  # Disallow installing anything that isn't an image.
+  installing = installing_one or installing_many or installing_ip
+  if not is_image and installing:
+    print ('Can only copy to usb or ip if downloading an image.  See help.')
     return 1
 
   # Request sudo permissions if installing later.
-  if installing_one or installing_many:
+  if installing:
     subprocess.call(['sudo', '-v'])
 
   # Subroutine to download a file for a single board.
@@ -357,39 +364,34 @@ def main():
 
   # Print output or run cros flash command.
   errors = ''
-  if installing_one or installing_many:
+  if installing:
     # Move to src/ dir to access 'cros' command.
     starting_dir = os.getcwd()
     os.chdir(src_dir)
 
-    # Use 'cros flash' to copy images to boards.
+    # Use 'cros flash' to copy images to usb or ip.
     jobs = []
-    for i in xrange(len(boards)):
-      board = boards[i]
-      # Skip unless board downloaded without errors.
+    if installing_one:
+      to_list = arguments.to_stick if arguments.to_stick else ['']
+      from_list = boards
+      destination_str = 'usb://%s'
+    elif installing_many:
+      to_list = arguments.to_many
+      from_list = [boards[0]] * len(to_list)
+      destination_str = 'usb://%s'
+    else: #installing_ip
+      to_list = arguments.to_ip
+      from_list = [boards[0]] * len(to_list)
+      destination_str = '%s'
+
+    for i in xrange(len(from_list)):
+      board = from_list[i]
       if not dl_error[board]:
-        cmd = 'cros flash usb://%s ' + output_str[board]
-
-        # Copy this (i-th) board to i-th drive
-        if installing_one:
-          # Use provided drive or leave blank.
-          if arguments.to_stick:
-            usb_drive = arguments.to_stick[i]
-          else:
-            usb_drive = ''
-          cmd = cmd % usb_drive
-          print 'Copying %s to %s.' % (board, usb_drive)
-          proc = subprocess.Popen(cmd.split(' '))
-          jobs.append(proc)
-
-        # Copy this (only) board to all drives
-        else:
-          for usb_drive in arguments.to_many:
-            cmd_per_usb = cmd % usb_drive
-            print 'Copying %s to %s.' % (board, usb_drive)
-            proc = subprocess.Popen(cmd_per_usb.split(' '))
-            jobs.append(proc)
-
+        destination = destination_str % to_list[i]
+        print 'Copying %s to %s.' % (board, destination)
+        cmd = 'cros flash %s %s' % (destination, output_str[board])
+        proc = subprocess.Popen(cmd.split(' '))
+        jobs.append(proc)
       else:
         errors += '%s\n' % output_str[board]
 
