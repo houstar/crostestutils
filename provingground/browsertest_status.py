@@ -33,6 +33,7 @@ import urllib2
 _BUILD_HOST = 'build.chromium.org'
 _BUILD_PROJECT = 'chromium.chromiumos'
 _BUILD_NUMBER = '-2'
+_TEST_TYPE = 'browser_tests'
 
 # TestResults server url parameter defaults.
 _TR_HOST = 'test-results.appspot.com'  # URI to TestResults server.
@@ -83,21 +84,23 @@ def _FindLatestCompletedBuildNumber(build_number):
   return build_number
 
 
-def _GetStdioLogUrl(builder, build_num):
+def _GetStdioLogUrl(builder, build_num, test_type):
   """Get url to Stdio Log file from builder for build number.
 
   Args:
     builder: Builder name.
     build_num: Build number.
+    test_type: Type of browser test.
 
   Returns:
     Url to the Stdio log text file.
   """
   # Generate percent-encoded build url.
   build_url = (('http://%s/p/%s/json/builders/%s/builds?'
-                'select=%s/steps/browser_tests/') %
+                'select=%s/steps/%s/') %
                (urllib2.quote(_BUILD_HOST), urllib2.quote(_BUILD_PROJECT),
-                urllib2.quote(builder), urllib2.quote(build_num)))
+                urllib2.quote(builder), urllib2.quote(build_num),
+                urllib2.quote(test_type)))
 
   # Fetch build status file from build url.
   print '\nFetching build status file from: %s' % build_url
@@ -110,7 +113,7 @@ def _GetStdioLogUrl(builder, build_num):
 
   # Extract stdio log url from build status dictionary.
   print '\n  Contents of build status file: %s' % build_status_dict
-  return build_status_dict[build_num]['steps']['browser_tests']['logs'][0][1]
+  return build_status_dict[build_num]['steps'][test_type]['logs'][0][1]
 
 
 def _GetStdioLogTestsDict(stdio_url):
@@ -151,8 +154,9 @@ def _GetStdioLogTestsDict(stdio_url):
 def _GetUserSpecifiedTests(tests_file):
   """Get list of user-specified tests from tests file.
 
-  File must be a text file, formatted with one line per test. Leading
-  and trailing spaces and blanklines are stripped from the test list.
+  File must be a text file, formatted with one line per test. Leading and
+  trailing spaces and blanklines are stripped from the test list. If a line
+  still contains a space return only the first word (to remove comments).
 
   Args:
     tests_file: Path and name of tests file.
@@ -162,7 +166,8 @@ def _GetUserSpecifiedTests(tests_file):
   """
   print '\nFetching user-specified tests from: %s' % tests_file
   content = open(tests_file, 'r').read().strip()
-  return [line.strip() for line in content.splitlines() if line.strip()]
+  return [line.strip().split()[0] for line in content.splitlines()
+          if line.strip()]
 
 
 def _RunAndNotrunTests(stdio_tests, user_tests):
@@ -202,7 +207,7 @@ def _RunAndNotrunTests(stdio_tests, user_tests):
   return run_user_tests, notrun_user_tests
 
 
-def _GetResultsDict(master, builder):
+def _GetResultsDict(master, builder, test_type):
   """Get results dictionary from builder results.json file.
 
   The results dictionary contains information about recent tests run,
@@ -212,15 +217,16 @@ def _GetResultsDict(master, builder):
   Args:
     master: Master repo (e.g., 'ChromiumChromiumOS')
     builder: Builder name (e.g., 'Linux ChromiumOS Tests (2)')
+    test_type: Type of browser test.
 
   Returns:
     Dictionary of builder results.
   """
   # Generate percent-encoded builder results url.
   results_url = (('https://%s/testfile?master=%s&builder=%s'
-                  '&testtype=browser_tests&name=results.json') %
+                  '&testtype=%s&name=results.json') %
                  (urllib2.quote(_TR_HOST), urllib2.quote(master),
-                  urllib2.quote(builder)))
+                  urllib2.quote(builder), urllib2.quote(test_type)))
 
   # Fetch results file from builder results url.
   print 'Fetching builder results file from %s' % results_url
@@ -396,25 +402,29 @@ def main():
   parser.add_argument('--report_dir', dest='report_dir', default=_REPORT_DIR,
                       help=('Specify path to report directory '
                             '(default is %s).' % _REPORT_DIR))
-  parser.add_argument('--build_num', dest='build_num', default=_BUILD_NUMBER,
-                      help=('Specify builder build number '
-                            '(default is %s).' % _BUILD_NUMBER))
   parser.add_argument('--master', dest='master', default=_TR_MASTER,
                       help=('Specify build master repository '
                             '(default is %s).' % _TR_MASTER))
   parser.add_argument('--builder', dest='builder', default=_TR_BUILDER,
                       help=('Specify test builder '
                             '(default is %s).' % _TR_BUILDER))
+  parser.add_argument('--build_num', dest='build_num', default=_BUILD_NUMBER,
+                      help=('Specify builder build number '
+                            '(default is %s).' % _BUILD_NUMBER))
+  parser.add_argument('--test_type', dest='test_type', default=_TEST_TYPE,
+                      help=('Specify test type '
+                            '(default is %s).' % _TEST_TYPE))
   parser.add_argument('--print_types', dest='print_types',
                       action='store_true', help='Print test result types.')
   arguments = parser.parse_args()
 
   # Set parameters from command line arguments.
-  report_dir = arguments.report_dir
   tests_file = arguments.tests_file
+  report_dir = arguments.report_dir
   master = arguments.master
   builder = arguments.builder
   build_num = arguments.build_num
+  test_type = arguments.test_type
   print_types = arguments.print_types
 
   # Print map of test result types.
@@ -443,7 +453,7 @@ def main():
   completed_build_num = _FindLatestCompletedBuildNumber(build_num)
 
   # Get list of test instances run on builder for build number.
-  stdio_log_url = _GetStdioLogUrl(builder, completed_build_num)
+  stdio_log_url = _GetStdioLogUrl(builder, completed_build_num, test_type)
   stdio_tests_dict = _GetStdioLogTestsDict(stdio_log_url)
 
   # Read list of user-specified tests from tests file.
@@ -460,7 +470,7 @@ def main():
   # Get run user tests and results data from the specified builder.
   if run_user_tests:
     # Fetch builder results dictionary from test-results server.
-    builder_results_dict = _GetResultsDict(master, builder)
+    builder_results_dict = _GetResultsDict(master, builder, test_type)
     builder_tests_dict = builder_results_dict['tests']
   else:
     builder_tests_dict = {}
