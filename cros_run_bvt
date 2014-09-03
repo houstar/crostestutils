@@ -52,7 +52,7 @@ fi
 
 DUT="$1"
 OPTIONS=( --board="${FLAGS_board}" )
-TESTS=( suite:bvt-{inline,cq,qav} )
+TESTS=( suite:bvt-{inline,cq,perbuild} )
 
 SUITE_CHECK=0
 if [ ${FLAGS_smoke} -eq ${FLAGS_TRUE} ]; then
