@@ -55,7 +55,6 @@ if [ "${FLAGS_quick_test}" -eq "${FLAGS_TRUE}" ]; then
 fi
 
 "${SCRIPT_ROOT}/image_to_live.sh" \
-  --no_patch_kernel \
   --remote=127.0.0.1 \
   --ssh_port=${FLAGS_ssh_port} \
   --stateful_update_flag=${FLAGS_stateful_update_flag} \
