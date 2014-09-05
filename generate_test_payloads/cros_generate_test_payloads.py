@@ -236,9 +236,12 @@ class UpdatePayloadGenerator(object):
         in_chroot_key = git.ReinterpretPathForChroot(payload.key)
 
       command.append('--image=%s' % in_chroot_target)
-      if payload.base: command.append('--src_image=%s' % in_chroot_base)
-      if payload.for_vm: command.append('--no_patch_kernel')
-      if payload.key: command.append('--private_key=%s' % in_chroot_key)
+      if payload.base:
+        command.append('--src_image=%s' % in_chroot_base)
+      if payload.for_vm:
+        command.append('--no_patch_kernel')
+      if payload.key:
+        command.append('--private_key=%s' % in_chroot_key)
 
       if payload.base:
         debug_message = 'delta payload from %s to %s' % (payload.base,
@@ -271,9 +274,11 @@ class UpdatePayloadGenerator(object):
       """Processes results from the log files of GeneratePayload invocations.
 
       Args:
-        log_files:  A list of filename strings with stored logs.
+        log_files: A list of filename strings with stored logs.
+
       Returns:
         An array of cache entries from the log files.
+
       Raises:
         payload_generation_exception.PayloadGenerationException: Raises this
           exception if we failed to parse the devserver output to find the
@@ -383,7 +388,7 @@ def CheckOptions(parser, options):
 
   Args:
     parser: Parser used to parse options.
-    options:  Parse options from OptionParser.
+    options: Parse options from OptionParser.
   """
   if not options.target or not os.path.isfile(options.target):
     parser.error('Target image must exist.')
