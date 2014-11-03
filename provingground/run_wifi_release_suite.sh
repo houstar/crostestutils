@@ -14,7 +14,7 @@ RUN_SUITE='../../../third_party/autotest/files/site_utils/run_suite.py'
 
 USAGE_STRING='Usage: ./run_wifi_release_suite.sh <branch number> <build number>'
 
-declare -i PREFLIGHT_POOL_VERSION=39
+declare -i PREFLIGHT_POOL_VERSION=41
 
 if [[ $# -eq 0  ||  -z $2 ]] ; then
   echo $USAGE_STRING
@@ -46,13 +46,16 @@ list_7=(falco_li tricky)
 list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
         swanky winky)
 
-# wificell_preflight boards; leaving empty for future boards
-list_9=()
+# intel wilkins peak 2 on kernel 3.14
+list_9=(samus)
 
-DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8)
+# wificell_preflight boards; leaving empty for future boards
+list_10=()
+
+DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9)
 
 if [ $BRANCH -ge ${PREFLIGHT_POOL_VERSION} ] ; then
-  DESIRED_BOARDS+=(list_9)
+  DESIRED_BOARDS+=(list_10)
 fi
 
 # POOLS format: POOLS[<pool name>]=<suite name>
