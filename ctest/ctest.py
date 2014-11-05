@@ -150,7 +150,7 @@ class CTest(object):
                     'cros_generate_update_payload for error handling.')
       sys.exit(1)
 
-  def RunAUTestHarness(self, full, only_verify, suite):
+  def RunAUTestHarness(self, only_verify, quick_update, suite):
     """Runs the auto update test harness.
 
     The auto update test harness encapsulates testing the auto-update mechanism
@@ -159,8 +159,8 @@ class CTest(object):
     verification process).
 
     Args:
-      full: Run full test suite.
       only_verify: Only verify the target image.
+      quick_update: Do a quick update test.
     Raises:
       TestException: If the cros_au_test_harness command returns an error code.
     """
@@ -178,19 +178,18 @@ class CTest(object):
     if suite:
       cmd.append('--verify_suite_name=%s' % suite)
 
-    # Only verify takes precedence over --quick.
     if only_verify:
       cmd.append('--test_prefix=SimpleTestVerify')
-    elif not full:
-      cmd.append('--test_prefix=SimpleTest')
+    elif quick_update:
+      cmd.append('--test_prefix=SimpleTestUpdateAndVerify')
 
     if self.test_results_root: cmd.append('--test_results_root=%s' %
                                           self.test_results_root)
     if self.no_graphics: cmd.append('--no_graphics')
     if self.whitelist_chrome_crashes: cmd.append('--whitelist_chrome_crashes')
 
-    # Using keys is only compatible with clean.
-    if full and self.sign_payloads:
+    # We did not generate signed payloads if this is a |quick_update| test.
+    if not quick_update and self.sign_payloads:
       cmd.append('--private_key=%s' % self.private_key)
 
     res = cros_build_lib.RunCommand(cmd, cwd=self.crosutils_root,
@@ -217,9 +216,10 @@ def main():
                     help='Disable graphics for the vm test.')
   parser.add_option('--only_verify', action='store_true', default=False,
                     help='Only run basic verification suite.')
-  parser.add_option('--quick', default=True, action='store_false',
-                    dest='full_suite',
-                    help='Run the quick version of ctest.')
+  parser.add_option('--quick_update', action='store_true',
+                    help='Run a quick update test. This will run a subset of '
+                         'test suite after running autoupdate from target '
+                         'image to itself.')
   parser.add_option('--nplus1_archive_dir', default=None,
                     help='If set, directory to archive nplus1 payloads.')
   parser.add_option('--remote', default='0.0.0.0',
@@ -248,6 +248,8 @@ def main():
 
   if args: parser.error('Extra args found %s.' % args)
   if not options.board: parser.error('Need board for image to compare against.')
+  if options.only_verify and options.quick_update: parser.error(
+          'Only one of --only_verify or --quick_update should be specified.')
 
   # force absolute path for these options, since a chdir occurs deeper in the
   # codebase.
@@ -260,9 +262,9 @@ def main():
   if ctest.sign_payloads: ctest.GeneratePublicKey()
   ctest.FindTargetAndBaseImages()
   if not options.only_verify:
-    ctest.GenerateUpdatePayloads(options.full_suite)
+    ctest.GenerateUpdatePayloads(not options.quick_update)
   try:
-    ctest.RunAUTestHarness(options.full_suite, options.only_verify,
+    ctest.RunAUTestHarness(options.only_verify, options.quick_update,
                            options.suite)
   except TestException as e:
     if options.verbose:
