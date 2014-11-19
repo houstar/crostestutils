@@ -44,13 +44,14 @@ list_7=(falco_li tricky)
 
 # intel wilkins peak 2 on kernel 3.10
 list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
-        swanky winky)
+        swanky winky candy)
 
 # intel wilkins peak 2 on kernel 3.14
 list_9=(samus)
 
 # wificell_preflight boards; leaving empty for future boards
-list_10=()
+# Marvell 8897 and Broadcom on kernel 3.10
+list_10=(glimmer)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9)
 
