@@ -1,0 +1,62 @@
+{
+    "bots": [
+        {"device_name": "cros-alex"},
+        {"device_name": "cros-snow"},
+        {"device_name": "cros-parrot"},
+        {"device_name": "cros-peppy"},
+        {"device_name": "cros-link"},
+        {"device_name": "cros-peach_pit"},
+        {"device_name": "cros-squawks"},
+        {"device_name": "cros-nyan_big"}
+    ],
+    "tests": [
+        {
+            "test_name": "platform_BootPerfServer/seconds_power_on_to_login",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "platform_BootPerfServer/seconds_shutdown_time",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "graphics_WebGLManyPlanetsDeep/average_fps",
+            "masters": "ChromeOS_Graphics"
+        },
+        {
+            "test_name": "graphics_WebGLAquarium/avg_fps_1000_fishes",
+            "masters": "ChromeOS_Graphics"
+        },
+        {
+            "test_name": "graphics_WebGLPerformance/time_geom_mean/time_geom_mean",
+            "masters": "ChromeOS_Graphics"
+        },
+        {
+            "test_name": "video_VDAPerf/crowd1080_h264.delivery_time",
+            "masters": "ChromeOSVideo"
+        },
+        {
+            "test_name": "video_VDAPerf/crowd1080_h264.decode_time.percentile_0.50",
+            "masters": "ChromeOSVideo"
+        },
+        {
+            "test_name": "video_WebRtcPerf/hw_decode_time.percentile_0.50",
+            "masters": "ChromeOSVideo"
+        },
+        {
+            "test_name": "video_WebRtcPerf/hw_decode_time.max",
+            "masters": "ChromeOSVideo"
+        },
+        {
+            "test_name": "power_Resume/system_suspend",
+            "masters": "ChromeOSPower"
+        },
+        {
+            "test_name": "power_Resume/system_resume",
+            "masters": "ChromeOSPower"
+        },
+        {
+            "test_name": "platform_Pkcs11LoadPerf/Key_Ready",
+            "masters": "ChromeOSPerf"
+        }
+    ]
+}
