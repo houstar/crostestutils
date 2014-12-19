@@ -47,7 +47,7 @@ list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
         swanky winky candy)
 
 # intel wilkins peak 2 on kernel 3.14
-list_9=(samus)
+list_9=(samus auron_paine auron_yuna)
 
 # wificell_preflight boards; leaving empty for future boards
 # Marvell 8897 and Broadcom on kernel 3.10
