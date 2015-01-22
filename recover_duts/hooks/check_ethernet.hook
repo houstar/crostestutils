@@ -60,6 +60,15 @@ find_ethernet_interfaces() {
   done
 }
 
+# Shows the list of USB-Ethernet interfaces found on the system.
+find_usb_ethernet_interfaces() {
+  for device_path in /sys/class/net/eth*; do
+    if readlink -f "${device_path}" | grep -q usb; then
+      basename "${device_path}"
+    fi
+  done
+}
+
 # Pings the given ipaddress through all wired ethernet devices
 # $1 - IP address to ping.
 do_ping() {
@@ -90,23 +99,61 @@ ping_controlling_server() {
   return 1
 }
 
-recover_ethernet_devices() {
+reload_usb_ethernet_devices() {
   local eth
-  critical_msg "Gateway unreachable; restarting ethernet interfaces"
+  local ret=1
+  for eth in $(find_usb_ethernet_interfaces); do
+    echo "Reload interface ${eth}"
+    reload_network_device "${eth}"
+    ret=0
+  done
+  return $ret
+}
+
+toggle_ethernet_interfaces() {
+  local eth
+  local ret=1
   for eth in $(find_ethernet_interfaces); do
     echo "Bounce interface ${eth}"
-    ifconfig ${eth} down
-    ifconfig ${eth} up
+    ifconfig "${eth}" down
+    ifconfig "${eth}" up
+    ret=0
   done
+  return $ret
+}
+
+restart_connection_manager() {
   initctl stop shill || echo "Shill was not running."
   initctl start shill
-  sleep 30
-  ifconfig -a
+}
 
-  if ping_controlling_server; then
-      critical_msg "Restart successful"
-      return 0
+ensure_connection_manager_is_running() {
+  if initctl status shill | grep -q running ; then
+    return 1
   fi
+  restart_connection_manager
+}
+
+recover_network() {
+  for recovery_method in \
+      ensure_connection_manager_is_running \
+      toggle_ethernet_interfaces \
+      reload_usb_ethernet_devices \
+      restart_connection_manager; do
+    critical_msg "Attempting recovery method \"${recovery_method}\""
+    # A success return from the recovery method implies that it successfully
+    # performed some action that makes it worth re-checking to see whether
+    # our connectivity was remediated.  Otherwise, we move on to the next
+    # recovery method without delay.
+    "${recovery_method}" || continue
+    sleep 30
+    ifconfig -a
+
+    if ping_controlling_server; then
+      critical_msg "Recovery method \"${recovery_method}\" successful"
+      return 0
+    fi
+  done
   return 1
 }
 
@@ -124,7 +171,7 @@ main() {
   if ping_controlling_server; then
     return 0
   fi
-  if recover_ethernet_devices; then
+  if recover_network; then
     return 0
   fi
   critical_msg "Restart failed; will retry recovery for ~$TIMEOUT_MINUTES minutes"
@@ -134,7 +181,7 @@ main() {
       critical_msg "Gateway now reachable; ending recovery loop"
       return 0
     fi
-    if recover_ethernet_devices; then
+    if recover_network; then
       return 0
     fi
   done
