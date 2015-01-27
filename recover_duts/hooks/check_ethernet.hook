@@ -43,18 +43,26 @@ is_non_ethernet_driver() {
   return 1
 }
 
+# Returns 0 if $1 indicates its link is connected, or 1 otherwise.
+is_connected() {
+  local device="$1"
+  ip link show "${device}" | grep -q LOWER_UP
+}
+
 # Shows the list of Ethernet interfaces found on the system.
 find_ethernet_interfaces() {
   local device_path
   local driver_path
+  local device
   local driver
 
   for device_path in /sys/class/net/eth*; do
     driver_path="${device_path}/device/driver"
     if [ -e "${driver_path}" ]; then
+      device=$(basename "${device_path}")
       driver=$(basename $(readlink -f "${driver_path}"))
-      if ! is_non_ethernet_driver "${driver}"; then
-        basename "${device_path}"
+      if ! is_non_ethernet_driver "${driver}" || is_connected "${device}" ; then
+        echo "${device}"
       fi
     fi
   done
