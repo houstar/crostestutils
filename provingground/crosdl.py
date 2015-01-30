@@ -224,7 +224,7 @@ def main():
   # Disallow installing anything that isn't an image.
   installing = installing_one or installing_many or installing_ip
   if not is_image and installing:
-    print ('Can only copy to usb or ip if downloading an image.  See help.')
+    print 'Can only copy to usb or ip if downloading an image.  See help.'
     return 1
 
   # Request sudo permissions if installing later.
@@ -271,9 +271,7 @@ def main():
       elif download_type == FACTORY:
         file_search = '%s*factory*.zip' % folder
       else: # RECOVERY
-        file_search = '%s*recovery*%s*%s*.bin' % (folder, channel, mp_str)
-        file_search_2 = ('%schromeos-signing*/*recovery*%s*%s*.bin'
-                         % (folder, channel, mp_str))
+        file_search = '%s*recovery*.bin' % folder
 
       # Output error if no files found
       def _no_file_error(message):
@@ -293,16 +291,8 @@ def main():
       try:
         possible_files = subprocess.check_output(['gsutil', 'ls', file_search])
       except subprocess.CalledProcessError:
-        if download_type == RECOVERY:
-          try:
-            possible_files = subprocess.check_output(['gsutil', 'ls',
-                                                      file_search_2])
-          except subprocess.CalledProcessError:
-            _no_file_error('Could not find file but found folder.')
-            return 1
-        else:
-          _no_file_error('Could not find file but found folder.')
-          return 1
+        _no_file_error('Could not find file but found folder.')
+        return 1
 
       # Locate exact file_name.
       possible_files = possible_files.splitlines()
@@ -316,8 +306,7 @@ def main():
       try:
         subprocess.call(['gsutil', 'cp', gsfile_path, folder_path])
       except subprocess.CalledProcessError:
-        print ('gsutil error.  Try running this command outside of '
-               'chroot?')
+        print 'gsutil error.  Try running this command outside of chroot?'
         output_str[board] = '%s: Could not run gsutil command.' % board
         return 1
 
