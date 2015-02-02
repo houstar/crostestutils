@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2015 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -38,7 +38,7 @@ _TEST_TYPE = 'browser_tests'
 # TestResults server url parameter defaults.
 _TR_HOST = 'test-results.appspot.com'  # URI to TestResults server.
 _TR_MASTER = 'ChromiumChromiumOS'  # Test-results build master repository.
-_TR_BUILDER = 'Linux ChromiumOS Tests (2)'  # TestResults builder name.
+_TR_BUILDER = 'Linux ChromiumOS Tests (dbg)(1)'  # TestResults builder name.
 
 # Input file and report directory parameter defaults.
 _TESTS_FILE = './tests'  # Path to the file that contains the tests names.
