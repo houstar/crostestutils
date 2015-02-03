@@ -52,21 +52,18 @@ list_9=(samus auron_paine auron_yuna)
 # Broadcom 4354 on kernel 3.14
 list_10=(veyron_jerry)
 
-# wificell_preflight boards; leaving empty for future boards
-# Marvell 8897 and Broadcom on kernel 3.10
-list_11=(glimmer)
+# Broadcom 4356 on kernel 3.14
+list_11=(veyron_speedy)
+
+# Intel wilkins peak 2 on kernel 3.10.18
+list_12=(glimmer)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9
-                list_10)
-
-if [ $BRANCH -ge ${PREFLIGHT_POOL_VERSION} ] ; then
-  DESIRED_BOARDS+=(list_11)
-fi
+                list_10 list_11 list_12)
 
 # POOLS format: POOLS[<pool name>]=<suite name>
 declare -A POOLS
 POOLS[wificell]=wifi_release
-POOLS[wificell_preflight]=wifi_release
 
 return_item_exists_in_array() {
   for current_board in ${boards_to_run[@]}; do
