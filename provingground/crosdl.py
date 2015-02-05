@@ -1,5 +1,5 @@
 #!/usr/bin/python
-# Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
+# Copyright (c) 2015 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -31,7 +31,12 @@ PLATFORM_CONVERT = {'spring': 'daisy-spring', 'alex': 'x86-alex',
                     'zgb': 'x86-zgb', 'zgb-he': 'x86-zgb-he',
                     'pit': 'peach-pit', 'pi': 'peach-pi',
                     'snow': 'daisy', 'lucas': 'daisy', 'big': 'nyan-big',
-                    'skate': 'daisy-skate', 'blaze': 'nyan-blaze'}
+                    'skate': 'daisy-skate', 'blaze': 'nyan-blaze',
+                    'paine': 'auron-paine', 'yuna': 'auron-yuna',
+                    'cid': 'auron-cid', 'lulu': 'auron-lulu',
+                    'pinky': 'veyron-pinky', 'jerry': 'veyron-jerry',
+                    'mighty': 'veyron-mighty', 'speedy': 'veyron-speedy',
+                    'minnie': 'veyron-minnie'}
 
 # Download types
 RECOVERY = 0
@@ -188,7 +193,7 @@ def main():
     print 'Downloading factory folder(s).'
     download_type = FACTORY
     is_image = False
-  else: # RECOVERY
+  else:  # RECOVERY
     print 'Downloading recovery image(s).'
     download_type = RECOVERY
     is_image = True
@@ -250,7 +255,7 @@ def main():
       target_name = ''
     elif download_type == FACTORY:
       target_name = ''
-    else: # RECOVERY
+    else:  # RECOVERY
       target_name = 'recovery_image.bin'
     target_path = os.path.join(folder_path, target_name)
 
@@ -270,7 +275,7 @@ def main():
         file_search = '%s*hwqual*.tar.bz2' % folder
       elif download_type == FACTORY:
         file_search = '%s*factory*.zip' % folder
-      else: # RECOVERY
+      else:  # RECOVERY
         file_search = '%s*recovery*.bin' % folder
 
       # Output error if no files found
@@ -326,7 +331,7 @@ def main():
         print 'trying to unzip %s to %s' % (file_path, folder_path)
         subprocess.call(['unzip', '-q', file_path, '-d', folder_path])
         os.remove(file_path)
-      else: # RECOVERY
+      else:  # RECOVERY
         os.rename(file_path, os.path.join(folder_path, target_name))
 
     # Report successful download and return path to downloaded thing
@@ -368,7 +373,7 @@ def main():
       to_list = arguments.to_many
       from_list = [boards[0]] * len(to_list)
       destination_str = 'usb://%s'
-    else: #installing_ip
+    else:  # installing_ip
       to_list = arguments.to_ip
       from_list = [boards[0]] * len(to_list)
       destination_str = '%s'
