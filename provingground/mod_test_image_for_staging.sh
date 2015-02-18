@@ -69,7 +69,7 @@ sudo_append "${CONFIG_FILE}" <<EOF
 --google-apis-host=www-googleapis-test.sandbox.google.com
 --oauth2-client-id=236834563817.apps.googleusercontent.com
 --oauth2-client-secret=RsKv5AwFKSzNgE0yjnurkPVI
---cloud-print-service=https://cloudprint.sandbox.google.com/cloudprint
+--cloud-print-url=https://cloudprint-nightly-ps.sandbox.google.com/cloudprint
 --ignore-urlfetcher-cert-requests
 
 # mod_test_image_for_staging.sh modifications end here.
