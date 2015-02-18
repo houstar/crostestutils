@@ -83,9 +83,9 @@ return_available_hosts() {
     IFS=$' '
     local host_info=($host)
     for board in ${boards[@]}; do
-      if [[ $board == ${host_info[4]} && (${host_info[1]} != 'Repairing' &&
+      if [[ $board == ${host_info[3]} && (${host_info[1]} != 'Repairing' &&
         ${host_info[1]} != 'Repair Failed') &&
-        ${host_info[3]} == 'False' ]] ; then
+        ${host_info[2]} == 'False' ]] ; then
         already_added=$(return_item_exists_in_array ${board})
         if [[ ${already_added} == 'False' ]] ; then
           boards_to_run+=($board)
