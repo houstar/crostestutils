@@ -37,7 +37,7 @@ list_4=(snow spring skate)
 list_5=(peach_pi peach_pit)
 
 # marvell_88w8897_2x2 on kernel 3.10
-list_6=(nyan_big nyan_blaze)
+list_6=(nyan_big nyan_blaze nyan_kitty)
 
 # intel wilkins peak 2 on kernel 3.8
 list_7=(falco_li tricky)
@@ -47,19 +47,16 @@ list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
         swanky winky candy)
 
 # intel wilkins peak 2 on kernel 3.14
-list_9=(samus auron_paine auron_yuna)
+list_9=(samus auron_paine auron_yuna guado)
 
 # Broadcom 4354 on kernel 3.14
-list_10=(veyron_jerry)
+list_10=(veyron_jerry veyron_speedy)
 
-# Broadcom 4356 on kernel 3.14
-list_11=(veyron_speedy)
-
-# Intel wilkins peak 2 on kernel 3.10.18
-list_12=(glimmer)
+# Marvell 8897 on kernel 3.14
+list_11=(veyron_mighty)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9
-                list_10 list_11 list_12)
+                list_10 list_11)
 
 # POOLS format: POOLS[<pool name>]=<suite name>
 declare -A POOLS
