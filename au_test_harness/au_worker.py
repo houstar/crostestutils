@@ -13,6 +13,7 @@ import inspect
 import os
 
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
 from crostestutils.au_test_harness import update_exception
 
@@ -239,7 +240,7 @@ class AUWorker(object):
     return percent_passed
 
   def TestInfo(self, message):
-    cros_build_lib.Info('%s: %s', self.test_name, message)
+    logging.info('%s: %s', self.test_name, message)
 
   def Initialize(self, port):
     """Initializes test specific variables for each test.

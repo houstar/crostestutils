@@ -26,6 +26,7 @@ sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
 
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
 from chromite.lib import parallel
 from chromite.lib import sudo
@@ -80,7 +81,7 @@ def _ReadUpdateCache(target_image):
   cache_file = os.path.join(path_to_dump, CACHE_FILE)
 
   if os.path.exists(cache_file):
-    cros_build_lib.Info('Loading update cache from ' + cache_file)
+    logging.info('Loading update cache from ' + cache_file)
     with open(cache_file) as file_handle:
       return pickle.load(file_handle)
 
@@ -104,7 +105,7 @@ def _RunTestsInParallel(options):
     test_case = unittest.TestLoader().loadTestsFromName(test_name)
     steps.append(functools.partial(_LessBacktracingTestRunner().run, test_case))
 
-  cros_build_lib.Info('Running tests in test suite in parallel.')
+  logging.info('Running tests in test suite in parallel.')
   try:
     parallel.RunParallelSteps(steps, max_parallel=options.jobs)
   except parallel.BackgroundFailure as ex:
@@ -127,7 +128,7 @@ def CheckOptions(parser, options, leftover_args):
     parser.error('Testing requires a valid target image.')
 
   if not options.base_image:
-    cros_build_lib.Info('No base image supplied.  Using target as base image.')
+    logging.info('No base image supplied.  Using target as base image.')
     options.base_image = options.target_image
 
   if not os.path.isfile(options.base_image):
@@ -200,7 +201,7 @@ def main():
   if not update_cache:
     msg = ('No update cache found. Update testing will not work.  Run '
            ' cros_generate_update_payloads if this was not intended.')
-    cros_build_lib.Info(msg)
+    logging.info(msg)
 
   # Create download folder for payloads for testing.
   download_folder = os.path.join(os.path.realpath(os.path.curdir),

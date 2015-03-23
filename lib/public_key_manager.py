@@ -9,6 +9,7 @@ import tempfile
 
 import constants
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from chromite.lib import git
 from chromite.lib import osutils
 from crostestutils.lib import mount_helper
@@ -49,11 +50,11 @@ class PublicKeyManager(object):
   def AddKeyToImage(self):
     """Adds the key specified in init to the image."""
     if not self._is_key_new:
-      cros_build_lib.Info('Public key already on image %s.  No work to do.',
-                          self.image_path)
+      logging.info('Public key already on image %s.  No work to do.',
+                   self.image_path)
       return
 
-    cros_build_lib.Info('Copying %s into %s', self.key_path, self.image_path)
+    logging.info('Copying %s into %s', self.key_path, self.image_path)
     try:
       mount_helper.MountImage(self.image_path, self._rootfs_dir,
                               self._stateful_dir, read_only=False)

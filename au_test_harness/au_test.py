@@ -11,6 +11,7 @@ import unittest
 import urllib
 
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
 from crostestutils.au_test_harness import cros_test_proxy
 from crostestutils.au_test_harness import real_au_worker
@@ -175,7 +176,7 @@ class AUTest(unittest.TestCase):
                                 signed_target_image_path,
                                 private_key_path=self.private_key)
     else:
-      cros_build_lib.Info('No key found to use for signed testing.')
+      logging.info('No key found to use for signed testing.')
 
   def SimpleTestUpdateAndVerify(self):
     """Test that updates to itself.

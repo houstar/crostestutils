@@ -14,6 +14,7 @@ import tempfile
 import constants
 sys.path.append(constants.SOURCE_ROOT)
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 
 
 _DEFAULT_BASE_SSH_PORT = 9322
@@ -89,11 +90,11 @@ class ParallelTestRunner(object):
       if self._quiet:
         args.append('--verbose=0')  # generate less output
         output = open('/dev/null', mode='w')
-        cros_build_lib.Info('Log files are in %s', results_dir)
+        logging.info('Log files are in %s', results_dir)
       elif self._order_output:
         output = tempfile.NamedTemporaryFile(prefix='parallel_vm_test_')
-        cros_build_lib.Info('Piping output to %s.', output.name)
-      cros_build_lib.Info('Running %r...', args)
+        logging.info('Piping output to %s.', output.name)
+      logging.info('Running %r...', args)
       proc = subprocess.Popen(args, stdout=output, stderr=output)
       test_info = { 'test': test,
                     'proc': proc,
@@ -121,11 +122,11 @@ class ParallelTestRunner(object):
       output = test_info['output']
       if output and not self._quiet:
         test = test_info['test']
-        cros_build_lib.Info('------ START %s:%s ------', test, output.name)
+        logging.info('------ START %s:%s ------', test, output.name)
         output.seek(0)
         for line in output:
           print line,
-        cros_build_lib.Info('------ END %s:%s ------', test, output.name)
+        logging.info('------ END %s:%s ------', test, output.name)
     return failed_tests
 
   def Run(self):
