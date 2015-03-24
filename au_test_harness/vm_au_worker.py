@@ -11,6 +11,7 @@ import tempfile
 import constants
 from chromite.cbuildbot import constants as buildbot_constants
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from crostestutils.au_test_harness import au_worker
 from crostestutils.au_test_harness import update_exception
 
@@ -71,19 +72,17 @@ class VMAUWorker(au_worker.AUWorker):
     try:
       shutil.copytree(log_directory, fail_directory)
     except shutil.Error as e:
-      cros_build_lib.Warning(
-          'Ignoring errors while copying logs: %s', e)
+      logging.warning('Ignoring errors while copying logs: %s', e)
 
     # Copy VM state. This includes the disk image, and the memory
     # image.
     try:
       _, mem_image_path = tempfile.mkstemp(
-        dir=fail_directory, prefix="%s." % buildbot_constants.VM_MEM_PREFIX)
+          dir=fail_directory, prefix="%s." % buildbot_constants.VM_MEM_PREFIX)
       self._KillExistingVM(self._kvm_pid_file, save_mem_path=mem_image_path)
       shutil.move(self.vm_image_path, fail_directory)
     except shutil.Error as e:
-      cros_build_lib.Warning(
-          'Ignoring errors while copying VM files: %s', e)
+      logging.warning('Ignoring errors while copying VM files: %s', e)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
                   proxy_port='', private_key_path=None):

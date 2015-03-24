@@ -10,7 +10,6 @@ import time
 import unittest
 import urllib
 
-from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
 from crostestutils.au_test_harness import cros_test_proxy
@@ -54,7 +53,7 @@ class AUTest(unittest.TestCase):
       # Will raise ValueError if expected is not found.
       if re.search(re.escape(expected_msg), err.output, re.MULTILINE):
         return
-      cros_build_lib.Warning("Didn't find %r in:\n%s", expected_msg, err.output)
+      logging.warning("Didn't find %r in:\n%s", expected_msg, err.output)
 
     self.fail('We managed to update when failure was expected')
 

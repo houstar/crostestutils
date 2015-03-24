@@ -215,7 +215,7 @@ class AUWorker(object):
       kwds['log_stdout_to_file'] = os.path.join(log_directory, 'update.log')
     result = cros_build_lib.RunCommand(cmd, **kwds)
     if result.returncode != 0:
-      cros_build_lib.Warning(result.output)
+      logging.warning(result.output)
       raise update_exception.UpdateException(result.returncode, 'Update failed')
 
   def AssertEnoughTestsPassed(self, unittest, output, percent_required_to_pass):
