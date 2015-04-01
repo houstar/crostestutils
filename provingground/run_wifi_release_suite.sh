@@ -47,7 +47,7 @@ list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
         swanky winky candy)
 
 # intel wilkins peak 2 on kernel 3.14
-list_9=(samus auron_paine auron_yuna guado tidus)
+list_9=(samus auron_paine auron_yuna guado tidus rikku)
 
 # Broadcom 4354 on kernel 3.14
 list_10=(veyron_jerry veyron_speedy veyron_minnie)
