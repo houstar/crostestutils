@@ -7,7 +7,10 @@
         {"device_name": "cros-link"},
         {"device_name": "cros-peach_pit"},
         {"device_name": "cros-squawks"},
-        {"device_name": "cros-nyan_big"}
+        {"device_name": "cros-nyan_big"},
+        {"device_name": "cros-veyron_jerry"},
+        {"device_name": "cros-auron_paine"},
+        {"device_name": "cros-samus"}
     ],
     "tests": [
         {
@@ -56,6 +59,26 @@
         },
         {
             "test_name": "platform_Pkcs11LoadPerf/Key_Ready",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "page_cycler.typical_25/cold_times/page_load_time",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "octane/Total/Score",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "kraken/Total",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "speedometer/Total/Total",
+            "masters": "ChromeOSPerf"
+        },
+        {
+            "test_name": "smoothness.top_25_smooth/percentage_smooth/percentage_smooth",
             "masters": "ChromeOSPerf"
         }
     ]
