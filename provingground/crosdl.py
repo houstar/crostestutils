@@ -1,5 +1,5 @@
-#!/usr/bin/python
-# Copyright (c) 2015 The Chromium OS Authors. All rights reserved.
+#!/usr/bin/python2
+# Copyright (c) 2014 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
@@ -12,6 +12,7 @@
 
 """Download and output or run cros flash command to copy image to usb."""
 
+from __future__ import print_function
 import argparse
 from multiprocessing import Manager
 from multiprocessing import Process
@@ -33,10 +34,10 @@ PLATFORM_CONVERT = {'spring': 'daisy-spring', 'alex': 'x86-alex',
                     'snow': 'daisy', 'lucas': 'daisy', 'big': 'nyan-big',
                     'skate': 'daisy-skate', 'blaze': 'nyan-blaze',
                     'paine': 'auron-paine', 'yuna': 'auron-yuna',
-                    'cid': 'auron-cid', 'lulu': 'auron-lulu',
                     'pinky': 'veyron-pinky', 'jerry': 'veyron-jerry',
                     'mighty': 'veyron-mighty', 'speedy': 'veyron-speedy',
-                    'minnie': 'veyron-minnie'}
+                    'minnie': 'veyron-minnie', 'gus': 'veyron-gus',
+                    'jaq': 'veyron-jaq'}
 
 # Download types
 RECOVERY = 0
@@ -131,7 +132,7 @@ def main():
   src_dir = os.path.join(script_file_dir, REL_SRC_DIR)
   src_dir = os.path.abspath(src_dir)
   if os.path.basename(src_dir) != 'src':
-    print 'Could not find src/ directory!  Has this script been moved?'
+    print('Could not find src/ directory!  Has this script been moved?')
     return
 
   # Set download folder as user defined or default.
@@ -144,27 +145,27 @@ def main():
   # Delete download folder contents if clearfolder flag present.
   if arguments.clear:
     if os.path.exists(download_folder):
-      print 'Deleting sub-folder contents of %s.' % download_folder
+      print('Deleting sub-folder contents of %s.' % download_folder)
       for item in os.listdir(download_folder):
         item_path = os.path.join(download_folder, item)
         if os.path.isdir(item_path):
           shutil.rmtree(item_path)
     else:
-      print 'Download folder %s did not exist.  Exiting.' % download_folder
+      print('Download folder %s did not exist.  Exiting.' % download_folder)
     return
 
   # Require board and platform arguments if not clearing downloads.
   if not (arguments.board and arguments.build):
-    print ('Must provide build number and platform(s).  See crosdl.py -h for '
-           'usage description.')
+    print('Must provide build number and platform(s).  See crosdl.py -h for '
+          'usage description.')
     return
 
   # Require --deletefiles flag to be used only with --tostick flag.
   if arguments.delete and (arguments.to_stick or arguments.to_many):
-    print 'Will delete all newly downloaded files once finished.'
+    print('Will delete all newly downloaded files once finished.')
   elif arguments.delete:
-    print ('This command will download and immediately delete all files.  '
-           'You probably meant to use the --tostick flag as well.')
+    print('This command will download and immediately delete all files.  '
+          'You probably meant to use the --tostick flag as well.')
     return
 
   # Deal with board name(s).
@@ -176,25 +177,25 @@ def main():
       boards[i] = PLATFORM_CONVERT[boards[i]]
     # Disallow duplicates.
     if boards[i] in dupe_boards:
-      print '%s is listed twice in the boards list!' % boards[i]
+      print('%s is listed twice in the boards list!' % boards[i])
       return 1
     dupe_boards.append(boards[i])
 
   # Set download_type based on input flags.  to_ip flag is TEST by default.
   if arguments.test or arguments.to_ip:
-    print 'Downloading test image(s).'
+    print('Downloading test image(s).')
     download_type = TEST
     is_image = True
   elif arguments.autotest:
-    print 'Downloading autotest folder(s).'
+    print('Downloading autotest folder(s).')
     download_type = AUTOTEST
     is_image = False
   elif arguments.factory:
-    print 'Downloading factory folder(s).'
+    print('Downloading factory folder(s).')
     download_type = FACTORY
     is_image = False
   else:  # RECOVERY
-    print 'Downloading recovery image(s).'
+    print('Downloading recovery image(s).')
     download_type = RECOVERY
     is_image = True
 
@@ -207,29 +208,29 @@ def main():
   installing_ip = type(arguments.to_ip) == list
   installing_many = type(arguments.to_many) == list
   if len(boards) > 1 and (installing_many or installing_ip):
-    print ('Please only specify one board if using --one_to_multiple_'
-           'sticks or --to_ip option.  See help menu.')
+    print('Please only specify one board if using --one_to_multiple_'
+          'sticks or --to_ip option.  See help menu.')
     return 1
 
   # If multiple boards to usb, must provide same number of drive names.
   installing_one = type(arguments.to_stick) == list
   if installing_one and (len(boards) > 1 or len(arguments.to_stick) > 1):
     if not arguments.to_stick:
-      print ('Error: To make sticks for multiple boards, please provide drive '
-             'names (e.g. /dev/sdc /dev/sdd).  See -h for help.')
+      print('Error: To make sticks for multiple boards, please provide drive '
+            'names (e.g. /dev/sdc /dev/sdd).  See -h for help.')
       return 1
     if len(arguments.to_stick) != len(boards):
-      print ('Error: Was given %d boards but %d usb drive locations.'
-             % (len(boards), len(arguments.to_stick)))
+      print('Error: Was given %d boards but %d usb drive locations.'
+            % (len(boards), len(arguments.to_stick)))
       return 1
     for drive in arguments.to_stick:
       if not os.path.exists(drive):
-        print '%s does not exist!' % drive
+        print('%s does not exist!' % drive)
 
   # Disallow installing anything that isn't an image.
   installing = installing_one or installing_many or installing_ip
   if not is_image and installing:
-    print 'Can only copy to usb or ip if downloading an image.  See help.'
+    print('Can only copy to usb or ip if downloading an image.  See help.')
     return 1
 
   # Request sudo permissions if installing later.
@@ -261,7 +262,7 @@ def main():
 
     # Skip for already present files, else download new file.
     if os.path.exists(target_path) and not arguments.force:
-      print '%s: Found file locally.  Skipping download.' % board
+      print('%s: Found file locally.  Skipping download.' % board)
     else:
       # Make folder if needed.
       if not os.path.exists(folder_path):
@@ -281,7 +282,7 @@ def main():
       # Output error if no files found
       def _no_file_error(message):
         """Actions to take if file is not found."""
-        print '%s: %s' % (board, message)
+        print('%s: %s' % (board, message))
         output_str[board] = '%s: Could not find file.' % board
 
       # Look for folder while file belongs.
@@ -311,7 +312,7 @@ def main():
       try:
         subprocess.call(['gsutil', 'cp', gsfile_path, folder_path])
       except subprocess.CalledProcessError:
-        print 'gsutil error.  Try running this command outside of chroot?'
+        print('gsutil error.  Try running this command outside of chroot?')
         output_str[board] = '%s: Could not run gsutil command.' % board
         return 1
 
@@ -321,14 +322,14 @@ def main():
         subprocess.call(['tar', '-xf', file_path, '-C', folder_path])
         os.remove(file_path)
       elif download_type == AUTOTEST:
-        print '%s: running tar -xf command' % board
+        print('%s: running tar -xf command' % board)
         subprocess.call(['tar', '-xf', file_path, '-C', folder_path])
         target_name = 'autotest'
         target_path = os.path.join(folder_path, file_name[:-len('.tar.bz2')],
                                    target_name)
         os.remove(file_path)
       elif download_type == FACTORY:
-        print 'trying to unzip %s to %s' % (file_path, folder_path)
+        print('trying to unzip %s to %s' % (file_path, folder_path))
         subprocess.call(['unzip', '-q', file_path, '-d', folder_path])
         os.remove(file_path)
       else:  # RECOVERY
@@ -337,7 +338,7 @@ def main():
     # Report successful download and return path to downloaded thing
     output_str[board] = target_path
     dl_error[board] = False
-    print '%s: DONE' % board
+    print('%s: DONE' % board)
 
   # For each board, download file.
   manager = Manager()
@@ -382,7 +383,7 @@ def main():
       board = from_list[i]
       if not dl_error[board]:
         destination = destination_str % to_list[i]
-        print 'Copying %s to %s.' % (board, destination)
+        print('Copying %s to %s.' % (board, destination))
         cmd = 'cros flash %s %s' % (destination, output_str[board])
         proc = subprocess.Popen(cmd.split(' '))
         jobs.append(proc)
@@ -393,23 +394,23 @@ def main():
     for job in jobs:
       job.wait()
     if arguments.delete:
-      print 'Deleting all files created for %s.' % board
+      print('Deleting all files created for %s.' % board)
       shutil.rmtree(dl_folder[board])
 
     # Return to previous directory.
     os.chdir(starting_dir)
 
   else:
-    print '\nDownloaded File(s):'
+    print('\nDownloaded File(s):')
     for board in boards:
       if not dl_error[board]:
-        print output_str[board]
+        print(output_str[board])
       else:
         errors += '%s\n' % output_str[board]
 
   # Summarize errors, if any.
-  print '\nScript complete.'
-  print errors
+  print('\nScript complete.')
+  print(errors)
 
 if __name__ == '__main__':
   main()
