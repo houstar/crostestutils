@@ -81,7 +81,7 @@ if [ -n "${FLAGS_args}" ]; then
 fi
 
 trap stop_kvm EXIT
-start_kvm "${FLAGS_image_path}"
+start_kvm "${FLAGS_image_path}" "${FLAGS_board}"
 retry_until_ssh
 
 echo 'Builder uptime: ' $(uptime)

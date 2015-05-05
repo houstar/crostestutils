@@ -10,6 +10,8 @@
 . "${SCRIPT_ROOT}/common.sh" || exit 1
 . "${SCRIPT_ROOT}/lib/cros_vm_lib.sh" || die "Unable to load cros_vm_lib.sh"
 
+DEFINE_string board "$DEFAULT_BOARD" \
+  "The board for which you built autotest." b
 DEFINE_string payload "" "Full name of the payload to update with."
 DEFINE_string proxy_port "" \
   "Have the client request from this proxy instead of devserver."
@@ -33,7 +35,7 @@ eval set -- "${FLAGS_ARGV}"
   die "You must specify a path to a vm image."
 
 trap stop_kvm EXIT
-start_kvm "${FLAGS_vm_image_path}"
+start_kvm "${FLAGS_vm_image_path}" "${FLAGS_board}"
 retry_until_ssh
 
 if [ -n "${FLAGS_image}" ]; then

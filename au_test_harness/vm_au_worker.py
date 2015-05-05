@@ -90,6 +90,7 @@ class VMAUWorker(au_worker.AUWorker):
     log_directory, fail_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
     cmd = ['%s/bin/cros_run_vm_update' % constants.CROSUTILS_DIR,
+           '--board=%s' % self.board,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),
            self.graphics_flag,
@@ -114,6 +115,7 @@ class VMAUWorker(au_worker.AUWorker):
     log_directory, fail_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
     cmd = ['%s/bin/cros_run_vm_update' % constants.CROSUTILS_DIR,
+           '--board=%s' % self.board,
            '--payload=%s' % update_path,
            '--vm_image_path=%s' % self.vm_image_path,
            '--update_log=%s' % os.path.join(log_directory, 'update_engine.log'),
