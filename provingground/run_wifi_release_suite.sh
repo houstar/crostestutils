@@ -8,8 +8,8 @@ set -e
 
 BRANCH=$1
 BUILD=$2
-
-ATEST='../../../third_party/autotest/files/cli/atest'
+# This script assumes that atest is in PATH
+ATEST='atest'
 RUN_SUITE='../../../third_party/autotest/files/site_utils/run_suite.py'
 
 USAGE_STRING='Usage: ./run_wifi_release_suite.sh <branch number> <build number>'
@@ -83,9 +83,9 @@ return_available_hosts() {
     IFS=$' '
     local host_info=($host)
     for board in ${boards[@]}; do
-      if [[ $board == ${host_info[4]} && (${host_info[1]} != 'Repairing' &&
+      if [[ ${host_info[3]} == 'False' && (${host_info[1]} != 'Repairing' &&
         ${host_info[1]} != 'Repair Failed') &&
-        ${host_info[3]} == 'False' ]] ; then
+        $board == ${host_info[4]} ]] ; then
         already_added=$(return_item_exists_in_array ${board})
         if [[ ${already_added} == 'False' ]] ; then
           boards_to_run+=($board)
@@ -148,6 +148,7 @@ for pool in "${!POOLS[@]}"; do
 
     results_file=$results_folder'/'$pool'_'$board'.txt'
 
+    #TODO: Move or delete extra files created by run suite
     eval $run_command &> $results_file &
     disown %1
 
