@@ -268,7 +268,7 @@ class AUWorker(object):
     Prefixes directory returned for worker with time called i.e. 1_label,
     2_label, etc.  The directory returned is outside the chroot so if passing
     to an script that is called with enther_chroot, make sure to use
-    ReinterpretPathForChroot. The first dir returned is the one where results
+    path_util.ToChrootPath(). The first dir returned is the one where results
     should be stored. The second is one where failed test results should be
     stored. Only the former is created as the latter should only be created if
     the test fails.

@@ -36,10 +36,10 @@ sys.path.append(constants.SOURCE_ROOT)
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
-from chromite.lib import git
 from chromite.lib import locking
 from chromite.lib import osutils
 from chromite.lib import parallel
+from chromite.lib import path_util
 from chromite.lib import sudo
 from chromite.lib import timeout_util
 from crostestutils.au_test_harness import cros_au_test_harness
@@ -230,12 +230,12 @@ class UpdatePayloadGenerator(object):
       command = ['start_devserver', '--pregenerate_update', '--exit']
 
       in_chroot_key = in_chroot_base = None
-      in_chroot_target = git.ReinterpretPathForChroot(payload.target)
+      in_chroot_target = path_util.ToChrootPath(payload.target)
       if payload.base:
-        in_chroot_base = git.ReinterpretPathForChroot(payload.base)
+        in_chroot_base = path_util.ToChrootPath(payload.base)
 
       if payload.key:
-        in_chroot_key = git.ReinterpretPathForChroot(payload.key)
+        in_chroot_key = path_util.ToChrootPath(payload.key)
 
       command.append('--image=%s' % in_chroot_target)
       if payload.base:

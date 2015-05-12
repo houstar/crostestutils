@@ -12,8 +12,8 @@ import tempfile
 import constants
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
-from chromite.lib import git
 from chromite.lib import osutils
+from chromite.lib import path_util
 from crostestutils.lib import mount_helper
 
 
@@ -73,7 +73,7 @@ class PublicKeyManager(object):
     """Makes the image bootable.  Note, it is only useful for non-vm images."""
     from_dir, image = os.path.split(self.image_path)
     if 'qemu' not in image:
-      from_dir = git.ReinterpretPathForChroot(from_dir)
+      from_dir = path_util.ToChrootPath(from_dir)
       cmd = ['bin/cros_make_image_bootable', from_dir, image,
              '--force_developer_mode']
       cros_build_lib.RunCommand(

@@ -13,7 +13,7 @@ import os
 import constants
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
-from chromite.lib import git
+from chromite.lib import path_util
 
 
 def _GetTotalMemoryGB():
@@ -58,7 +58,7 @@ def CreateVMImage(image, board=None, full=True):
   if not os.path.exists(vm_image_path):
     logging.info('Creating %s', vm_image_path)
     cmd = ['./image_to_vm.sh',
-           '--from=%s' % git.ReinterpretPathForChroot(os.path.dirname(image)),
+           '--from=%s' % path_util.ToChrootPath(os.path.dirname(image)),
            '--test_image']
     if full:
       cmd.extend(['--disk_layout', '2gb-rootfs-updatable'])
