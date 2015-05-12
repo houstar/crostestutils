@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python2
 #
 # Copyright (c) 2011 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
@@ -17,8 +17,9 @@ payloads for testing in virtual machines.
 FOR USE OUTSIDE CHROOT ONLY.
 """
 
+from __future__ import print_function
+
 import functools
-import logging
 import optparse
 import os
 import pickle
@@ -33,6 +34,7 @@ sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
 
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
 from chromite.lib import git
 from chromite.lib import locking
@@ -283,7 +285,7 @@ class UpdatePayloadGenerator(object):
           location of the update path.
       """
       # Looking for this line in the output.
-      key_line_re = re.compile('^PREGENERATED_UPDATE=([\w/./+]+)')
+      key_line_re = re.compile(r'^PREGENERATED_UPDATE=([\w/./+]+)')
       return_array = []
       for log_file in log_files:
         with open(log_file) as f:

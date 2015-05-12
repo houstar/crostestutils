@@ -4,13 +4,15 @@
 
 """Module containing python helper methods for testing."""
 
+from __future__ import print_function
+
 import glob
-import logging
 import multiprocessing
 import os
 
 import constants
 from chromite.lib import cros_build_lib
+from chromite.lib import cros_logging as logging
 from chromite.lib import git
 
 

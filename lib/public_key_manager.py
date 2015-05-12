@@ -4,6 +4,8 @@
 
 """This module manages interactions between an image and a public key."""
 
+from __future__ import print_function
+
 import os
 import tempfile
 
@@ -29,7 +31,7 @@ class PublicKeyManager(object):
     # Gather some extra information about the image.
     try:
       mount_helper.MountImage(image_path, self._rootfs_dir, self._stateful_dir,
-                 read_only=True)
+                              read_only=True)
       self._full_target_key_path = os.path.join(
           self._rootfs_dir, PublicKeyManager.TARGET_KEY_PATH)
       self._is_key_new = True
@@ -37,7 +39,8 @@ class PublicKeyManager(object):
         cmd = ['diff', self.key_path, self._full_target_key_path]
         res = cros_build_lib.RunCommand(
             cmd, print_cmd=False, error_code_ok=True, capture_output=True)
-        if not res.output: self._is_key_new = False
+        if not res.output:
+          self._is_key_new = False
 
     finally:
       mount_helper.UnmountImage(self._rootfs_dir, self._stateful_dir)
