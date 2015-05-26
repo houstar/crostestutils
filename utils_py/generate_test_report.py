@@ -55,8 +55,7 @@ class ResultCollector(object):
   """Collects status and performance data from an autoserv results directory."""
 
   def __init__(self, collect_perf=True, collect_attr=False, collect_info=False,
-               escape_error=False, strip_text='',
-               whitelist_chrome_crashes=False):
+               escape_error=False, whitelist_chrome_crashes=False):
     """Initialize ResultsCollector class.
 
     Args:
@@ -64,14 +63,12 @@ class ResultCollector(object):
       collect_attr: Should attr keyvals be collected?
       collect_info: Should info keyvals be collected?
       escape_error: Escape error message text for tools.
-      strip_text: Prefix to strip from test directory names.
       whitelist_chrome_crashes: Treat Chrome crashes as non-fatal.
     """
     self._collect_perf = collect_perf
     self._collect_attr = collect_attr
     self._collect_info = collect_info
     self._escape_error = escape_error
-    self._strip_text = strip_text
     self._whitelist_chrome_crashes = whitelist_chrome_crashes
 
   def _CollectPerf(self, testdir):
@@ -196,35 +193,6 @@ class ResultCollector(object):
           if match:
             info[match.group(1)] = str(match.group(2)).strip()
     return info
-
-  def _MakeResultKey(self, testdir):
-    """Helper to shorten directory for easier review of long printed lines.
-
-    WITHOUT --strip [all lines exceed 80 characters]
-
-    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH
-                               [  FAILED  ]
-    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH/firmware_SoftwareSync.
-    normal                     [  PASSED  ]
-    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH/firmware_SoftwareSync.
-    normal/firmware_FAFTClient [  PASSED  ]
-
-    WITH --strip
-
-    /tmp/run_remote_tests.MVyY/tmp.combined-control.cHThH [  FAILED  ]
-    firmware_SoftwareSync.normal                          [  PASSED  ]
-    firmware_SoftwareSync.normal/firmware_FAFTClient      [  PASSED  ]
-
-    Args:
-      testdir: The autoserv test result directory.
-
-    Returns:
-      If the option for shortening the directory is provided, truncates the
-      long directory path for a cleaner output report.
-    """
-    if testdir.startswith(self._strip_text):
-      return testdir.replace(self._strip_text, '', 1)
-    return testdir
 
   def _CollectEndTimes(self, status_raw, status_re='', is_end=True):
     """Helper to match and collect timestamp and localtime.
@@ -361,7 +329,7 @@ class ResultCollector(object):
       timestamp, localtime = self._CollectEndTimes(status_raw, is_end=False)
 
     results.append({
-        'testdir': self._MakeResultKey(testdir),
+        'testdir': testdir,
         'crashes': self._CollectCrashes(status_raw),
         'status': status,
         'error_msg': error_msg,
@@ -429,10 +397,13 @@ class ReportGenerator(object):
     contain values such as: test folder, status, localtime, crashes, error_msg,
     perf keyvals [optional], info [optional].
     """
-    collector = ResultCollector(self._options.perf, self._options.attr,
-                                self._options.info, self._options.escape_error,
-                                self._options.strip,
-                                self._options.whitelist_chrome_crashes)
+    collector = ResultCollector(
+        collect_perf=self._options.perf,
+        collect_attr=self._options.attr,
+        collect_info=self._options.info,
+        escape_error=self._options.escape_error,
+        whitelist_chrome_crashes=self._options.whitelist_chrome_crashes)
+
     for resdir in self._args:
       if not os.path.isdir(resdir):
         cros_build_lib.Die('%r does not exist', resdir)
@@ -515,7 +486,7 @@ class ReportGenerator(object):
       test_string: the name of a test with which to prefix the line.
     """
     if self._options.print_debug:
-      debug_file_regex = os.path.join(self._options.strip, test, 'debug',
+      debug_file_regex = os.path.join('results.', test, 'debug',
                                       '%s*.ERROR' % os.path.basename(test))
       for path in glob.glob(debug_file_regex):
         try:
@@ -698,12 +669,6 @@ def main():
                     help='Include attr keyvals in the report')
   parser.add_option('--no-perf', dest='perf', action='store_false',
                     help='Don\'t include perf keyvals in the report')
-  parser.add_option('--strip', dest='strip', type='string', action='store',
-                    default='results.',
-                    help='Strip a prefix from test directory names'
-                    ' [default: \'%default\']')
-  parser.add_option('--no-strip', dest='strip', const='', action='store_const',
-                    help='Don\'t strip a prefix from test directory names')
   parser.add_option('--sort-chron', dest='sort_chron', action='store_true',
                     default=False,
                     help='Sort results by datetime instead of by test name.')
