@@ -42,7 +42,7 @@ class CTest(object):
     sign_payloads: Build some payloads with signed keys.
     target: Target image to test.
     test_results_root: Root directory to store au_test_harness results.
-    type: which test harness to run.  Possible values: real, vm.
+    type: which test harness to run.  Possible values: real, vm, gce.
     whitelist_chrome_crashes: Whether to treat Chrome crashes as non-fatal.
   """
 
@@ -231,7 +231,7 @@ def main():
                     help='Root directory to store test results.  Should '
                     'be defined relative to chroot root.')
   parser.add_option('--type', default='vm',
-                    help='type of test to run: [vm, real]. Default: vm.')
+                    help='type of test to run: [vm, real, gce]. Default: vm.')
   parser.add_option('--verbose', default=False, action='store_true',
                     help='Print out added debugging information')
   parser.add_option('--whitelist_chrome_crashes', default=False,
@@ -249,11 +249,14 @@ def main():
   if args: parser.error('Extra args found %s.' % args)
   if not options.board: parser.error('Need board for image to compare against.')
   if options.only_verify and options.quick_update: parser.error(
-          'Only one of --only_verify or --quick_update should be specified.')
+      'Only one of --only_verify or --quick_update should be specified.')
 
   # force absolute path for these options, since a chdir occurs deeper in the
   # codebase.
   for x in ('nplus1_archive_dir', 'target_image', 'test_results_root'):
+    if x == 'target_image' and options.type == 'gce':
+      # In this case |target_image| is a Google Storage path.
+      continue
     val = getattr(options, x)
     if val is not None:
       setattr(options, x, os.path.abspath(val))

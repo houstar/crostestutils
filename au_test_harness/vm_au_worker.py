@@ -146,8 +146,12 @@ class VMAUWorker(au_worker.AUWorker):
         cmd, image_path, src_image_path, proxy_port, private_key_path,
         for_vm=True)
 
+  def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
+    # VMAUWorker disregards |unittest| and |percent_required_to_pass|.
+    return self._VerifyImage(test)
+
   # pylint: disable-msg=W0221
-  def VerifyImage(self, test=''):
+  def _VerifyImage(self, test=''):
     """Runs vm smoke suite or any single test to verify image.
 
     Returns True upon success.  Prints test output and returns False otherwise.

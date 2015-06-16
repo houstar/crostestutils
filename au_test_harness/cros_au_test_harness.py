@@ -28,6 +28,7 @@ sys.path.append(constants.SOURCE_ROOT)
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
+from chromite.lib import gs
 from chromite.lib import parallel
 from chromite.lib import sudo
 from chromite.lib import timeout_util
@@ -75,8 +76,11 @@ class _LessBacktracingTestRunner(unittest.TextTestRunner):
         raise parallel.BackgroundFailure(msg)
 
 
-def _ReadUpdateCache(target_image):
+def _ReadUpdateCache(dut_type, target_image):
   """Reads update cache from generate_test_payloads call."""
+  # TODO(wonderfly): Figure out how to use update cache for GCE images.
+  if dut_type == 'gce':
+    return None
   path_to_dump = os.path.dirname(target_image)
   cache_file = os.path.join(path_to_dump, CACHE_FILE)
 
@@ -120,19 +124,34 @@ def CheckOptions(parser, options, leftover_args):
     options: Parsed options.
     leftover_args: Args left after parsing.
   """
+
+  _IMAGE_PATH_REQUIREMENT = """
+  For vm and real types, the image should be a local file and for gce, the image
+  path has to be a valid Google Cloud Storage path.
+  """
+
   if leftover_args: parser.error('Found unsupported flags ' + leftover_args)
-  if not options.type in ['real', 'vm']:
+  if not options.type in ['real', 'vm', 'gce']:
     parser.error('Failed to specify valid test type.')
 
-  if not options.target_image or not os.path.isfile(options.target_image):
-    parser.error('Testing requires a valid target image.')
+  def _IsValidImage(image):
+    """Asserts that |image_path| is a valid image file for |options.type|."""
+    if not image:
+      return False
+    return (gs.PathIsGs(image) if options.type == 'gce' else
+            os.path.isfile(image))
+
+  if not _IsValidImage(options.target_image):
+    parser.error('Testing requires a valid target image. Given %s. %s' %
+                 (options.target_image, _IMAGE_PATH_REQUIREMENT))
 
   if not options.base_image:
     logging.info('No base image supplied.  Using target as base image.')
     options.base_image = options.target_image
 
-  if not os.path.isfile(options.base_image):
-    parser.error('Testing requires a valid base image.')
+  if not _IsValidImage(options.base_image):
+    parser.error('Testing requires a valid base image. Given: %s. %s' %
+                 (options.base_image, _IMAGE_PATH_REQUIREMENT))
 
   if options.private_key and not os.path.isfile(options.private_key):
     parser.error('Testing requires a valid path to the private key.')
@@ -179,7 +198,7 @@ def main():
                     help='Only runs tests with specific prefix i.e. '
                     'testFullUpdateWipeStateful.')
   parser.add_option('-p', '--type', default='vm',
-                    help='type of test to run: [vm, real]. Default: vm.')
+                    help='type of test to run: [vm, real, gce]. Default: vm.')
   parser.add_option('--verbose', default=True, action='store_true',
                     help='Print out rather than capture output as much as '
                     'possible.')
@@ -197,7 +216,7 @@ def main():
   CheckOptions(parser, options, leftover_args)
 
   # Generate cache of updates to use during test harness.
-  update_cache = _ReadUpdateCache(options.target_image)
+  update_cache = _ReadUpdateCache(options.type, options.target_image)
   if not update_cache:
     msg = ('No update cache found. Update testing will not work.  Run '
            ' cros_generate_update_payloads if this was not intended.')
@@ -220,7 +239,7 @@ def main():
             log_dir=options.test_results_root)
         my_server.Start()
 
-      if options.type == 'vm' and options.parallel:
+      if options.type == 'vm' or options.type == 'gce' and options.parallel:
         _RunTestsInParallel(options)
       else:
         # TODO(sosa) - Take in a machine pool for a real test.

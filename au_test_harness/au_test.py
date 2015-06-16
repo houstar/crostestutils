@@ -13,6 +13,7 @@ import urllib
 from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
 from crostestutils.au_test_harness import cros_test_proxy
+from crostestutils.au_test_harness import gce_au_worker
 from crostestutils.au_test_harness import real_au_worker
 from crostestutils.au_test_harness import update_exception
 from crostestutils.au_test_harness import vm_au_worker
@@ -39,6 +40,8 @@ class AUTest(unittest.TestCase):
     cls.test_results_root = options.test_results_root
     if options.type == 'vm':
       cls.worker_class = vm_au_worker.VMAUWorker
+    elif  options.type == 'gce':
+      cls.worker_class = gce_au_worker.GCEAUWorker
     else:
       cls.worker_class = real_au_worker.RealAUWorker
 
@@ -106,11 +109,11 @@ class AUTest(unittest.TestCase):
 
     # Update to
     self.worker.PerformUpdate(self.target_image_path, base_image_path)
-    self.assertTrue(self.worker.VerifyImage())
+    self.assertTrue(self.worker.VerifyImage(self))
 
     # Update from
     self.worker.PerformUpdate(self.target_image_path, self.target_image_path)
-    self.assertTrue(self.worker.VerifyImage())
+    self.assertTrue(self.worker.VerifyImage(self))
 
   def testUpdateWipeStateful(self):
     """Tests if we can update after cleaning the stateful partition.
@@ -126,12 +129,12 @@ class AUTest(unittest.TestCase):
     # Update to
     self.worker.PerformUpdate(self.target_image_path, base_image_path,
                               'clean')
-    self.assertTrue(self.worker.VerifyImage())
+    self.assertTrue(self.worker.VerifyImage(self))
 
     # Update from
     self.worker.PerformUpdate(self.target_image_path, self.target_image_path,
                               'clean')
-    self.assertTrue(self.worker.VerifyImage())
+    self.assertTrue(self.worker.VerifyImage(self))
 
   def testInterruptedUpdate(self):
     """Tests what happens if we interrupt payload delivery 3 times."""
@@ -186,7 +189,7 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9227)
     target_image_path = self.worker.PrepareBase(self.target_image_path)
     self.worker.PerformUpdate(target_image_path, target_image_path)
-    self.assertTrue(self.worker.VerifyImage())
+    self.assertTrue(self.worker.VerifyImage(self))
 
   def SimpleTestVerify(self):
     """Test that only verifies the target image.
@@ -196,7 +199,7 @@ class AUTest(unittest.TestCase):
     """
     self.worker.Initialize(9228)
     self.worker.PrepareBase(self.target_image_path)
-    self.assertTrue(self.worker.VerifyImage())
+    self.assertTrue(self.worker.VerifyImage(self))
 
   # --- DISABLED TESTS ---
 

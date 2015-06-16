@@ -18,3 +18,6 @@ CROSUTILS_DIR = os.path.join(SOURCE_ROOT, 'src', 'scripts')
 CROSUTILS_LIB_DIR = os.path.join(CROSUTILS_DIR, 'lib')
 
 MAX_TIMEOUT_SECONDS = 4800
+
+GCE_PROJECT = 'chromiumos-gce-testlab'
+GCE_ZONE = 'us-central1-a'
