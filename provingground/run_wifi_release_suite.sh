@@ -28,7 +28,7 @@ list_1=(alex lumpy stumpy)
 list_2=(parrot butterfly)
 
 # atheros_ar9462 on kernel 3.8
-list_3=(link stout peppy falco monroe panther leon wolf mccloud zako gizmo)
+list_3=(link stout peppy falco monroe panther leon wolf mccloud zako)
 
 # marvell_88w8797_2x2 on kernel 3.8
 list_4=(snow spring skate)
@@ -44,16 +44,16 @@ list_7=(falco_li tricky)
 
 # intel wilkins peak 2 on kernel 3.10
 list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
-        swanky winky candy)
+        swanky winky candy orco sumo ninja banjo)
 
 # intel wilkins peak 2 on kernel 3.14
-list_9=(samus auron_paine auron_yuna guado tidus rikku)
+list_9=(samus auron_paine auron_yuna guado tidus rikku lulu)
 
 # Broadcom 4354 on kernel 3.14
-list_10=(veyron_jerry veyron_speedy veyron_minnie)
+list_10=(veyron_speedy veyron_minnie)
 
 # Marvell 8897 on kernel 3.14
-list_11=(veyron_mighty veyron_jaq)
+list_11=(veyron_mighty veyron_jaq veyron_jerry)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9
                 list_10 list_11)
