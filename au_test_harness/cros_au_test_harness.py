@@ -125,10 +125,9 @@ def CheckOptions(parser, options, leftover_args):
     leftover_args: Args left after parsing.
   """
 
-  _IMAGE_PATH_REQUIREMENT = """
-  For vm and real types, the image should be a local file and for gce, the image
-  path has to be a valid Google Cloud Storage path.
-  """
+  _IMAGE_PATH_REQUIREMENT = ('For vm and real types, the image must be a local '
+                             'file. For gce, the image path has to be a valid '
+                             'Google Cloud Storage URI.')
 
   if leftover_args: parser.error('Found unsupported flags ' + leftover_args)
   if not options.type in ['real', 'vm', 'gce']:
@@ -142,19 +141,27 @@ def CheckOptions(parser, options, leftover_args):
             os.path.isfile(image))
 
   if not _IsValidImage(options.target_image):
-    parser.error('Testing requires a valid target image. Given %s. %s' %
-                 (options.target_image, _IMAGE_PATH_REQUIREMENT))
+    parser.error('Testing requires a valid target image.\n'
+                 '%s\n'
+                 'Given: type=%s, target_image=%s.' %
+                 (_IMAGE_PATH_REQUIREMENT, options.type, options.target_image))
 
   if not options.base_image:
     logging.info('No base image supplied.  Using target as base image.')
     options.base_image = options.target_image
 
   if not _IsValidImage(options.base_image):
-    parser.error('Testing requires a valid base image. Given: %s. %s' %
-                 (options.base_image, _IMAGE_PATH_REQUIREMENT))
+    parser.error('Testing requires a valid base image.\n'
+                 '%s\n'
+                 'Given: type=%s, base_image=%s.' %
+                 (_IMAGE_PATH_REQUIREMENT, options.type, options.base_image))
 
-  if options.private_key and not os.path.isfile(options.private_key):
+  if (options.payload_signing_key and not
+      os.path.isfile(options.payload_signing_key)):
     parser.error('Testing requires a valid path to the private key.')
+
+  if options.ssh_private_key and not os.path.isfile(options.ssh_private_key):
+    parser.error('Testing requires a valid path to the ssh private key.')
 
   if options.test_results_root:
     if not 'chroot/tmp' in options.test_results_root:
@@ -183,7 +190,7 @@ def main():
                     help='Disable graphics for the vm test.')
   parser.add_option('-j', '--jobs', default=test_helper.CalculateDefaultJobs(),
                     type=int, help='Number of simultaneous jobs')
-  parser.add_option('--private_key', default=None,
+  parser.add_option('--payload_signing_key', default=None,
                     help='Path to the private key used to sign payloads with.')
   parser.add_option('-q', '--quick_test', default=False, action='store_true',
                     help='Use a basic test to verify image.')
@@ -211,6 +218,9 @@ def main():
                     action='store_true',
                     help='Run multiple test stages in parallel (applies only '
                          'to vm tests). Default: False')
+  parser.add_option('--ssh_private_key', default=None,
+                    help='Path to the private key to use to ssh into the image '
+                    'as the root user.')
   (options, leftover_args) = parser.parse_args()
 
   CheckOptions(parser, options, leftover_args)

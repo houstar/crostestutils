@@ -39,6 +39,9 @@ class AUWorker(object):
     else:
       self.verify_suite = 'suite:%s' % (options.verify_suite_name or 'smoke')
 
+    # An optional ssh private key for testing.
+    self.ssh_private_key = options.ssh_private_key
+
   def CleanUp(self):
     """Called at the end of every test."""
 
@@ -68,7 +71,7 @@ class AUWorker(object):
     """
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
-                  proxy_port=None, private_key_path=None):
+                  proxy_port=None, payload_signing_key=None):
     """Implementation of an actual update.
 
     Subclasses must override this method with the correct update procedure for
@@ -113,7 +116,7 @@ class AUWorker(object):
   # --- INTERFACE TO AU_TEST ---
 
   def PerformUpdate(self, image_path, src_image_path='', stateful_change='old',
-                    proxy_port=None, private_key_path=None):
+                    proxy_port=None, payload_signing_key=None):
     """Performs an update using  _UpdateImage and reports any error.
 
     Subclasses should not override this method but override _UpdateImage
@@ -130,11 +133,11 @@ class AUWorker(object):
             exception of code needed for ssh.
       proxy_port:  Port to have the client connect to. For use with
         CrosTestProxy.
-      private_key_path:  Path to a private key to use with update payload.
+      payload_signing_key: Path to the private key to use to sign payloads.
     Raises an update_exception.UpdateException if _UpdateImage returns an error.
     """
     if not self.use_delta_updates: src_image_path = ''
-    key_to_use = private_key_path
+    key_to_use = payload_signing_key
 
     self.UpdateImage(image_path, src_image_path, stateful_change, proxy_port,
                      key_to_use)
@@ -176,7 +179,7 @@ class AUWorker(object):
     return stateful_change_flag
 
   def AppendUpdateFlags(self, cmd, image_path, src_image_path, proxy_port,
-                        private_key_path, for_vm=False):
+                        payload_signing_key, for_vm=False):
     """Appends common args to an update cmd defined by an array.
 
     Modifies cmd in places by appending appropriate items given args.
@@ -188,7 +191,7 @@ class AUWorker(object):
     """
     if proxy_port: cmd.append('--proxy_port=%s' % proxy_port)
     update_id = dev_server_wrapper.GenerateUpdateId(
-        image_path, src_image_path, private_key_path,
+        image_path, src_image_path, payload_signing_key,
         for_vm=for_vm)
     cache_path = self.update_cache.get(update_id)
     if cache_path:

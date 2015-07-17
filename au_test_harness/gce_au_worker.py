@@ -113,14 +113,15 @@ class GCEAUWorker(au_worker.AUWorker):
       test = self.verify_suite
 
     self.TestInfo('Running test %s to verify image.' % test)
-    result = cros_build_lib.RunCommand(
-        ['test_that',
-         '--no-quickmerge',
-         '--results_dir=%s' % test_directory,
-         self.instance_ip,
-         test
-        ], error_code_ok=True, enter_chroot=True, redirect_stdout=True,
-        cwd=constants.CROSUTILS_DIR)
+
+    cmd = ['test_that', '--no-quickmerge', '--results_dir=%s' % test_directory,
+           self.instance_ip, test]
+    if self.ssh_private_key is not None:
+      cmd.append('--ssh_private_key=%s' % self.ssh_private_key)
+
+    result = cros_build_lib.RunCommand(cmd, error_code_ok=True,
+                                       enter_chroot=True, redirect_stdout=True,
+                                       cwd=constants.CROSUTILS_DIR)
     ret = self.AssertEnoughTestsPassed(unittest, result.output,
                                        percent_required_to_pass)
     if not ret:

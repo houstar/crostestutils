@@ -64,7 +64,7 @@ class CrosAuTestHarnessTest(unittest.TestCase):
     self.assertIn(self.INVALID_IMAGE_PATH, cm.exception.result.error)
 
     cmd = [os.path.join(constants.CROSUTILS_DIR, 'bin', 'cros_au_test_harness'),
-           '--type=vm',
+           '--type=gce',
            '--target_image=%s' % gs_path
           ]
     with self.assertRaises(cros_build_lib.RunCommandError) as cm:

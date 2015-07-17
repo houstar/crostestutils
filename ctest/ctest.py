@@ -36,7 +36,7 @@ class CTest(object):
     jobs: Numbers of threads to run in parallel.
     no_graphics: boolean: If True, disable graphics during vm test.
     nplus1_archive_dir: Archive directory to store nplus1 payloads.
-    private_key: Signs payloads with this key.
+    payload_signing_key: Signs payloads with this key.
     public_key: Loads key to verify signed payloads.
     remote: ip address for real test harness run.
     sign_payloads: Build some payloads with signed keys.
@@ -68,14 +68,17 @@ class CTest(object):
 
     self.public_key = None
     if self.sign_payloads:
-      self.private_key = os.path.realpath(
+      self.payload_signing_key = os.path.realpath(
           os.path.join(self.crosutils_root, '..', 'platform', 'update_engine',
                        'unittest_key.pem'))
     else:
-      self.private_key = None
+      self.payload_signing_key = None
 
     self.jobs = options.jobs
     self.nplus1_archive_dir = options.nplus1_archive_dir
+
+    # An optional ssh private key used for testing.
+    self.ssh_private_key = options.ssh_private_key
 
   def GeneratePublicKey(self):
     """Returns the path to a generated public key from the UE private key."""
@@ -83,7 +86,7 @@ class CTest(object):
     public_key_path = 'public_key.pem'
     logging.info('Generating public key from private key.')
     cros_build_lib.RunCommand(
-        ['openssl', 'rsa', '-in', self.private_key, '-pubout',
+        ['openssl', 'rsa', '-in', self.payload_signing_key, '-pubout',
          '-out', public_key_path], print_cmd=False)
     self.public_key = public_key_path
 
@@ -136,7 +139,7 @@ class CTest(object):
       # This only is compatible with payload signing.
       if self.sign_payloads:
         cmd.append('--public_key=%s' % self.public_key)
-        cmd.append('--private_key=%s' % self.private_key)
+        cmd.append('--private_key=%s' % self.payload_signing_key)
     else:
       cmd.append('--basic_suite')
 
@@ -175,6 +178,9 @@ class CTest(object):
            '--jobs=%d' % self.jobs,
           ]
 
+    if self.ssh_private_key is not None:
+      cmd.append('--ssh_private_key=%s' % self.ssh_private_key)
+
     if suite:
       cmd.append('--verify_suite_name=%s' % suite)
 
@@ -190,7 +196,7 @@ class CTest(object):
 
     # We did not generate signed payloads if this is a |quick_update| test.
     if not quick_update and self.sign_payloads:
-      cmd.append('--private_key=%s' % self.private_key)
+      cmd.append('--payload_signing_key=%s' % self.payload_signing_key)
 
     res = cros_build_lib.RunCommand(cmd, cwd=self.crosutils_root,
                                     error_code_ok=True)
@@ -237,6 +243,9 @@ def main():
   parser.add_option('--whitelist_chrome_crashes', default=False,
                     dest='whitelist_chrome_crashes', action='store_true',
                     help='Treat Chrome crashes as non-fatal.')
+  parser.add_option('--ssh_private_key', default=None,
+                    help='Path to the private key to use to ssh into the image '
+                    'as the root user')
 
   # Set the usage to include flags.
   def _ParserError(msg):

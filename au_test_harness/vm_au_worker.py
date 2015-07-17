@@ -85,7 +85,7 @@ class VMAUWorker(au_worker.AUWorker):
       logging.warning('Ignoring errors while copying VM files: %s', e)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
-                  proxy_port='', private_key_path=None):
+                  proxy_port='', payload_signing_key=None):
     """Updates VM image with image_path."""
     log_directory, fail_directory = self.GetNextResultsPath('update')
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
@@ -100,7 +100,7 @@ class VMAUWorker(au_worker.AUWorker):
            stateful_change_flag,
           ]
     self.AppendUpdateFlags(cmd, image_path, src_image_path, proxy_port,
-                           private_key_path)
+                           payload_signing_key)
     self.TestInfo(self.GetUpdateMessage(image_path, src_image_path, True,
                                         proxy_port))
     try:
@@ -134,7 +134,7 @@ class VMAUWorker(au_worker.AUWorker):
       raise
 
   def AppendUpdateFlags(self, cmd, image_path, src_image_path, proxy_port,
-                        private_key_path, for_vm=False):
+                        payload_signing_key, for_vm=False):
     """Appends common args to an update cmd defined by an array.
 
     Calls super function with for_vm set to True.
@@ -143,7 +143,7 @@ class VMAUWorker(au_worker.AUWorker):
       See AppendUpdateFlags for description of args.
     """
     super(VMAUWorker, self).AppendUpdateFlags(
-        cmd, image_path, src_image_path, proxy_port, private_key_path,
+        cmd, image_path, src_image_path, proxy_port, payload_signing_key,
         for_vm=True)
 
   def VerifyImage(self, unittest, percent_required_to_pass=100, test=''):
@@ -175,6 +175,9 @@ class VMAUWorker(au_worker.AUWorker):
     if self.graphics_flag: command.append(self.graphics_flag)
     if self.whitelist_chrome_crashes:
       command.append('--whitelist_chrome_crashes')
+    if self.ssh_private_key is not None:
+      logging.warning('Flag "--ssh_private_key" set but not yet supported for '
+                      '"VMAUWorker". Default test key will be used.')
     self.TestInfo('Running smoke suite to verify image.')
     result = cros_build_lib.RunCommand(
         command, print_cmd=False, combine_stdout_stderr=True,

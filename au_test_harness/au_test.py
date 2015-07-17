@@ -35,7 +35,7 @@ class AUTest(unittest.TestCase):
       options: options class to be parsed from main class.
     """
     cls.base_image_path = options.base_image
-    cls.private_key = options.private_key
+    cls.payload_signing_key = options.payload_signing_key
     cls.target_image_path = options.target_image
     cls.test_results_root = options.test_results_root
     if options.type == 'vm':
@@ -173,10 +173,10 @@ class AUTest(unittest.TestCase):
     self.worker.Initialize(9226)
     signed_target_image_path = self.worker.PrepareBase(self.target_image_path,
                                                        signed_base=True)
-    if self.private_key:
-      self.worker.PerformUpdate(self.target_image_path,
-                                signed_target_image_path,
-                                private_key_path=self.private_key)
+    if self.payload_signing_key:
+      self.worker.PerformUpdate(
+          self.target_image_path, signed_target_image_path,
+          payload_signing_key=self.payload_signing_key)
     else:
       logging.info('No key found to use for signed testing.')
 

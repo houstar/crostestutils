@@ -24,7 +24,7 @@ class RealAUWorker(au_worker.AUWorker):
     return self.PrepareRealBase(image_path, signed_base)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
-                  proxy_port=None, private_key_path=None):
+                  proxy_port=None, payload_signing_key=None):
     """Updates a remote image using image_to_live.sh."""
     stateful_change_flag = self.GetStatefulChangeFlag(stateful_change)
     cmd = ['%s/image_to_live.sh' % constants.CROSUTILS_DIR,
@@ -33,7 +33,7 @@ class RealAUWorker(au_worker.AUWorker):
            '--verify',
           ]
     self.AppendUpdateFlags(cmd, image_path, src_image_path, proxy_port,
-                           private_key_path)
+                           payload_signing_key)
     self.RunUpdateCmd(cmd)
 
   def UpdateUsingPayload(self, update_path, stateful_change='old',
@@ -54,14 +54,15 @@ class RealAUWorker(au_worker.AUWorker):
     test_directory, _ = self.GetNextResultsPath('autotest_tests')
     if not test: test = self.verify_suite
 
-    result = cros_build_lib.RunCommand(
-        ['test_that',
-         '--no-quickmerge',
-         '--results_dir=%s' % test_directory,
-         self.remote,
-         test
-        ], error_code_ok=True, enter_chroot=True, redirect_stdout=True,
-        cwd=constants.CROSUTILS_DIR)
+    cmd = ['test_that', '--no-quickmerge', '--results_dir=%s' % test_directory,
+           self.remote, test]
+    if self.ssh_private_key is not None:
+      cmd.append('--ssh_private_key=%s' % self.ssh_private_key)
+
+    result = cros_build_lib.RunCommand(cmd, error_code_ok=True,
+                                       enter_chroot=True, redirect_stdout=True,
+                                       cwd=constants.CROSUTILS_DIR)
+
     return self.AssertEnoughTestsPassed(unittest, result.output,
                                         percent_required_to_pass)
 
