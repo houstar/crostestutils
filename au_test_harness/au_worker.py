@@ -15,6 +15,7 @@ import os
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
+from chromite.lib import path_util
 from crostestutils.au_test_harness import update_exception
 
 
@@ -39,8 +40,11 @@ class AUWorker(object):
     else:
       self.verify_suite = 'suite:%s' % (options.verify_suite_name or 'smoke')
 
-    # An optional ssh private key for testing.
+    # An optional ssh private key for testing. This path is going to be used by
+    # test_that, so it has to a valid chroot path.
     self.ssh_private_key = options.ssh_private_key
+    if self.ssh_private_key:
+      self.ssh_private_key = path_util.ToChrootPath(self.ssh_private_key)
 
   def CleanUp(self):
     """Called at the end of every test."""

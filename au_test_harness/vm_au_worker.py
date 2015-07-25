@@ -176,8 +176,8 @@ class VMAUWorker(au_worker.AUWorker):
     if self.whitelist_chrome_crashes:
       command.append('--whitelist_chrome_crashes')
     if self.ssh_private_key is not None:
-      logging.warning('Flag "--ssh_private_key" set but not yet supported for '
-                      '"VMAUWorker". Default test key will be used.')
+      command.append('--ssh_private_key=%s' % self.ssh_private_key)
+
     self.TestInfo('Running smoke suite to verify image.')
     result = cros_build_lib.RunCommand(
         command, print_cmd=False, combine_stdout_stderr=True,

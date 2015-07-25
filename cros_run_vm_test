@@ -25,6 +25,8 @@ DEFINE_boolean use_emerged ${FLAGS_FALSE} \
 DEFINE_integer verbose 1 "{0,1,2} Max verbosity shows autoserv debug output." v
 DEFINE_boolean whitelist_chrome_crashes ${FLAGS_FALSE} \
     "Treat Chrome crashes as non-fatal."
+DEFINE_string ssh_private_key "" \
+    "Path to the private key to use to ssh into test image as the root user."
 
 set -e
 
@@ -78,6 +80,13 @@ fi
 if [ -n "${FLAGS_args}" ]; then
   test_args+=( "--args" )
   test_args+=( "${FLAGS_args}" )
+fi
+
+if [ -n "${FLAGS_ssh_private_key}" ]; then
+  test_args+=(
+    "--ssh_private_key"
+    "${FLAGS_ssh_private_key}"
+  )
 fi
 
 trap stop_kvm EXIT
