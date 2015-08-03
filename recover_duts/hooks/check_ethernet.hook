@@ -56,13 +56,15 @@ find_ethernet_interfaces() {
   local device
   local driver
 
-  for device_path in /sys/class/net/eth*; do
-    driver_path="${device_path}/device/driver"
-    if [ -e "${driver_path}" ]; then
-      device=$(basename "${device_path}")
-      driver=$(basename $(readlink -f "${driver_path}"))
-      if ! is_non_ethernet_driver "${driver}" || is_connected "${device}" ; then
-        echo "${device}"
+  for device_path in /sys/class/net/{eth,wan,lan,usbeth}*; do
+    if [ -e "${device_path}" ]; then
+      driver_path="${device_path}/device/driver"
+      if [ -e "${driver_path}" ]; then
+        device=$(basename "${device_path}")
+        driver=$(basename $(readlink -f "${driver_path}"))
+        if ! is_non_ethernet_driver "${driver}" || is_connected "${device}" ; then
+          echo "${device}"
+        fi
       fi
     fi
   done
@@ -70,9 +72,11 @@ find_ethernet_interfaces() {
 
 # Shows the list of USB-Ethernet interfaces found on the system.
 find_usb_ethernet_interfaces() {
-  for device_path in /sys/class/net/eth*; do
-    if readlink -f "${device_path}" | grep -q usb; then
-      basename "${device_path}"
+  for device_path in /sys/class/net/{eth,wan,lan,usbeth}*; do
+    if [ -e "${device_path}" ]; then
+      if readlink -f "${device_path}" | grep -q usb; then
+        basename "${device_path}"
+      fi
     fi
   done
 }
