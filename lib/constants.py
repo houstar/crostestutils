@@ -19,5 +19,9 @@ CROSUTILS_LIB_DIR = os.path.join(CROSUTILS_DIR, 'lib')
 
 MAX_TIMEOUT_SECONDS = 4800
 
-GCE_PROJECT = 'chromiumos-gce-testlab'
-GCE_ZONE = 'us-central1-a'
+# Information of the GCE autotest bots.
+GCE_PROJECT = 'cros-autotest-bots'
+GCE_DEFAULT_ZONE = 'us-central1-a'
+GCE_DEFAULT_NETWORK = 'network-prod'
+GCE_JSON_KEY = '/creds/service_accounts/service-account-cros-autotest-bots.json'
+GCS_BUCKET = 'chromeos-test-gce-tarballs'

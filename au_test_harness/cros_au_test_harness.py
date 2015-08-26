@@ -28,7 +28,6 @@ sys.path.append(constants.SOURCE_ROOT)
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
 from chromite.lib import dev_server_wrapper
-from chromite.lib import gs
 from chromite.lib import parallel
 from chromite.lib import sudo
 from chromite.lib import timeout_util
@@ -125,26 +124,18 @@ def CheckOptions(parser, options, leftover_args):
     leftover_args: Args left after parsing.
   """
 
-  _IMAGE_PATH_REQUIREMENT = ('For vm and real types, the image must be a local '
-                             'file. For gce, the image path has to be a valid '
-                             'Google Cloud Storage URI.')
-
   if leftover_args: parser.error('Found unsupported flags ' + leftover_args)
   if not options.type in ['real', 'vm', 'gce']:
     parser.error('Failed to specify valid test type.')
 
   def _IsValidImage(image):
     """Asserts that |image_path| is a valid image file for |options.type|."""
-    if not image:
-      return False
-    return (gs.PathIsGs(image) if options.type == 'gce' else
-            os.path.isfile(image))
+    return (image is not None) and os.path.isfile(image)
 
   if not _IsValidImage(options.target_image):
     parser.error('Testing requires a valid target image.\n'
-                 '%s\n'
                  'Given: type=%s, target_image=%s.' %
-                 (_IMAGE_PATH_REQUIREMENT, options.type, options.target_image))
+                 (options.type, options.target_image))
 
   if not options.base_image:
     logging.info('No base image supplied.  Using target as base image.')
@@ -152,9 +143,8 @@ def CheckOptions(parser, options, leftover_args):
 
   if not _IsValidImage(options.base_image):
     parser.error('Testing requires a valid base image.\n'
-                 '%s\n'
                  'Given: type=%s, base_image=%s.' %
-                 (_IMAGE_PATH_REQUIREMENT, options.type, options.base_image))
+                 (options.type, options.base_image))
 
   if (options.payload_signing_key and not
       os.path.isfile(options.payload_signing_key)):
