@@ -14,6 +14,7 @@ from multiprocessing import Process
 from chromite.compute import gcloud
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
+from chromite.lib import path_util
 from crostestutils.au_test_harness import au_worker
 from crostestutils.au_test_harness import constants
 from crostestutils.au_test_harness import update_exception
@@ -82,7 +83,7 @@ class GCEAUWorker(au_worker.AUWorker):
     return self.PrepareRealBase(image_path, signed_base)
 
   def UpdateImage(self, image_path, src_image_path='', stateful_change='old',
-                  proxy_port=None, private_key_path=None):
+                  proxy_port=None, payload_signing_key=None):
     """Updates the image on a GCE instance.
 
     Unlike real_au_worker, this method always creates a new instance. Note that
@@ -117,7 +118,8 @@ class GCEAUWorker(au_worker.AUWorker):
     cmd = ['test_that', '--no-quickmerge', '--results_dir=%s' % test_directory,
            self.instance_ip, test]
     if self.ssh_private_key is not None:
-      cmd.append('--ssh_private_key=%s' % self.ssh_private_key)
+      cmd.append('--ssh_private_key=%s' %
+                 path_util.ToChrootPath(self.ssh_private_key))
 
     result = cros_build_lib.RunCommand(cmd, error_code_ok=True,
                                        enter_chroot=True, redirect_stdout=True,

@@ -6,6 +6,7 @@
 
 import constants
 from chromite.lib import cros_build_lib
+from chromite.lib import path_util
 from crostestutils.au_test_harness import au_worker
 
 
@@ -57,7 +58,8 @@ class RealAUWorker(au_worker.AUWorker):
     cmd = ['test_that', '--no-quickmerge', '--results_dir=%s' % test_directory,
            self.remote, test]
     if self.ssh_private_key is not None:
-      cmd.append('--ssh_private_key=%s' % self.ssh_private_key)
+      cmd.append('--ssh_private_key=%s' %
+                 path_util.ToChrootPath(self.ssh_private_key))
 
     result = cros_build_lib.RunCommand(cmd, error_code_ok=True,
                                        enter_chroot=True, redirect_stdout=True,
