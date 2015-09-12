@@ -13,6 +13,7 @@ if [ ! -f /mnt/stateful_partition/.labmachine ]; then
 fi
 
 NON_ETHERNET_DRIVERS="cdc_ether"
+SHILL_START_LOCK_PATH="/var/lock/shill-start.lock"
 
 # Critical messages should be sent to /var/log/messages.  Other messages should
 # be sent via echo to be harvested by recover_duts.py.
@@ -135,6 +136,14 @@ toggle_ethernet_interfaces() {
 }
 
 restart_connection_manager() {
+  # NB: -e will fail on a dangling symlink. That's deliberate. The
+  # symlink should point at /proc/<locker's PID>. And if that path is
+  # gone, the locker has exited, and the lock is stale.
+  if [ -e "${SHILL_START_LOCK_PATH}" ]; then
+    lock_holder=$(readlink "${SHILL_START_LOCK_PATH}")
+    echo "Ignoring restart request; lock held by $lock_holder"
+    return 1
+  fi
   initctl stop shill || echo "Shill was not running."
   initctl start shill
 }
