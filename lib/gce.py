@@ -10,14 +10,11 @@ Google API fails, or gce.Error on other failures.
 
 from __future__ import print_function
 
-import json
-
 from chromite.lib import cros_logging as logging
 from chromite.lib import timeout_util
 from googleapiclient.discovery import build
 from googleapiclient import errors
-from oauth2client.client import SERVICE_ACCOUNT
-from oauth2client.service_account import _ServiceAccountCredentials
+from oauth2client.client import GoogleCredentials
 
 
 class Error(Exception):
@@ -43,7 +40,7 @@ class GceGoogleApiError(Error):
     self.error = error
 
   def __str__(self):
-    return ('GCE API failure. %s: %s' % (type(self.error), str(self.error)))
+    return 'GCE API failure. %s: %s' % (type(self.error), str(self.error))
 
 
 class GceContext(object):
@@ -87,22 +84,8 @@ class GceContext(object):
     Returns:
       GceContext.
     """
-    with open(json_key_file) as keyfile:
-      service_account_info = json.load(keyfile)
-
-    account_type = service_account_info.get('type')
-    if account_type != SERVICE_ACCOUNT:
-        raise CredentialsError(
-            'Invalid service account credentials: %s' % (json_key_file))
-    # pylint: disable=protected-access
-    credentials = _ServiceAccountCredentials(
-        service_account_id=service_account_info['client_id'],
-        service_account_email=service_account_info['client_email'],
-        private_key_id=service_account_info['private_key_id'],
-        private_key_pkcs8_text=service_account_info['private_key'],
-        scopes=cls.GCE_SCOPES)
-    # pylint: enable=protected-access
-
+    credentials = GoogleCredentials.from_stream(json_key_file).create_scoped(
+        cls.GCE_SCOPES)
     return GceContext(project, zone, network, credentials)
 
   def CreateInstance(self, name, image, machine_type=DEFAULT_MACHINE_TYPE,
