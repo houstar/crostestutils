@@ -1,13 +1,16 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # Copyright (c) 2013 The Chromium OS Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Transporter copies logs file to GS storage.
+"""Transporter copies log files to GS storage.
 
-# Must be a member of "chromiumos-test-logs-ninja" group or will get
-# "Access Denied" error from gsutil.
+Must be a member of "chromiumos-test-logs-ninja" group or will get
+"Access Denied" error from gsutil.
 
+"""
+
+from __future__ import print_function
 import argparse
 import os
 
@@ -40,7 +43,7 @@ def main():
   arguments = parser.parse_args()
 
   if [arguments.broadcom, arguments.imgtech,
-      arguments.intel, arguments.marvell].count(True) > 1
+      arguments.intel, arguments.marvell].count(True) > 1:
     print('Error: logs can be uploaded only for one partner.')
     return 1
 
