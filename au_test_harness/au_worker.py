@@ -231,7 +231,7 @@ class AUWorker(object):
     Returns:
       percent that passed.
     """
-    percent_passed = self._ParseGenerateTestReportOutput(output)
+    percent_passed = self.ParseGeneratedTestOutput(output)
     self.TestInfo('Percent passed: %d vs. Percent required: %d' % (
         percent_passed, percent_required_to_pass))
     if percent_passed < percent_required_to_pass:
@@ -290,9 +290,7 @@ class AUWorker(object):
 
     return results_dir, fail_dir
 
-  # --- PRIVATE HELPER FUNCTIONS ---
-
-  def _ParseGenerateTestReportOutput(self, output):
+  def ParseGeneratedTestOutput(self, output):
     """Returns the percentage of tests that passed based on output.
 
     Args:

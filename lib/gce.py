@@ -10,9 +10,12 @@ Google API fails, or gce.Error on other failures.
 
 from __future__ import print_function
 
+import httplib2
+
 from chromite.lib import cros_logging as logging
 from chromite.lib import timeout_util
 from googleapiclient.discovery import build
+from googleapiclient.http import HttpRequest
 from googleapiclient import errors
 from oauth2client.client import GoogleCredentials
 
@@ -54,22 +57,38 @@ class GceContext(object):
   DEFAULT_MACHINE_TYPE = 'n1-standard-8'
   DEFAULT_TIMEOUT_SEC = 5 * 60
 
-  def __init__(self, project, zone, network, credentials):
+  def __init__(self, project, zone, network, machine_type, credentials,
+               thread_safe=False):
     """Initializes GceContext.
 
     Args:
       project: The GCP project to create instances in.
       zone: The default zone to create instances in.
       network: The default network to create instances in.
+      machine_type: The default machine type to use.
       credentials: The credentials used to call the GCE API.
+      thread_safe: Whether the client is expected to be thread safe.
     """
     self.project = project
     self.zone = zone
     self.network = network
-    self.gce_client = build('compute', 'v1', credentials=credentials)
+    self.machine_type = machine_type
+
+    def BuildRequest(_, *args, **kwargs):
+      """Create a new Http() object for every request."""
+      http = httplib2.Http()
+      http = credentials.authorize(http)
+      return HttpRequest(http, *args, **kwargs)
+
+    if thread_safe:
+      self.gce_client = build('compute', 'v1', credentials=credentials,
+                              requestBuilder=BuildRequest)
+    else:
+      self.gce_client = build('compute', 'v1', credentials=credentials)
 
   @classmethod
-  def ForServiceAccount(cls, project, zone, network, json_key_file):
+  def ForServiceAccount(cls, project, zone, network, machine_type,
+                        json_key_file):
     """Creates a GceContext using service account credentials.
 
     About service account:
@@ -79,6 +98,7 @@ class GceContext(object):
       project: The GCP project to create images and instances in.
       zone: The default zone to create instances in.
       network: The default network to create instances in.
+      machine_type: The default machine type to use.
       json_key_file: Path to the service account JSON key.
 
     Returns:
@@ -86,10 +106,33 @@ class GceContext(object):
     """
     credentials = GoogleCredentials.from_stream(json_key_file).create_scoped(
         cls.GCE_SCOPES)
-    return GceContext(project, zone, network, credentials)
+    return GceContext(project, zone, network, machine_type, credentials)
 
-  def CreateInstance(self, name, image, machine_type=DEFAULT_MACHINE_TYPE,
-                     network=None, zone=None):
+  @classmethod
+  def ForServiceAccountThreadSafe(cls, project, zone, network, machine_type,
+                                  json_key_file):
+    """Creates a thread-safe GceContext using service account credentials.
+
+    About service account:
+    https://developers.google.com/api-client-library/python/auth/service-accounts
+
+    Args:
+      project: The GCP project to create images and instances in.
+      zone: The default zone to create instances in.
+      network: The default network to create instances in.
+      machine_type: The default machine type to use.
+      json_key_file: Path to the service account JSON key.
+
+    Returns:
+      GceContext.
+    """
+    credentials = GoogleCredentials.from_stream(json_key_file).create_scoped(
+        cls.GCE_SCOPES)
+    return GceContext(project, zone, network, machine_type, credentials,
+                      thread_safe=True)
+
+  def CreateInstance(self, name, image, machine_type=None, network=None,
+                     zone=None, **kwargs):
     """Creates an instance with the given image and waits until it's ready.
 
     Args:
@@ -106,14 +149,22 @@ class GceContext(object):
       zone:
         The zone to create the instance in. Default zone will be used if
         omitted.
+      kwargs:
+        Other possible Instance Resource properties.
+        https://cloud.google.com/compute/docs/reference/latest/instances#resource
 
     Returns:
       URL to the created instance.
     """
+    machine_type = 'zones/%s/machineTypes/%s' % (
+        zone or self.zone, machine_type or self.machine_type)
+    # Allow machineType overriding.
+    if 'machineType' in kwargs.keys():
+      machine_type = kwargs['machineType']
+
     config = {
         'name': name,
-        'machineType': 'zones/%s/machineTypes/%s' % (zone or self.zone,
-                                                     machine_type),
+        'machineType': machine_type,
         'disks': [
             {
                 'boot': True,
@@ -132,6 +183,7 @@ class GceContext(object):
                 }
             ]
         }
+    config.update(**kwargs)
     operation = self.gce_client.instances().insert(
         project=self.project,
         zone=zone or self.zone,
@@ -226,7 +278,6 @@ class GceContext(object):
       return result['networkInterfaces'][0]['accessConfigs'][0]['natIP']
     except (KeyError, IndexError):
       raise Error('Failed to get IP address for instance %s' % instance)
-
 
   def _WaitForZoneOperation(self, operation, zone=None, timeout_handler=None):
     get_request = self.gce_client.zoneOperations().get(
