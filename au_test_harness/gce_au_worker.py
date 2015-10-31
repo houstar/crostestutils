@@ -132,18 +132,10 @@ class GCEAUWorker(au_worker.AUWorker):
 
   def CleanUp(self):
     """Deletes throw-away instances and images."""
-    logging.info('Waiting for all instances and images to be deleted.')
-
-    def _WaitForBackgroundDeleteProcesses():
-      for p in self.bg_delete_processes:
-        p.join()
-      self.bg_delete_processes = []
-
-    _WaitForBackgroundDeleteProcesses()
-    # Delete the instance/image created by the last call to UpdateImage.
-    self._DeleteInstancesIfExist()
-    _WaitForBackgroundDeleteProcesses()
-    logging.info('All instances/images are deleted.')
+    logging.info('Waiting for GCP resources to be deleted.')
+    self._WaitForBackgroundDeleteProcesses()
+    self._DeleteExistingResources()
+    logging.info('All resources are deleted.')
 
   def PrepareBase(self, image_path, signed_base=False):
     """Auto-update to base image to prepare for test."""
@@ -155,7 +147,16 @@ class GCEAUWorker(au_worker.AUWorker):
 
     There may be multiple instances created with different gcloud flags that
     will be used by different tests or suites.
+
+    Unlike vm_au_worker or real_au_worker, UpdateImage always creates a new
+    image and a new instance.
     """
+    # Delete existing resources in the background if any.
+    bg_delete = Process(target=self._DeleteExistingResources)
+    bg_delete.start()
+    self.bg_delete_processes.append(bg_delete)
+
+    # Creates an image and instances.
     self._CreateImage(image_path)
     self._CreateInstances()
 
@@ -336,15 +337,14 @@ class GCEAUWorker(au_worker.AUWorker):
 
   def _CreateImage(self, image_path):
     """Uploads the gce tarball and creates an image with it."""
-    self.tarball_local = image_path
     log_directory, fail_directory = self.GetNextResultsPath('update')
-    self._DeleteInstancesIfExist()
+
     ts = datetime.datetime.fromtimestamp(time.time()).strftime(
         '%Y-%m-%d-%H-%M-%S')
-    image = '%s%s' % (self.IMAGE_PREFIX, ts)
-    gs_directory = ('gs://%s/%s' % (self.gcs_bucket, ts))
 
     # Upload the GCE tarball to Google Cloud Storage.
+    self.tarball_local = image_path
+    gs_directory = ('gs://%s/%s' % (self.gcs_bucket, ts))
     try:
       self.gscontext.CopyInto(self.tarball_local, gs_directory)
       self.tarball_remote = '%s/%s' % (gs_directory,
@@ -355,6 +355,7 @@ class GCEAUWorker(au_worker.AUWorker):
           'Error: %s' % e)
 
     # Create an image from |image_path| and an instance from the image.
+    image = '%s%s' % (self.IMAGE_PREFIX, ts)
     try:
       self.image_link = self.gce_context.CreateImage(
           image, self._GsPathToUrl(self.tarball_remote))
@@ -377,22 +378,60 @@ class GCEAUWorker(au_worker.AUWorker):
       self.instances[test['name']] = instance
     parallel.RunParallelSteps(steps)
 
-  def _DeleteInstancesIfExist(self):
-    """Deletes existing instances if any."""
-    def _DeleteInstancesAndImage():
-      steps = [
-          lambda: self.gscontext.DoCommand(['rm', self.tarball_remote]),
-          lambda: self.gce_context.DeleteImage(self.image),
-      ]
-      for instance in self.instances.values():
-        steps.append(partial(self.gce_context.DeleteInstance, instance))
-      parallel.RunParallelSteps(steps)
+  def _DeleteExistingResouce(self, resource, existence_checker, deletor):
+    """Deletes a resource if it exists.
 
-    if self.instances:
-      logging.info('Deleting instances...')
-      bg_delete = Process(target=_DeleteInstancesAndImage)
-      bg_delete.start()
-      self.bg_delete_processes.append(bg_delete)
+    This method checks the existence of a resource using |existence_checker|,
+    and deletes it on true.
+
+    Args:
+      resource: (str) The resource name/url to delete.
+      existence_checker:
+        (callable) The callable to check existence. This callable should take
+        |resource| as its first argument.
+      deletor:
+        (callable) The callable to perform the deletion. This callable should
+        take |resource| as its first argument.
+
+    Raises:
+      ValueError if existence_checker or deletor is not callable.
+    """
+    if not hasattr(existence_checker, '__call__'):
+      raise ValueError('existence_checker must be a callable')
+    if not hasattr(deletor, '__call__'):
+      raise ValueError('deletor must be a callable')
+
+    if existence_checker(resource):
+      deletor(resource)
+
+  def _DeleteExistingResources(self):
+    """Delete instances, image and the tarball on GCS if they exist."""
+    steps = []
+
+    if self.tarball_remote:
+      steps.append(partial(self.gscontext.DoCommand,
+                           ['rm', self.tarball_remote]))
+    if self.image:
+      steps.append(partial(self.gce_context.DeleteImage, self.image))
+
+    for instance in self.instances.values():
+      steps.append(partial(
+          self._DeleteExistingResouce,
+          resource=instance,
+          existence_checker=self.gce_context.InstanceExists,
+          deletor=self.gce_context.DeleteInstance))
+
+    # Delete all resources in parallel.
+    try:
+      parallel.RunParallelSteps(steps)
+    except Exception as e:
+      logging.warn('Infrastructure failure. Error: %r' % e)
+
+    # Reset variables.
+    self.tarball_remote = None
+    self.image = None
+    self.image_link = None
+    self.instances = {}
 
   def _HandleFail(self, log_directory, fail_directory):
     """Handles test failures.
@@ -424,7 +463,7 @@ class GCEAUWorker(au_worker.AUWorker):
     except shutil.Error as e:
       logging.warning('Ignoring errors while copying GCE tarball: %s', e)
 
-    self._DeleteInstancesIfExist()
+    self._DeleteExistingResources()
 
   def _GsPathToUrl(self, gs_path):
     """Converts a gs:// path to a URL.
@@ -444,3 +483,9 @@ class GCEAUWorker(au_worker.AUWorker):
       raise ValueError('Invalid GCS path: %s' % gs_path)
     return gs_path.replace(self.GS_PATH_COMMON_PREFIX,
                            self.GS_URL_COMMON_PREFIX, 1)
+
+  def _WaitForBackgroundDeleteProcesses(self):
+    """Waits for all background proecesses to finish."""
+    for p in self.bg_delete_processes:
+      p.join()
+    self.bg_delete_processes = []

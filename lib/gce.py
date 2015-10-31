@@ -264,20 +264,80 @@ class GceContext(object):
     except KeyError:
       return []
 
+  def GetInstance(self, instance, zone=None):
+    """Gets an Instance Resource by name and zone.
+
+    Args:
+      instance: Name of the instance.
+      zone: Zone where the instance is in. Default zone will be used if omitted.
+
+    Returns:
+      An Instance Resource.
+    """
+    result = self.gce_client.instances().get(project=self.project,
+                                             zone=zone or self.zone,
+                                             instance=instance).execute()
+    return result
+
   def GetInstanceIP(self, instance, zone=None):
     """Gets the external IP of an instance.
 
     Args:
       instance: Name of the instance to get IP for.
       zone: Zone where the instance is in. Default zone will be used if omitted.
+
+    Returns:
+      External IP address of the instance.
+
+    Raises:
+      gce.Error on failures.
     """
-    result = self.gce_client.instances().get(project=self.project,
-                                             zone=zone or self.zone,
-                                             instance=instance).execute()
+    result = self.GetInstance(instance, zone)
+    if not result:
+      raise Error('Instance %s does not exist in zone %s.'
+                  % (instance, zone or self.zone))
     try:
       return result['networkInterfaces'][0]['accessConfigs'][0]['natIP']
     except (KeyError, IndexError):
       raise Error('Failed to get IP address for instance %s' % instance)
+
+  def GetImage(self, image):
+    """Gets an Image Resource by name.
+
+    Args:
+      image: Name of the image to look for.
+
+    Returns:
+      An Image Resource.
+    """
+    result = self.gce_client.images().get(project=self.project,
+                                          image=image).execute()
+    return result
+
+  def InstanceExists(self, instance, zone=None):
+    """Checks if an instance exists in the current project.
+
+    Args:
+      instance: Name of the instance to check existence of.  zone: Zone where
+      the instance is in. Default zone will be used if omitted.
+
+    Returns:
+      True if the instance exists or False otherwise.
+    """
+    result = self.GetInstance(instance, zone)
+    return (result is not None)
+
+  def ImageExists(self, image):
+    """Checks if an image exists in the current project.
+
+    Args:
+      instance: Name of the image to check existence of.
+
+    Returns:
+      True if the instance exists or False otherwise.
+    """
+    result = self.GetImage(image)
+    return (result is not None)
 
   def _WaitForZoneOperation(self, operation, zone=None, timeout_handler=None):
     get_request = self.gce_client.zoneOperations().get(

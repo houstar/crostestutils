@@ -245,43 +245,93 @@ class GceAuWorkerTest(cros_test_lib.MockTempDirTestCase):
       self.assertIn(test, actual_tests_run)
 
   def testCleanUp(self):
-    """Tests that CleanUp deletes all instances and doesn't leak processes."""
+    """Tests that CleanUp deletes all GCS/GCE resources."""
     worker = GCEAUWorker(self.options, self.test_results_root,
                          project=self.PROJECT, zone=self.ZONE,
                          network=self.NETWORK, gcs_bucket=self.BUCKET,
                          json_key_file=self.json_key_file)
-    for cmd in ['CopyInto', 'DoCommand']:
-      self.PatchObject(worker.gscontext, cmd, autospec=True)
+    worker.instances = dict(smoke='fake-instance')
+    worker.image = 'fake-image'
+    worker.tarball_remote = 'gs://fake-tarball'
 
-    self.PatchObject(worker.gce_context, 'DeleteInstance', autospec=True)
+    # Fake resource existance.
+    self.PatchObject(worker.gce_context, 'InstanceExists', autospec=True,
+                     return_value=True)
 
-    for _ in range(3):
-      worker.UpdateImage(self.image_path)
-    self.assertEqual(len(worker.bg_delete_processes), 2)
+    # Fake resource deletors.
+    for cmd in ['DeleteImage', 'DeleteInstance']:
+      self.PatchObject(worker.gce_context, cmd, autospec=True)
+    self.PatchObject(worker.gscontext, 'DoCommand', autospec=True)
 
     worker.CleanUp()
-    self.assertEqual(len(worker.bg_delete_processes), 0)
+
+    # Assert that existing resources are cleaned up.
+    worker.gce_context.DeleteImage.assert_called_once_with('fake-image')
+    worker.gce_context.DeleteInstance.assert_called_once_with('fake-instance')
+    self.assertDictEqual({}, worker.instances)
+    self.assertIsNone(worker.image)
+    self.assertIsNone(worker.tarball_remote)
 
   def testHandleFail(self):
-    """Tests that _HandleFail copies necessary files for repro."""
+    """Tests that _HandleFail copies necessary files for repro.
+
+    In case of a test failure, _HandleFail should copy necessary files to a
+    debug location, and delete existing GCS/GCE resources. And because of the
+    latter, a final call to Cleanup will not make an additional attempt to
+    delete those resources.
+    """
     worker = GCEAUWorker(self.options, self.test_results_root,
                          project=self.PROJECT, zone=self.ZONE,
                          network=self.NETWORK, gcs_bucket=self.BUCKET,
                          json_key_file=self.json_key_file)
+
+    worker.instances = dict(smoke='fake-instance')
+    worker.image = 'fake-image'
+    worker.tarball_local = self.image_path
+    worker.tarball_remote = 'gs://fake-tarball'
+    worker.tests = [dict(name='smoke', flags=dict())]
+
+    # Fake general commands.
     for cmd in ['CopyInto', 'DoCommand']:
       self.PatchObject(worker.gscontext, cmd, autospec=True)
     self.PatchObject(cros_build_lib, 'RunCommand', autospec=True)
-    self.PatchObject(worker, '_DeleteInstancesIfExist', autospec=True)
     self.PatchObject(path_util, 'ToChrootPath', autospec=True,
                      return_value='x/y/z')
+
+    # Make _RunTest return 0% of pass rate.
     self.PatchObject(worker, '_RunTest', autospec=True,
                      return_value=(0, None, None))
-    worker.UpdateImage(self.image_path)
+
+    # Fake resource existance.
+    remote_instance = 'fake-remote-instance'
+    self.PatchObject(worker.gce_context, 'InstanceExists', autospec=True,
+                     side_effect=lambda instance: remote_instance is not None)
+
+    # Fake resource deletors.
+    self.PatchObject(worker.gce_context, 'DeleteImage', autospec=True)
+    # Make DeleteInstance delete the remote resource.
+    def _OverrideDeleteInstance(_):
+      remote_instance = None
+    self.PatchObject(worker.gce_context, 'DeleteInstance', autospec=True,
+                     side_effect=_OverrideDeleteInstance)
+
+    # VerifyImage should fail and _HandleFail should be called.
     worker.VerifyImage(None)
+
+    # Assert that required files are retained at debug location.
     self.assertExists(os.path.join(self.test_results_failed, self.GCE_TARBALL))
     self.assertExists(os.path.join(
         self.test_results_failed,
         os.path.basename(self.options.ssh_private_key)))
+
+    # CleanUp will not attempt to delete resources because they should have been
+    # deleted by _HandleFail.
+    worker.instances = dict(smoke='fake-instance')
+    worker.CleanUp()
+
+    # Assert that one and only one attempt was made to delete existing
+    # instances.
+    worker.gce_context.DeleteInstance.assert_called_once_with(mock.ANY)
 
 
 if __name__ == '__main__':
