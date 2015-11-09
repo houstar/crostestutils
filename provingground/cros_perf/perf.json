@@ -50,6 +50,14 @@
             "masters": "ChromeOSVideo"
         },
         {
+            "test_name": "power_LoadTest.WIFI_1hr/minutes_battery_life",
+            "masters": "ChromeOSPower"
+        },
+        {
+            "test_name": "power_LoadTest.WIRED_1hr/minutes_battery_life",
+            "masters": "ChromeOSPower"
+        },
+        {
             "test_name": "power_Resume/system_suspend",
             "masters": "ChromeOSPower"
         },
