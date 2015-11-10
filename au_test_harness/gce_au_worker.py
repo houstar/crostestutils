@@ -73,6 +73,7 @@ from multiprocessing import Process
 
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_logging as logging
+from chromite.lib import gce
 from chromite.lib import gs
 from chromite.lib import parallel
 from chromite.lib import path_util
@@ -80,7 +81,6 @@ from chromite.lib import portage_util
 from crostestutils.au_test_harness import au_worker
 from crostestutils.au_test_harness import constants
 from crostestutils.au_test_harness import update_exception
-from crostestutils.lib import gce
 
 
 class GCEAUWorker(au_worker.AUWorker):
@@ -89,6 +89,8 @@ class GCEAUWorker(au_worker.AUWorker):
   Attributes:
     gce_context: An utility for GCE operations.
     gscontext: An utility for GCS operations.
+    network: Default network to create instances in.
+    machine_type: Default machine type to create instances with.
     gcs_bucket: The GCS bucket to upload image tarballs to.
     tarball_local: Local path to the tarball of test image.
     tarball_remote: GCS path to the tarball of test image.
@@ -114,8 +116,10 @@ class GCEAUWorker(au_worker.AUWorker):
     """Processes GCE-specific options."""
     super(GCEAUWorker, self).__init__(options, test_results_root)
     self.gce_context = gce.GceContext.ForServiceAccountThreadSafe(
-        project, zone, network, machine_type, json_key_file=json_key_file)
+        project, zone, json_key_file=json_key_file)
     self.gscontext = gs.GSContext()
+    self.network = network
+    self.machine_type = machine_type
     self.gcs_bucket = gcs_bucket
     self.tarball_local = None
     self.tarball_remote = None
@@ -374,7 +378,8 @@ class GCEAUWorker(au_worker.AUWorker):
       kwargs = test['flags'].copy()
       kwargs['description'] = 'For test %s' % test['name']
       steps.append(partial(self.gce_context.CreateInstance, instance,
-                           self.image_link, **kwargs))
+                           self.image_link, network=self.network,
+                           machine_type=self.machine_type, **kwargs))
       self.instances[test['name']] = instance
     parallel.RunParallelSteps(steps)
 

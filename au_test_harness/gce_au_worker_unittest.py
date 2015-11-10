@@ -17,6 +17,7 @@ import constants
 sys.path.append(constants.CROS_PLATFORM_ROOT)
 sys.path.append(constants.SOURCE_ROOT)
 
+from chromite.lib.gce import GceContext
 from chromite.lib import cros_build_lib
 from chromite.lib import cros_test_lib
 from chromite.lib import osutils
@@ -25,7 +26,6 @@ from chromite.lib import path_util
 from chromite.lib import portage_util
 from crostestutils.au_test_harness.au_worker import AUWorker
 from crostestutils.au_test_harness.gce_au_worker import GCEAUWorker
-from crostestutils.lib.gce import GceContext
 
 
 class Options(object):
