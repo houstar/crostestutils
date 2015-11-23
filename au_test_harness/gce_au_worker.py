@@ -412,10 +412,10 @@ class GCEAUWorker(au_worker.AUWorker):
   def _CreateInstances(self):
     """Creates instances with custom flags as specificed in |self.tests|."""
     steps = []
-    for test in self.tests:
+    for i, test in enumerate(self.tests):
       ts = datetime.datetime.fromtimestamp(time.time()).strftime(
           '%Y-%m-%d-%H-%M-%S')
-      instance = '%s%s' % (self._INSTANCE_PREFIX, ts)
+      instance = '%s%s-%d' % (self._INSTANCE_PREFIX, ts, i)
       kwargs = test['flags'].copy()
       kwargs['description'] = 'For test %s' % test['name']
       steps.append(partial(self._CreateInstance, instance,
