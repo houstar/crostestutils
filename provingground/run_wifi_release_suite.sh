@@ -44,19 +44,22 @@ list_7=(falco_li tricky)
 
 # intel wilkins peak 2 on kernel 3.10
 list_8=(squawks expresso clapper glimmer quawks enguarde kip squawks gnawty
-        swanky winky candy orco sumo ninja banjo)
+        swanky winky candy orco sumo ninja banjo heli)
 
 # intel wilkins peak 2 on kernel 3.14
-list_9=(samus auron_paine auron_yuna guado tidus rikku lulu)
+list_9=(samus auron_paine auron_yuna guado tidus rikku lulu gandof)
 
 # Broadcom 4354 on kernel 3.14
-list_10=(veyron_speedy veyron_minnie)
+list_10=(veyron_speedy veyron_minnie veyron_mickey)
 
 # Marvell 8897 on kernel 3.14
 list_11=(veyron_mighty veyron_jaq veyron_jerry)
 
+# Intel Stonepeak2 on kernel 3.18
+list_12=(cyan celes glados)
+
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9
-                list_10 list_11)
+                list_10 list_11 list_12)
 
 # POOLS format: POOLS[<pool name>]=<suite name>
 declare -A POOLS
