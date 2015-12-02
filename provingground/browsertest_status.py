@@ -3,22 +3,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# Script to display latest test run status and test results for a user-
-# specified list of browsertests. The names of the desired browertests are
-# read from a file located (by default) in the same directory as this script.
+# Script to display latest test run status for a user-specified list of
+# browsertests. The names of the desired browertests are read from a file
+# located (by default) in the same directory as this script.
 #
 # Latest test run status for a build is fetched from the builder, read from
 # the 'stdio' text file located at:
 #   http://BUILDER_HOST/p/BUILDER_PROJECT/builders/BUILDER_NAME/
 #   builds/BUILD_NUMBER/steps/TEST_TYPE/logs/stdio/text
 #
-# Recent test results history are fetched from the test-results server, read
-# from the results.json file located at:
-#   https://TR_HOST/testfile?master=TR_MASTER&builder=BUILDER_NAME
-#   &testtype=TEST_TYPE&name=results.json
-#
 
-"""Script to report test status and results of user-specified browsertests."""
+"""Script to report test status of user-specified browsertests."""
 
 from __future__ import print_function
 
@@ -38,36 +33,18 @@ _BUILDER_NAME = 'Linux ChromeOS Buildspec Tests'  # Builder name.
 _BUILD_NUMBER = -1
 _TEST_TYPE = 'browser_tests'
 
-# Test-results server url parameter defaults.
-_TR_HOST = 'test-results.appspot.com'  # Host name of test-results server.
-_TR_MASTER = 'ChromiumChromiumOS'  # Project master of test-results server.
-
 # Input file and report directory parameter defaults.
 _TESTS_FILE = './tests'  # Path to the file that contains the tests names.
 _REPORT_DIR = os.getcwd()  # Path to the directory to store the results report.
 
-# Contents of test result types.
-_RESULT_TYPES = {
-    'A': 'AUDIO',
-    'C': 'CRASH',
-    'F': 'TEXT',
-    'I': 'IMAGE',
-    'L': 'FLAKY',
-    'O': 'MISSING',
-    'N': 'NO DATA',
-    'Q': 'FAIL',
-    'P': 'PASS',
-    'T': 'TIMEOUT',
-    'Y': 'NOTRUN',
-    'X': 'SKIP',
-    'Z': 'IMAGE+TEXT'
-    }
+# Test result types.
+_FAIL = 'Fail'
+_PASS = 'Pass'
 
 # Report header result types.
 _NOTRUN = 'NotRun'
 _FAILED = 'Failed'
 _PASSED = 'Passed'
-_MISSING = 'Missing'
 
 
 def _GetUserSpecifiedTests(tests_file):
@@ -105,15 +82,21 @@ def _GetBuildsList(build_dict):
     List of builds available on builder.
   """
   # Generate percent-encoded builder url.
-  builder_url = ('https://%s/p/%s/json/builders/%s' %
-                 (urllib2.quote(build_dict['builder_host']),
-                  urllib2.quote(build_dict['builder_proj']),
-                  urllib2.quote(build_dict['builder_name'])))
+  builder_url = (
+      'https://%s/p/%s/builders/%s' %
+      (urllib2.quote(build_dict['builder_host']),
+       urllib2.quote(build_dict['builder_proj']),
+       urllib2.quote(build_dict['builder_name'])))
+  builder_json_url = (
+      'https://%s/p/%s/json/builders/%s' %
+      (urllib2.quote(build_dict['builder_host']),
+       urllib2.quote(build_dict['builder_proj']),
+       urllib2.quote(build_dict['builder_name'])))
 
   # Fetch builder status file from builder url.
   print('\nFetching builder status file from: %s' % builder_url)
   try:
-    response = urllib2.urlopen(builder_url)
+    response = urllib2.urlopen(builder_json_url)
     builder_status_file = response.read()
     response.close()
   except urllib2.HTTPError as err:
@@ -128,26 +111,6 @@ def _GetBuildsList(build_dict):
   build_list = builder_status_dict['cachedBuilds']
   print('\nList of avaiable builds: %s\n' % build_list)
   return build_list
-
-
-def _FindBuildByChromiumVersion(build_dict):
-  """Find the latest completed build with the given chromium version.
-
-  Search from the top of the cached build list for a build with the given
-  chromium |version| number as it's buildspec_version. If found, return the
-  build number. If no build is found containing the |version|, return None.
-
-  Args:
-    build_dict: build info, with chromium version number.
-
-  Returns:
-    Number of most recent build containing the given chromium version.
-  """
-  # TODO(scunningham): Implement real function in later version.
-  cr_version = build_dict['cr_version']
-  if cr_version:
-    pass
-  return _BUILD_NUMBER
 
 
 def _GetNominalBuildNumber(build_num, builds_list):
@@ -180,39 +143,65 @@ def _GetNominalBuildNumber(build_num, builds_list):
   return build_num
 
 
-def _LatestCompletedBuild(build_dict, builds_list):
-  """Find the latest completed build number from the given list of builds.
+def _LatestCompletedBuildByVersion(build_dict, builds_list):
+  """Find latest completed build with chrome version from list of builds.
 
   Check each build in the |builds_list|, starting with the build number in
   the given |build_dict|, to determine if the build completed successfully.
-  If completed successfully, return the number of the build. If not, continue
-  checking. If none of the builds completed successfully, exits.
+  If completed successfully, check to see if it contains the specified
+  version of Chrome. Return the number of the build. If none of the builds
+  completed successfully, or contain the specified Chrome version, exit.
 
   Args:
-    build_dict: build info dictionary, with build number to start search.
+    build_dict: build info dictionary, with build number and version.
     builds_list: List of cached build numbers on the builder.
 
   Returns:
-    Build number of the latest successfully completed build, and the build
-    test status dictionary of that build.
+    Build number of the latest successfully completed build that has the
+    specified version of Chrome, and the build test status dictionary of
+    that build.
   """
   # Find the latest completed build, starting from build_num.
   build_num = build_dict['build_num']
-  starting_build_num = build_num
-  starting_build_num_failed = False
-  starting_build_index = builds_list.index(starting_build_num)
-  for build_num in reversed(builds_list[0:starting_build_index+1]):
+  requested_cr_version = build_dict['cr_version']
+  requested_build_num = build_num
+  requested_build_num_failed = False
+  requested_build_index = builds_list.index(requested_build_num)
+  build_status_dict = None
+  for build_num in reversed(builds_list[0:requested_build_index+1]):
     build_test_status_dict = _BuildIsCompleted(build_dict, build_num)
     if build_test_status_dict is not None:
+      # Found completed build. Check for requested cr_version.
+      if requested_cr_version is not None:
+        # Get build status and Chrome version of the latest completed build.
+        build_status_dict = _GetBuildStatus(build_dict, build_num)
+        build_properties = build_status_dict['properties']
+        build_cr_version = _GetBuildProperty(build_properties,
+                                             'buildspec_version')
+        if build_cr_version == requested_cr_version:
+          break
+        else:
+          continue
       break
-    starting_build_num_failed = True
-  else:
+    requested_build_num_failed = True
+  else:  # loop exhausted list builds.
     print('No completed builds are available.')
     sys.exit(2)
-  if starting_build_num_failed:
-    print('\nError: Requested build_num %s was not completed successfully.' %
-          starting_build_num)
-  print('Using latest successfully completed build: %s\n' % build_num)
+  if requested_build_num_failed:
+    print('Error: Requested build %s was not completed successfully.' %
+          requested_build_num)
+
+  # Get Chrome OS and Chrome versions from the latest completed build.
+  if build_status_dict is None:
+    build_status_dict = _GetBuildStatus(build_dict, build_num)
+  build_properties = build_status_dict['properties']
+  build_cros_branch = _GetBuildProperty(build_properties, 'branch')
+  build_cr_version = _GetBuildProperty(build_properties, 'buildspec_version')
+
+  print('Using latest successfully completed build:')
+  print('  Build Number: %s' % build_num)
+  print('  Chrome OS Version: %s' % build_cros_branch)
+  print('  Chrome Version: %s\n' % build_cr_version)
   return build_num, build_test_status_dict
 
 
@@ -264,78 +253,97 @@ def _GetBuildTestStatus(build_dict):
     Build Test Status dictionary.
   """
   # Generate percent-encoded build test status url.
-  build_url = (('https://%s/p/%s/json/builders/%s/builds?'
-                'select=%s/steps/%s/') %
-               (urllib2.quote(build_dict['builder_host']),
-                urllib2.quote(build_dict['builder_proj']),
-                urllib2.quote(build_dict['builder_name']),
-                build_dict['build_num'],
-                urllib2.quote(build_dict['test_type'])))
-  print('Fetching build test status file from: %s' % build_url)
-  return _FetchStatusFromUrl(build_dict, build_url)
+  build_url = (
+      'https://%s/p/%s/builders/%s/builds/%s' %
+      (urllib2.quote(build_dict['builder_host']),
+       urllib2.quote(build_dict['builder_proj']),
+       urllib2.quote(build_dict['builder_name']),
+       build_dict['build_num']))
+  build_json_url = (
+      'https://%s/p/%s/json/builders/%s/builds?select=%s/steps/%s/' %
+      (urllib2.quote(build_dict['builder_host']),
+       urllib2.quote(build_dict['builder_proj']),
+       urllib2.quote(build_dict['builder_name']),
+       build_dict['build_num'],
+       urllib2.quote(build_dict['test_type'])))
+  print('Fetching build test status file from builder: %s' % build_url)
+  return _FetchStatusFromUrl(build_dict, build_json_url)
 
 
-def _GetBuildStatus(build_dict):
-  """Get the build status for the given build.
+def _GetBuildStatus(build_dict, build_num=None):
+  """Get the build status for the given build number.
 
-  Fetch the build status file from the builder for the build number, specified
-  in the build info dictionary given by |build_dict|.
+  Fetch the build status file from the builder for the given |build_num|.
+  If nominal |build_num| is not given, default to that stored in build_dict.
 
   Args:
     build_dict: Build info dictionary.
+    build_num: Nominal build number.
 
   Returns:
     Build Status dictionary.
   """
+  if build_num is None:
+    build_num = build_dict['build_num']
+
   # Generate percent-encoded build status url.
-  build_url = (('https://%s/p/%s/json/builders/%s/builds/%s') %
-               (urllib2.quote(build_dict['builder_host']),
-                urllib2.quote(build_dict['builder_proj']),
-                urllib2.quote(build_dict['builder_name']),
-                build_dict['build_num']))
-  print('Fetching build status file from: %s' % build_url)
-  return _FetchStatusFromUrl(build_dict, build_url)
+  build_url = (
+      'https://%s/p/%s/builders/%s/builds/%s' %
+      (urllib2.quote(build_dict['builder_host']),
+       urllib2.quote(build_dict['builder_proj']),
+       urllib2.quote(build_dict['builder_name']),
+       build_num))
+  build_url_json = (
+      'https://%s/p/%s/json/builders/%s/builds/%s' %
+      (urllib2.quote(build_dict['builder_host']),
+       urllib2.quote(build_dict['builder_proj']),
+       urllib2.quote(build_dict['builder_name']),
+       build_num))
+  print('Fetching build status file from builder: %s' % build_url)
+  return _FetchStatusFromUrl(build_dict, build_url_json)
 
 
-def _FetchStatusFromUrl(build_dict, build_url):
+def _FetchStatusFromUrl(build_dict, build_url_json):
   """Get the status from the given URL.
 
   Args:
     build_dict: Build info dictionary.
-    build_url: URL to the status json file.
+    build_url_json: URL to the status json file.
 
   Returns:
     Status dictionary.
   """
   # Fetch json status file from build url.
-  hosted_url = _SetUrlHost(build_url, build_dict['builder_host'])
+  hosted_url = _SetUrlHost(build_url_json, build_dict['builder_host'])
   url = urllib2.urlopen(hosted_url)
   status_file = url.read()
   url.close()
 
-  # Convert json status file to dictionary.
-  status_dict = json.loads(status_file)
-  return status_dict
+  # Convert json status file to status dictionary and return.
+  return json.loads(status_file)
 
 
-def _PrintChromiumVersion(build_properties):
-  """Get and print the version number of chromium used in the build.
+def _GetBuildProperty(build_properties, property_name):
+  """Get the specified build property from the build properties dictionary.
+
+  Example property names are Chromium OS Version ('branch'), Chromium OS
+  Version ('buildspec_version'), and GIT Revision ('git_revision').
 
   Args:
     build_properties: The properties dictionary for the build.
+    property_name: The name of the build property.
 
   Returns:
-    A string containing the chromium version.
+    A string containing the property value.
   """
   for property_list in build_properties:
-    if 'buildspec_version' in property_list:
-      chromium_version = property_list[1]
-      print('  Chromium version: %s' % chromium_version)
+    if property_name in property_list:
+      property_value = property_list[1]
       break
   else:
-    chromium_version = None
-    print('  Warning: Build properties has no chromium version.')
-  return chromium_version
+    property_value = None
+    print('  Warning: Build properties has no %s property.' % property_name)
+  return property_value
 
 
 def _GetTestsFailedList(build_dict, build_status_dict):
@@ -382,7 +390,7 @@ def _GetTestsFailedList(build_dict, build_status_dict):
         if m:
           test_failures = m.group(1)
           continue
-      break #  Exit step_dict loop if test_type is in text_list.
+      break  # Exit step_dict loop if test_type is in text_list.
     is_finished = step_dict['isFinished']
   else:
     print('Error: build_steps has no \'%s\' step.' % test_type)
@@ -411,7 +419,6 @@ def _GetStdioLogUrlFromBuildStatus(build_dict, build_test_status_dict):
   Returns:
     Url to the Stdio Log text file.
   """
-
   steps_dict = build_test_status_dict[str(build_dict['build_num'])]['steps']
   test_type_dict = steps_dict[build_dict['test_type']]
 
@@ -432,17 +439,15 @@ def _GetStdioLogTests(stdio_log_url, tests_failed_list):
     that contains the test result. We use a list for the test result to mirror
     the format used by the test-result server.
 
-    If a test is in the |tests_failed_list|, then set the test result to the
-    the failure code: 'Q'. Otherwise, set result to the pass code: 'P'. The
-    result repetition count of '999' is a placeholder that indicates that the
-    value is not from the test-result server.
+    If a test is in the |tests_failed_list|, then set the test result to
+    'Fail'. Otherwise, set result to 'Pass'.
 
     Here is the format of the dictionary:
     {
-      MaybeSetMetadata/SafeBrowseService.MalwareImg/1: [[999, 'P']],
-      MaybeSetMetadata/SafeBrowseService.MalwareImg/2: [[999, 'Q']],
-      PlatformAppBrowserTest.ComponentBackgroundPage: [[999, 'P']],
-      NoSessionRestoreTest.LocalStorageClearedOnExit: [[999, 'P']]
+      MaybeSetMetadata/SafeBrowseService.MalwareImg/1: 'Pass',
+      MaybeSetMetadata/SafeBrowseService.MalwareImg/2: 'Fail',
+      PlatformAppBrowserTest.ComponentBackgroundPage: 'Pass',
+      NoSessionRestoreTest.LocalStorageClearedOnExit: 'Pass']
     }
 
   Args:
@@ -485,9 +490,9 @@ def _GetStdioLogTests(stdio_log_url, tests_failed_list):
     if m:
       long_test_name = m.group(1)
       if long_test_name in tests_failed_list:
-        test_result = [[999, u'Q']]  # Test result Failed code 'Q'.
+        test_result = _FAIL  # Test Result Failed.
       else:
-        test_result = [[999, u'P']]  # Test result Passed code 'P'.
+        test_result = _PASS  # Test Result Passed.
       stdio_tests_dict[long_test_name] = test_result
     else:
       print('Error: Invalid test line %s) %s' % (i, line.strip()))
@@ -533,127 +538,16 @@ def _RunAndNotrunTests(stdio_tests, user_tests):
   return run_user_tests, notrun_user_tests
 
 
-def _GetTestResultsJson(master, builder_name, test_type):
-  """Get test results data from results.json file for the builder.
-
-  The results.json file contains historical data about the tests run on the
-  given |builder_name| for the most recent (up to the last 500) builds. The
-  data includes test names, test result codes, build numbers, and chrome
-  revision numbers.
-
-  Args:
-    master: Master repo (e.g., 'ChromiumChromiumOS')
-    builder_name: Builder name (e.g., 'Linux ChromiumOS Tests (dbg)(1)')
-    test_type: Type of browsertests: browser_tests or interactive_ui_tests
-
-  Returns:
-    Contents of the results.json file from the test-result server for the
-    specified builder.
-  """
-  # Generate percent-encoded test results url for specified builder.
-  results_url = (('https://%s/testfile?master=%s&builder=%s'
-                  '&testtype=%s&name=results.json') %
-                 (urllib2.quote(_TR_HOST), urllib2.quote(master),
-                  urllib2.quote(builder_name), urllib2.quote(test_type)))
-
-  # Fetch results file from test results url.
-  print('Fetching test results file from %s' % results_url)
-  try:
-    url = urllib2.urlopen(results_url)
-    results_json = url.read()
-    url.close()
-  except urllib2.HTTPError:
-    results_json = None
-    print(('  Warning: test-result history was not available '
-           'for builder \'%s\'.\n' % builder_name))
-  return results_json
-
-
-def _CreateTestsResultsDictionary(tr_tests_dict):
-  """Create dictionary of all tests+results from the given tests dictionary.
-
-  Parse individual tests and results from the |tr_tests_dict|, and place them
-  into a flattened tests results dictionary. Most tests are standalone, and
-  keyed by their test name. Some tests belong to a testinstance group, and are
-  keyed by their testinstance group name, then the testinstance number
-  (e.g., '0', '1', '2'), and finally the test name.
-
-  For example, a standalone test:result is formatted thus:
-  "BookmarksTest.CommandOpensBookmarksTab": {
-    "results": [...]
-    "times": [...]
-  }
-
-  Tests grouped under a testinstance, are formatted thus:
-  "KioskUpdateSuite": {
-    "KioskUpdateTest.PermissionChange": {
-      "1": {
-        "results": [...],
-        "times": [...]
-      }
-    "KioskUpdateTest.PermissionChange": {
-      "0": {
-        "results": [...],
-        "times": [...]
-      }
-    }
-
-  The flattened test results dictionary is formatted thus:
-    {
-      BookmarksTest.CommandOpensBookmarksTab: [[60, u'Q'], [440, u'P']],
-      KioskUpdateTest.PermissionChange/0: [[498, u'P'], [2, u'Q']]
-      KioskUpdateTest.PermissionChange/1: [[493, u'P'], [7, u'Q']]
-    }
-
-  Args:
-    tr_tests_dict: Dictionary of test groups & tests.
-
-  Returns:
-    Dictionary of flattened tests and their results.
-  """
-  tests_results_dict = {}
-  standalone = 0
-  group = 0
-  subtest = 0
-
-  for group_name in tr_tests_dict:
-    test_group = tr_tests_dict[group_name]
-    if '.' in group_name:
-      standalone += 1
-      test_result = test_group['results']
-      tests_results_dict[group_name] = test_result
-    else:
-      group += 1
-      for test_name in test_group.keys():
-        test_values = test_group[test_name]
-        for value in test_values.keys():
-          subtest += 1
-          test_result = test_values[value]['results']
-          long_test_name = '%s/%s/%s' % (group_name, test_name, value)
-          tests_results_dict[long_test_name] = test_result
-
-  print('  Number of standalone tests: %s' % standalone)
-  print('  Number of instance tests (in %s groups): %s' % (group, subtest))
-  print('  Total tests results: %s\n' % len(tests_results_dict))
-
-  return tests_results_dict
-
-
-def _CreateUserTestsResults(run_user_tests, stdio_tests_dict,
-                            tests_results_dict):
+def _CreateUserTestsResults(run_user_tests, stdio_tests_dict):
   """Create dictionary of tests results for all user-specified tests.
 
-  If a user test is failed in the build status given by |stdio_tests_dict|,
-  then set the test result to failed code: 'Q'. If a user test is in the test
-  results given by |test_results_dict|, then use those results. Otherwise,
-  use the test result given by |stdio_tests_dict|. If a user test is missing
-  from both |stdio_tests_dict| and |test_results_dict|, then set the test
-  test result to missing code: 'O'.
+  If a user test is in the build status given by |stdio_tests_dict|, then
+  use the test result stored in |stdio_tests_dict|. Otherwise, set the test
+  test result to 'Missing'.
 
   Args:
     run_user_tests: List of run instances of user specified tests.
     stdio_tests_dict: builder's results.json test results.
-    tests_results_dict: test results from the tests-results server.
 
   Returns:
     Dictionary of tests and results for all user specified tests.
@@ -661,15 +555,10 @@ def _CreateUserTestsResults(run_user_tests, stdio_tests_dict,
   user_tests_results_dict = {}
   # Iterate over tests in the run user-specified tests list.
   for test_name in run_user_tests:
-    if (test_name in stdio_tests_dict and
-        stdio_tests_dict[test_name] == [[999, u'Q']]):
-      test_result = stdio_tests_dict[test_name]
-    elif test_name in tests_results_dict:  # Use test-results server results.
-      test_result = tests_results_dict[test_name]
-    elif test_name in stdio_tests_dict:  # Use builder results.json results.
+    if test_name in stdio_tests_dict:  # Use result from builder results.json.
       test_result = stdio_tests_dict[test_name]
     else:
-      test_result = [[999, u'O']]  # Set result to missing.
+      test_result = 'Missing'  # Set result to missing.
     user_tests_results_dict[test_name] = test_result
   return user_tests_results_dict
 
@@ -683,25 +572,15 @@ def _CreateResultOfTests(user_tests_results_dict):
   Returns:
     Dictionary of results of tests.
   """
-  # Test result type lists.
-  missing = ['O']
-  passed = ['P']
-  fails = [key for key in _RESULT_TYPES if key not in missing+passed]
-
   failed_tests = []
   passed_tests = []
-  missing_tests = []
   for test in user_tests_results_dict:
-    result = user_tests_results_dict[test][0][1]
-    if result in fails:
-      failed_tests.append(test)
-    elif result in passed:
+    result = user_tests_results_dict[test]
+    if result == _PASS:
       passed_tests.append(test)
-    elif result in missing:
-      missing_tests.append(test)
-  return {_FAILED: failed_tests,
-          _PASSED: passed_tests,
-          _MISSING: missing_tests}
+    elif result == _FAIL:
+      failed_tests.append(test)
+  return {_FAILED: failed_tests, _PASSED: passed_tests}
 
 
 def _ReportTestsByResult(result_of_tests_dict, tr_dict, rout, rdir):
@@ -715,12 +594,11 @@ def _ReportTestsByResult(result_of_tests_dict, tr_dict, rout, rdir):
   """
   # Test report result types and section headers.
   report_results_headers = {
-      _NOTRUN: 'Test Status: Not Run',
-      _FAILED: 'Test Result: Fail or other Error',
-      _PASSED: 'Test Result: Passed recently',
-      _MISSING: 'Test Result: Passing long-term'
+      _NOTRUN: 'Test Status: Missing',
+      _FAILED: 'Test Result: Failed or other Error',
+      _PASSED: 'Test Result: Passed'
   }
-  report_section_order = [_NOTRUN, _FAILED, _PASSED, _MISSING]
+  report_section_order = [_NOTRUN, _FAILED, _PASSED]
 
   if rout:
     ofile = open(rdir+'/report', 'w')
@@ -732,9 +610,9 @@ def _ReportTestsByResult(result_of_tests_dict, tr_dict, rout, rdir):
       ofile.write('%s (%s)\n' % (header, len(tests)))
     for num, test in enumerate(sorted(tests)):
       if test in tr_dict:
-        print('  %s) %s: %s' % (num+1, test, tr_dict[test][0:2]))
+        print('  %s) %s' % (num+1, test))
         if rout:
-          ofile.write('  %s) %s: %s\n' % (num+1, test, tr_dict[test]))
+          ofile.write('  %s) %s\n' % (num+1, test))
       else:
         print('  %s) %s' % (num+1, test))
         if rout:
@@ -774,9 +652,6 @@ def main():
   parser.add_argument('--report_dir', dest='report_dir', default=_REPORT_DIR,
                       help=('Specify path to report directory '
                             '(default is %s).' % _REPORT_DIR))
-  parser.add_argument('--master', dest='master', default=_TR_MASTER,
-                      help=('Specify build master repository '
-                            '(default is %s).' % _TR_MASTER))
   parser.add_argument('--builder_host', dest='builder_host',
                       default=_BUILDER_HOST,
                       help=('Specify builder host name '
@@ -801,8 +676,6 @@ def main():
   parser.add_argument('--version', dest='cr_version', default=None,
                       help=('Specify chromium version number '
                             '(default is None).'))
-  parser.add_argument('--print_types', dest='print_types',
-                      action='store_true', help='Print test result types.')
   arguments = parser.parse_args()
 
   ### Set parameters from CLI arguments, and check for valid values.
@@ -810,20 +683,12 @@ def main():
   tests_file = arguments.tests_file
   report_out = arguments.report_out
   report_dir = arguments.report_dir
-  master = arguments.master
   builder_host = arguments.builder_host
   builder_proj = arguments.builder_project
   builder_name = arguments.builder_name
   build_num = arguments.build_num
   test_type = arguments.test_type
   cr_version = arguments.cr_version
-  print_types = arguments.print_types
-
-  # Print map of test result types and exit.
-  if print_types:
-    print('Test result types:')
-    print(json.dumps(_RESULT_TYPES, indent=4))
-    sys.exit(0)
 
   # Ensure default or user-defined |tests_file| points to a real file.
   if not os.path.isfile(tests_file):
@@ -834,12 +699,6 @@ def main():
   if not os.path.exists(report_dir):
     print(('Error: Could not find report directory. '
            'Try passing in --report_dir.'))
-    sys.exit(2)
-
-  # Verify that user gave |build_num| or |cr_version|, but not both.
-  if build_num != _BUILD_NUMBER and cr_version:
-    print(('Error: You may specify the build_num or the cr_version, '
-           'but not both.'))
     sys.exit(2)
 
   # Verify user gave valid |test_type|.
@@ -865,25 +724,14 @@ def main():
   # Get list of available builds from builder.
   builds_list = _GetBuildsList(build_dict)
 
-  # Find the latest completed build by chromium version.
-  if cr_version:
-    build_num = _FindBuildByChromiumVersion(build_dict)
-
   # Set nominal build_num from builds available in |builds_list|.
   build_dict['build_num'] = _GetNominalBuildNumber(build_num, builds_list)
 
   # Get number of latest completed build, and update build_dict with it.
   build_num, build_test_status_dict = (
-      _LatestCompletedBuild(build_dict, builds_list))
+      _LatestCompletedBuildByVersion(build_dict, builds_list))
   build_dict['build_num'] = build_num
-
-  ### Get build status from the builder for the build number.
-  # Get the build status of the latest completed build.
   build_status_dict = _GetBuildStatus(build_dict)
-
-  # Extract the build properties, and print chromium version.
-  build_properties = build_status_dict['properties']
-  _PrintChromiumVersion(build_properties)
 
   ### Get test status from the builder for the build number.
   # Get list of failed tests from build status.
@@ -900,23 +748,12 @@ def main():
   run_user_tests, notrun_user_tests = (
       _RunAndNotrunTests(stdio_tests_dict, user_tests))
 
-  ### Read test results from test-results server for the builder.
-  test_results_json = _GetTestResultsJson(master, builder_name, test_type)
-  if test_results_json:
-    # Extract tests results dictionary from results json for builder.
-    tr_tests_dict = json.loads(test_results_json)[builder_name]['tests']
-    tests_results_dict = _CreateTestsResultsDictionary(tr_tests_dict)
-  else:
-    # Extract test results from stdio tests dictionary.
-    tests_results_dict = stdio_tests_dict
-
-  ### Combine run user tests, build test status, and test results into a
-  ### single dictionary of user tests and their results, and then into a
-  ### dictionary of results and their tests.
+  ### Combine run user tests and build test status into a single dictionary
+  ### of user tests and their results, and then into a dictionary of results
+  ### and their tests.
   # Create dictionary of run user test instances and results.
   user_tests_results_dict = (
-      _CreateUserTestsResults(run_user_tests, stdio_tests_dict,
-                              tests_results_dict))
+      _CreateUserTestsResults(run_user_tests, stdio_tests_dict))
 
   # Create dictionary of run tests that are failed, passed, and missing.
   result_of_tests_dict = _CreateResultOfTests(user_tests_results_dict)
@@ -926,7 +763,7 @@ def main():
 
   ### Output report of tests grouped by result. Result types are notrun,
   ### failed, passed, and missing
-  _ReportTestsByResult(result_of_tests_dict, tests_results_dict,
+  _ReportTestsByResult(result_of_tests_dict, stdio_tests_dict,
                        report_out, report_dir)
 
 if __name__ == '__main__':
