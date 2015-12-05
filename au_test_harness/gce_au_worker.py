@@ -66,6 +66,7 @@ import datetime
 import json
 import os
 import shutil
+import tempfile
 import time
 
 from functools import partial
@@ -117,6 +118,7 @@ class GCEAUWorker(au_worker.AUWorker):
     super(GCEAUWorker, self).__init__(options, test_results_root)
     self.gce_context = gce.GceContext.ForServiceAccountThreadSafe(
         project, zone, json_key_file=json_key_file)
+    self.json_key_file = json_key_file
     self.gscontext = gs.GSContext()
     self.network = network
     self.machine_type = machine_type
@@ -234,18 +236,29 @@ class GCEAUWorker(au_worker.AUWorker):
         test, log_directory_base, fail_directory_base)
     log_directory_in_chroot = log_directory.rpartition('chroot')[2]
 
-    cmd = ['test_that', '-b', self.board, '--no-quickmerge',
-           '--results_dir=%s' % log_directory_in_chroot, remote, test]
-    if self.ssh_private_key is not None:
-      cmd.append('--ssh_private_key=%s' %
-                 path_util.ToChrootPath(self.ssh_private_key))
+    # Copy GCE key file in a temporary file inside the chroot and
+    # make sure to remove it before return.
+    with tempfile.NamedTemporaryFile(
+        dir=path_util.FromChrootPath('/tmp')) as gce_key_copy:
+      shutil.copy(self.json_key_file, gce_key_copy.name)
+
+      args = 'gce_project=%s gce_zone=%s gce_instance=%s gce_key_file=%s' % (
+          self.gce_context.project, self.gce_context.zone, self.instances[test],
+          path_util.ToChrootPath(gce_key_copy.name))
+
+      cmd = ['test_that', '-b', self.board, '--no-quickmerge',
+             '--results_dir=%s' % log_directory_in_chroot, remote, test,
+             '--args=%s' % args]
+      if self.ssh_private_key is not None:
+        cmd.append('--ssh_private_key=%s' %
+                   path_util.ToChrootPath(self.ssh_private_key))
 
       result = cros_build_lib.RunCommand(cmd, error_code_ok=True,
                                          enter_chroot=True,
                                          redirect_stdout=True,
                                          cwd=constants.CROSUTILS_DIR)
       percent_passed = self.ParseGeneratedTestOutput(result.output)
-    return test, percent_passed, result.output
+      return test, percent_passed, result.output
 
   def _GetResultsDirectoryForTest(self, test, log_directory_base,
                                   fail_directory_base):
