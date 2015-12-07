@@ -19,9 +19,3 @@ install:
 	ln ${DESTDIR}/usr/bin/bootperf ${DESTDIR}/usr/bin/showbootdata
 	install -m 0644 unit_test_black_list.txt \
 		"${DESTDIR}/usr/share/crostestutils"
-	install -m 0755 utils_py/generate_test_report.py \
-		"${DESTDIR}/usr/lib/crostestutils"
-
-	# Make symlinks for those python files in lib.
-	ln -s "${DESTDIR}/usr/lib/crostestutils/generate_test_report.py" \
-		"${DESTDIR}/usr/bin/generate_test_report"
