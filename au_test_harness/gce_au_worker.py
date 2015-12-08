@@ -381,6 +381,12 @@ class GCEAUWorker(au_worker.AUWorker):
       self._HandleFail(log_directory, fail_directory)
       raise update_exception.UpdateException(1, 'Update failed. Error: %r' % e)
 
+  def _CreateInstance(self, name, image, **kwargs):
+    """Creates a single VM instance with a static IP address."""
+    address = self.gce_context.CreateAddress(name)
+    return self.gce_context.CreateInstance(name, image, static_address=address,
+                                           **kwargs)
+
   def _CreateInstances(self):
     """Creates instances with custom flags as specificed in |self.tests|."""
     steps = []
@@ -390,7 +396,7 @@ class GCEAUWorker(au_worker.AUWorker):
       instance = '%s%s' % (self.INSTANCE_PREFIX, ts)
       kwargs = test['flags'].copy()
       kwargs['description'] = 'For test %s' % test['name']
-      steps.append(partial(self.gce_context.CreateInstance, instance,
+      steps.append(partial(self._CreateInstance, instance,
                            self.image_link, network=self.network,
                            machine_type=self.machine_type, **kwargs))
       self.instances[test['name']] = instance
@@ -422,8 +428,13 @@ class GCEAUWorker(au_worker.AUWorker):
     if existence_checker(resource):
       deletor(resource)
 
+  def _DeleteInstance(self, name):
+    """Deletes a VM instance and its IP address."""
+    self.gce_context.DeleteInstance(name)
+    self.gce_context.DeleteAddress(name)
+
   def _DeleteExistingResources(self):
-    """Delete instances, image and the tarball on GCS if they exist."""
+    """Deletes instances, image and the tarball on GCS if they exist."""
     steps = []
 
     if self.tarball_remote:
@@ -437,7 +448,7 @@ class GCEAUWorker(au_worker.AUWorker):
           self._DeleteExistingResouce,
           resource=instance,
           existence_checker=self.gce_context.InstanceExists,
-          deletor=self.gce_context.DeleteInstance))
+          deletor=self._DeleteInstance))
 
     # Delete all resources in parallel.
     try:
