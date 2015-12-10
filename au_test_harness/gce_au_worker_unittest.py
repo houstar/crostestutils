@@ -209,8 +209,11 @@ class GceAuWorkerTest(cros_test_lib.MockTempDirTestCase):
         return '3.3.3.3'
 
     def _OverrideRunCommand(cmd, *unused_args, **unused_kwargs):
-      remote = cmd[-3]
-      test = cmd[-2]
+      """A mock of cros_build_lib.RunCommand that injects arguments."""
+      # In this test setup, |test| and |remote| should be the third and fourth
+      # last argument respectively.
+      test = cmd[-3]
+      remote = cmd[-4]
       actual_tests_run.append(dict(remote=remote, test=test))
       return cros_build_lib.CommandResult()
 
