@@ -200,7 +200,7 @@ class GceAuWorkerTest(cros_test_lib.MockTempDirTestCase):
     ]
     actual_tests_run = []
 
-    def _OverrideGetInstanceIP(instance, *unused_args, **unused_kwargs):
+    def _OverrideGetInstanceIP(instance, *_args, **_kwargs):
       if instance == 'instance_1':
         return '1.1.1.1'
       elif instance == 'instance_2':
@@ -208,7 +208,7 @@ class GceAuWorkerTest(cros_test_lib.MockTempDirTestCase):
       else:
         return '3.3.3.3'
 
-    def _OverrideRunCommand(cmd, *unused_args, **unused_kwargs):
+    def _OverrideRunCommand(cmd, *_args, **_kwargs):
       """A mock of cros_build_lib.RunCommand that injects arguments."""
       # In this test setup, |test| and |remote| should be the third and fourth
       # last argument respectively.
@@ -217,7 +217,7 @@ class GceAuWorkerTest(cros_test_lib.MockTempDirTestCase):
       actual_tests_run.append(dict(remote=remote, test=test))
       return cros_build_lib.CommandResult()
 
-    def _OverrideRunParallelSteps(steps, *unused_args, **unused_kwargs):
+    def _OverrideRunParallelSteps(steps, *_args, **_kwargs):
       """Run steps sequentially."""
       return_values = []
       for step in steps:
