@@ -56,7 +56,7 @@ list_10=(veyron_speedy veyron_minnie veyron_mickey)
 list_11=(veyron_mighty veyron_jaq veyron_jerry)
 
 # Intel Stonepeak2 on kernel 3.18
-list_12=(cyan celes glados)
+list_12=(cyan celes glados ultima reks chell)
 
 DESIRED_BOARDS=(list_1 list_2 list_3 list_4 list_5 list_6 list_7 list_8 list_9
                 list_10 list_11 list_12)
